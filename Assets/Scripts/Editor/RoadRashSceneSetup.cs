@@ -1,6 +1,10 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
 namespace RacingGame.Editor
@@ -24,10 +28,27 @@ namespace RacingGame.Editor
             mainCam.orthographicSize = 5f;
             mainCam.transform.position = new Vector3(0f, 0f, -10f);
 
+            UniversalAdditionalCameraData camData = mainCam.GetComponent<UniversalAdditionalCameraData>();
+            if (camData == null) camData = mainCam.gameObject.AddComponent<UniversalAdditionalCameraData>();
+            camData.renderPostProcessing = true;
+            camData.volumeLayerMask = ~0;
+
             DestroyIfExists("GameManager");
             DestroyIfExists("WaypointTrack");
             DestroyIfExists("PlayerCar");
             DestroyIfExists("RoadRashRenderer2D");
+            DestroyIfExists("Global PostProcess Volume");
+            DestroyIfExists("EventSystem");
+
+            GameObject esObj = new GameObject("EventSystem");
+            esObj.AddComponent<EventSystem>();
+            esObj.AddComponent<InputSystemUIInputModule>();
+
+            VolumeProfile profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/Settings/DefaultVolumeProfile.asset");
+            GameObject volObj = new GameObject("Global PostProcess Volume");
+            Volume vol = volObj.AddComponent<Volume>();
+            vol.isGlobal = true;
+            vol.sharedProfile = profile;
 
             GameObject trackObj = new GameObject("WaypointTrack");
             WaypointTrack track = trackObj.AddComponent<WaypointTrack>();
@@ -35,10 +56,11 @@ namespace RacingGame.Editor
 
             GameObject carObj = new GameObject("PlayerCar");
             Car playerCar = carObj.AddComponent<Car>();
-            playerCar.ConfigureIdentity(true, new Color(0.95f, 0.24f, 0.24f));
+            playerCar.ConfigureIdentity(true, RoadRashVisualTheme.PlayerJacketBlue);
 
             GameObject rendererObj = new GameObject("RoadRashRenderer2D");
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
+            rendererObj.AddComponent<RaceVfxController>();
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
 
             GameObject gmObj = new GameObject("GameManager");
@@ -50,6 +72,9 @@ namespace RacingGame.Editor
             GameManager gm = gmObj.AddComponent<GameManager>();
             LapCheckpointManager lapManager = gmObj.AddComponent<LapCheckpointManager>();
             RaceHUD raceHud = gmObj.AddComponent<RaceHUD>();
+            GameMenuUI menuUi = gmObj.AddComponent<GameMenuUI>();
+            RaceAudioController audioCtrl = gmObj.AddComponent<RaceAudioController>();
+
             SerializedObject gmSo = new SerializedObject(gm);
             gmSo.FindProperty("track").objectReferenceValue = track;
             gmSo.FindProperty("playerCar").objectReferenceValue = playerCar;
@@ -58,11 +83,13 @@ namespace RacingGame.Editor
             gmSo.FindProperty("roadRenderer").objectReferenceValue = roadRenderer;
             gmSo.FindProperty("lapManager").objectReferenceValue = lapManager;
             gmSo.FindProperty("raceHud").objectReferenceValue = raceHud;
+            gmSo.FindProperty("menuUi").objectReferenceValue = menuUi;
+            gmSo.FindProperty("audioController").objectReferenceValue = audioCtrl;
             gmSo.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log("[RoadRashSceneSetup] SampleScene configured for Loop 5 (LapCheckpointManager + RaceHUD).");
+            Debug.Log("[RoadRashSceneSetup] SampleScene configured with URP Post-Processing, Road Rash Graphics, and Kick Combat.");
         }
 
         private static void DestroyIfExists(string name)

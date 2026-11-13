@@ -24,6 +24,13 @@ namespace RacingGame
         private VehicleInput _lastInput;
         private Vector2 _previousPosition;
 
+        private float _kickTimer;
+        private float _kickDuration = 0.34f;
+        private float _kickCooldownTimer;
+        private int _kickDirection = 1;
+        private bool _kickHitLanded;
+        private float _hitStaggerTimer;
+
         public VehiclePhysics Physics => physics;
         /// <summary>Position at the start of the last physics step (used for checkpoint crossing).</summary>
         public Vector2 PreviousPosition => _previousPosition;
@@ -39,6 +46,17 @@ namespace RacingGame
         public float LeanAngle => _leanAngle;
         public VehicleInput LastInput => _lastInput;
 
+        public bool IsKicking => _kickTimer > 0f;
+        public int KickDirection => _kickDirection;
+        public float KickProgress => _kickDuration > 0f && _kickTimer > 0f
+            ? 1f - (_kickTimer / _kickDuration)
+            : 0f;
+        public float KickCooldownRemaining => _kickCooldownTimer;
+        public bool CanKick => _kickTimer <= 0f && _kickCooldownTimer <= 0f && _hitStaggerTimer <= 0f;
+        public bool HasKickHitThisSwing => _kickHitLanded;
+        public bool IsStaggered => _hitStaggerTimer > 0f;
+        public float HitStaggerRemaining => _hitStaggerTimer;
+
         public void ConfigureIdentity(bool playerFlag, Color color)
         {
             isPlayer = playerFlag;
@@ -52,6 +70,7 @@ namespace RacingGame
             _previousPosition = startPos;
             _leanAngle = 0f;
             _lastInput = default;
+            ResetCombatState();
 
             if (_driver != null)
             {
@@ -68,18 +87,57 @@ namespace RacingGame
             _previousPosition = pos;
             _leanAngle = 0f;
             _lastInput = default;
+            ResetCombatState();
             UpdateTrackProjection(track);
             SyncTransform();
+        }
+
+        public bool TryStartKick(int direction, float duration = 0.34f, float cooldown = 0.58f)
+        {
+            if (!CanKick) return false;
+            _kickDuration = Mathf.Max(0.1f, duration);
+            _kickTimer = _kickDuration;
+            _kickCooldownTimer = Mathf.Max(_kickDuration, cooldown);
+            _kickDirection = direction >= 0 ? 1 : -1;
+            _kickHitLanded = false;
+            return true;
+        }
+
+        public void MarkKickHit()
+        {
+            _kickHitLanded = true;
+        }
+
+        public void ReceiveKick(int kickDir, Vector2 lateralImpulse, float staggerDuration = 0.45f)
+        {
+            _kickTimer = 0f;
+            _hitStaggerTimer = Mathf.Max(_hitStaggerTimer, staggerDuration);
+            physics.ApplyVelocityImpulse(lateralImpulse);
+            physics.ScaleVelocity(0.84f);
+            _leanAngle = Mathf.Clamp((kickDir >= 0 ? 1f : -1f) * 0.9f, -1f, 1f);
+        }
+
+        private void ResetCombatState()
+        {
+            _kickTimer = 0f;
+            _kickCooldownTimer = 0f;
+            _kickHitLanded = false;
+            _hitStaggerTimer = 0f;
         }
 
         public void StepPhysics(float dt, WaypointTrack track)
         {
             if (physics == null || dt <= 0f) return;
 
+            if (_kickTimer > 0f) _kickTimer = Mathf.Max(0f, _kickTimer - dt);
+            if (_kickCooldownTimer > 0f) _kickCooldownTimer = Mathf.Max(0f, _kickCooldownTimer - dt);
+            if (_hitStaggerTimer > 0f) _hitStaggerTimer = Mathf.Max(0f, _hitStaggerTimer - dt);
+
             _previousPosition = physics.Position;
             _lastInput = _driver != null ? _driver.DecideInput(this, track) : default;
 
-            physics.ApplyThrottle(_lastInput.throttle);
+            float throttle = _hitStaggerTimer > 0f ? _lastInput.throttle * 0.55f : _lastInput.throttle;
+            physics.ApplyThrottle(throttle);
             physics.ApplyBrake(_lastInput.brake);
             physics.ApplySteering(_lastInput.steering);
 
