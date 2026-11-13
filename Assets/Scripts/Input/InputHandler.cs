@@ -4,17 +4,17 @@ using UnityEngine.InputSystem;
 namespace RacingGame
 {
     /// <summary>
-    /// Reads keyboard input via Unity's InputSystem and translates it into VehicleInput
-    /// for the player-controlled Car.
+    /// Reads keyboard input via Unity's InputSystem and converts it into VehicleInput.
+    /// Used by PlayerDriver (composition).
     /// </summary>
-    public class InputHandler : MonoBehaviour, IVehicleDriver
+    public class InputHandler : MonoBehaviour
     {
         [Header("Steering Smoothing")]
-        public float steerResponseSpeed = 9f;
+        [SerializeField] private float steerResponseSpeed = 9f;
 
         private float _smoothedSteer;
 
-        public VehicleInput DecideInput(Car car, WaypointTrack track)
+        public VehicleInput ReadInput()
         {
             Keyboard kb = Keyboard.current;
             if (kb == null)
@@ -33,6 +33,11 @@ namespace RacingGame
             _smoothedSteer = Mathf.MoveTowards(_smoothedSteer, rawSteer, steerResponseSpeed * dt);
 
             return new VehicleInput(throttle, brake, _smoothedSteer);
+        }
+
+        public void ResetState()
+        {
+            _smoothedSteer = 0f;
         }
     }
 }

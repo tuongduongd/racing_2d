@@ -5,34 +5,37 @@ namespace RacingGame
 {
     /// <summary>
     /// Renders a Road Rash-style 2D pseudo-3D behind-the-vehicle perspective view
-    /// driven by the underlying 2D WaypointTrack and VehiclePhysics simulation.
-    /// Also renders a compact 2D top-down minimap in the top-right corner.
+    /// including the scrolling curved track, player motorcycle, AI opponent motorcycles
+    /// scaled by perspective distance, and a 2D minimap of all racers.
     /// </summary>
     public class RoadRashRenderer2D : MonoBehaviour
     {
         [Header("References")]
-        public Camera targetCamera;
-        public WaypointTrack track;
-        public Car playerCar;
+        [SerializeField] private Camera targetCamera;
+        [SerializeField] private WaypointTrack track;
+        [SerializeField] private Car playerCar;
 
         [Header("Pseudo-3D Projection")]
-        public int sliceCount = 85;
-        public float sliceStep = 2.0f;
-        public float cameraHeight = 2.6f;
-        public float cameraDepth = 0.85f;
-        public float curveVisualGain = 2.4f;
-        public float hillVisualGain = 0.045f;
+        [SerializeField] private int sliceCount = 85;
+        [SerializeField] private float sliceStep = 2.0f;
+        [SerializeField] private float cameraHeight = 2.6f;
+        [SerializeField] private float cameraDepth = 0.85f;
+        [SerializeField] private float curveVisualGain = 2.4f;
+        [SerializeField] private float hillVisualGain = 0.045f;
 
         [Header("Colors")]
-        public Color skyTopColor = new Color(0.12f, 0.36f, 0.78f);
-        public Color skyHorizonColor = new Color(0.62f, 0.84f, 0.98f);
-        public Color hillColor = new Color(0.16f, 0.35f, 0.25f);
-        public Color grassLight = new Color(0.18f, 0.56f, 0.24f);
-        public Color grassDark = new Color(0.14f, 0.46f, 0.19f);
-        public Color roadLight = new Color(0.24f, 0.25f, 0.28f);
-        public Color roadDark = new Color(0.20f, 0.21f, 0.24f);
-        public Color curbLight = new Color(0.95f, 0.95f, 0.95f);
-        public Color curbDark = new Color(0.86f, 0.18f, 0.18f);
+        [SerializeField] private Color skyTopColor = new Color(0.12f, 0.36f, 0.78f);
+        [SerializeField] private Color skyHorizonColor = new Color(0.62f, 0.84f, 0.98f);
+        [SerializeField] private Color hillColor = new Color(0.16f, 0.35f, 0.25f);
+        [SerializeField] private Color grassLight = new Color(0.18f, 0.56f, 0.24f);
+        [SerializeField] private Color grassDark = new Color(0.14f, 0.46f, 0.19f);
+        [SerializeField] private Color roadLight = new Color(0.24f, 0.25f, 0.28f);
+        [SerializeField] private Color roadDark = new Color(0.20f, 0.21f, 0.24f);
+        [SerializeField] private Color curbLight = new Color(0.95f, 0.95f, 0.95f);
+        [SerializeField] private Color curbDark = new Color(0.86f, 0.18f, 0.18f);
+
+        private readonly List<Car> _allCars = new List<Car>();
+        private readonly List<OpponentSpriteSlot> _opponentPool = new List<OpponentSpriteSlot>();
 
         private Mesh _mesh;
         private MeshFilter _meshFilter;
@@ -41,12 +44,15 @@ namespace RacingGame
         private readonly List<int> _tris = new List<int>(6144);
         private readonly List<Color> _colors = new List<Color>(4096);
 
+        private Sprite _bikeSprite;
+        private Sprite _shadowSprite;
         private SpriteRenderer _bikeRenderer;
         private SpriteRenderer _shadowRenderer;
         private float _horizonScroll;
 
         private struct SliceData
         {
+            public float worldZ;
             public float screenY;
             public float centerX;
             public float roadHalfW;
@@ -55,9 +61,31 @@ namespace RacingGame
             public float worldS;
             public int stripeIndex;
             public bool isStartLine;
+            public bool occluded;
+        }
+
+        private class OpponentSpriteSlot
+        {
+            public SpriteRenderer bike;
+            public SpriteRenderer shadow;
         }
 
         private SliceData[] _slices;
+
+        public void SetSceneReferences(Camera cam, WaypointTrack trackRef, Car player, IReadOnlyList<Car> cars)
+        {
+            targetCamera = cam != null ? cam : Camera.main;
+            track = trackRef;
+            playerCar = player;
+            _allCars.Clear();
+            if (cars != null)
+            {
+                for (int i = 0; i < cars.Count; i++)
+                {
+                    if (cars[i] != null) _allCars.Add(cars[i]);
+                }
+            }
+        }
 
         private void Awake()
         {
@@ -76,6 +104,9 @@ namespace RacingGame
                 targetCamera.transform.rotation = Quaternion.identity;
                 targetCamera.backgroundColor = skyTopColor;
             }
+
+            if (_bikeSprite == null) _bikeSprite = CreateBikeSprite();
+            if (_shadowSprite == null) _shadowSprite = CreateShadowSprite();
 
             if (_meshFilter == null)
             {
@@ -101,15 +132,15 @@ namespace RacingGame
                 GameObject shadowObj = new GameObject("PlayerBikeShadow");
                 shadowObj.transform.SetParent(transform, false);
                 _shadowRenderer = shadowObj.AddComponent<SpriteRenderer>();
-                _shadowRenderer.sprite = CreateShadowSprite();
+                _shadowRenderer.sprite = _shadowSprite;
                 _shadowRenderer.color = new Color(0f, 0f, 0f, 0.45f);
-                _shadowRenderer.sortingOrder = 9;
+                _shadowRenderer.sortingOrder = 499;
 
                 GameObject bikeObj = new GameObject("PlayerBikeSprite");
                 bikeObj.transform.SetParent(transform, false);
                 _bikeRenderer = bikeObj.AddComponent<SpriteRenderer>();
-                _bikeRenderer.sprite = CreateBikeSprite();
-                _bikeRenderer.sortingOrder = 10;
+                _bikeRenderer.sprite = _bikeSprite;
+                _bikeRenderer.sortingOrder = 500;
             }
         }
 
@@ -120,6 +151,7 @@ namespace RacingGame
 
             RenderFrame();
             UpdatePlayerBikeVisual();
+            UpdateOpponentBikeVisuals();
         }
 
         private void RenderFrame()
@@ -130,15 +162,12 @@ namespace RacingGame
 
             float halfH = targetCamera.orthographicSize;
             float halfW = halfH * targetCamera.aspect;
-            float screenW = halfW * 2f;
 
-            // Player track state
-            float baseS = playerCar.trackDistance;
+            float baseS = playerCar.TrackDistance;
             TrackSample playerSample = track.SampleAtDistance(baseS);
-            float headingError = SignedAngleRad(playerSample.tangent, playerCar.physics.Forward);
+            float headingError = SignedAngleRad(playerSample.tangent, playerCar.Physics.Forward);
             float baseElevation = playerSample.elevation;
 
-            // Horizon line sits slightly above screen center
             float horizonY = halfH * 0.18f;
 
             // 1. Sky gradient
@@ -150,16 +179,13 @@ namespace RacingGame
                 skyHorizonColor, skyHorizonColor, skyTopColor, skyTopColor, 0f
             );
 
-            // Distant parallax hills
-            _horizonScroll -= playerCar.physics.ForwardSpeed * headingError * Time.deltaTime * 0.15f;
-            DrawDistantHills(halfW, horizonY, halfH);
+            _horizonScroll -= playerCar.Physics.ForwardSpeed * headingError * Time.deltaTime * 0.15f;
+            DrawDistantHills(halfW, horizonY);
 
-            // 2. Project road slices from near (0) to far (sliceCount - 1)
+            // 2. Project road slices
             float curveAcc = 0f;
             float xOffset = 0f;
-            float playerLatNorm = playerCar.lateralOffset / Mathf.Max(1f, track.trackWidth * 0.5f);
-
-            // Heading error tilts the road vanishing point left/right
+            float playerLatNorm = playerCar.LateralOffset / Mathf.Max(1f, track.TrackWidth * 0.5f);
             float headingShift = Mathf.Tan(Mathf.Clamp(headingError, -0.7f, 0.7f)) * halfW * 0.85f;
 
             int validSlices = 0;
@@ -178,11 +204,11 @@ namespace RacingGame
                 float hillDelta = (sample.elevation - baseElevation) * hillVisualGain * scale;
                 float projY = horizonY - cameraHeight * scale * 2.3f + hillDelta;
 
-                // Clamp above bottom of screen and enforce painter's horizon occlusion
                 if (i == 0) projY = Mathf.Min(projY, -halfH * 0.99f);
+                bool occluded = projY < maxDrawnY;
                 float clampedY = Mathf.Max(projY, maxDrawnY);
 
-                float roadHalfW = (track.trackWidth * 0.5f) * scale * 0.42f;
+                float roadHalfW = (track.TrackWidth * 0.5f) * scale * 0.42f;
                 float curbHalfW = roadHalfW * 1.16f;
                 float centerX = xOffset - playerLatNorm * roadHalfW * 0.95f + headingShift * (i / (float)sliceCount);
 
@@ -191,6 +217,7 @@ namespace RacingGame
 
                 _slices[i] = new SliceData
                 {
+                    worldZ = worldZ,
                     screenY = clampedY,
                     centerX = centerX,
                     roadHalfW = roadHalfW,
@@ -198,14 +225,14 @@ namespace RacingGame
                     scale = scale,
                     worldS = sampleS,
                     stripeIndex = stripe,
-                    isStartLine = isStartLine
+                    isStartLine = isStartLine,
+                    occluded = occluded
                 };
 
                 if (projY > maxDrawnY) maxDrawnY = projY;
                 validSlices++;
             }
 
-            // Draw road strips from near to far (or far to near; non-overlapping in Y)
             for (int i = 0; i < validSlices - 1; i++)
             {
                 SliceData a = _slices[i];
@@ -217,7 +244,6 @@ namespace RacingGame
                 Color curbCol = even ? curbLight : curbDark;
                 Color roadCol = a.isStartLine ? Color.white : (even ? roadLight : roadDark);
 
-                // Grass spanning full screen width
                 AddQuad(
                     new Vector2(-halfW, a.screenY),
                     new Vector2(halfW, a.screenY),
@@ -226,7 +252,6 @@ namespace RacingGame
                     grassCol, grassCol, grassCol, grassCol, 0f
                 );
 
-                // Rumble curbs
                 AddQuad(
                     new Vector2(a.centerX - a.curbHalfW, a.screenY),
                     new Vector2(a.centerX + a.curbHalfW, a.screenY),
@@ -235,7 +260,6 @@ namespace RacingGame
                     curbCol, curbCol, curbCol, curbCol, 0f
                 );
 
-                // Asphalt road
                 AddQuad(
                     new Vector2(a.centerX - a.roadHalfW, a.screenY),
                     new Vector2(a.centerX + a.roadHalfW, a.screenY),
@@ -244,7 +268,6 @@ namespace RacingGame
                     roadCol, roadCol, roadCol, roadCol, 0f
                 );
 
-                // Center dashed lane marker
                 if (even && !a.isStartLine)
                 {
                     float dashA = Mathf.Max(0.015f, a.roadHalfW * 0.045f);
@@ -259,10 +282,11 @@ namespace RacingGame
                 }
             }
 
-            // 3. Draw roadside trees & posts back-to-front for strong sense of speed
+            // 3. Roadside props
             for (int i = validSlices - 2; i >= 1; i--)
             {
                 SliceData s = _slices[i];
+                if (s.occluded) continue;
                 int propSlot = Mathf.FloorToInt(s.worldS / 16f);
                 int prevSlot = Mathf.FloorToInt(_slices[i - 1].worldS / 16f);
                 if (propSlot != prevSlot)
@@ -276,7 +300,7 @@ namespace RacingGame
                 }
             }
 
-            // 4. Top-right 2D Minimap showing the underlying WaypointTrack & player position
+            // 4. Top-right 2D Minimap showing all racers
             DrawMinimap(halfW, halfH);
 
             _mesh.Clear();
@@ -286,7 +310,100 @@ namespace RacingGame
             _mesh.RecalculateBounds();
         }
 
-        private void DrawDistantHills(float halfW, float horizonY, float halfH)
+        private void UpdateOpponentBikeVisuals()
+        {
+            float maxVisibleZ = sliceCount * sliceStep;
+            float totalLen = track.TotalLength;
+            int slotIdx = 0;
+
+            for (int i = 0; i < _allCars.Count; i++)
+            {
+                Car other = _allCars[i];
+                if (other == null || other == playerCar) continue;
+
+                float dz = other.TrackDistance - playerCar.TrackDistance;
+                if (dz < -totalLen * 0.5f) dz += totalLen;
+                if (dz > totalLen * 0.5f) dz -= totalLen;
+
+                // Show opponent bikes within visible range ahead (and slightly beside player)
+                if (dz >= 0.8f && dz <= maxVisibleZ - sliceStep)
+                {
+                    if (TrySampleProjectedSlice(dz, out SliceData slice) && !slice.occluded)
+                    {
+                        OpponentSpriteSlot slot = GetOrCreateOpponentSlot(slotIdx++);
+                        slot.bike.gameObject.SetActive(true);
+                        slot.shadow.gameObject.SetActive(true);
+
+                        float otherLatNorm = other.LateralOffset / Mathf.Max(1f, track.TrackWidth * 0.5f);
+                        float screenX = slice.centerX + otherLatNorm * slice.roadHalfW * 0.95f;
+                        float spriteScale = slice.scale * 2.55f;
+
+                        int order = Mathf.Clamp(480 - Mathf.RoundToInt(dz * 2.5f), 20, 480);
+
+                        slot.bike.transform.position = new Vector3(screenX, slice.screenY, -0.15f);
+                        slot.bike.transform.rotation = Quaternion.Euler(0f, 0f, -other.LeanAngle * 22f);
+                        slot.bike.transform.localScale = Vector3.one * spriteScale;
+                        slot.bike.color = other.BikeColor;
+                        slot.bike.sortingOrder = order;
+
+                        slot.shadow.transform.position = new Vector3(screenX, slice.screenY - 0.04f * slice.scale, -0.1f);
+                        slot.shadow.transform.localScale = new Vector3(2.1f * spriteScale * 0.36f, 0.55f * spriteScale * 0.36f, 1f);
+                        slot.shadow.sortingOrder = order - 1;
+                    }
+                }
+            }
+
+            for (int i = slotIdx; i < _opponentPool.Count; i++)
+            {
+                _opponentPool[i].bike.gameObject.SetActive(false);
+                _opponentPool[i].shadow.gameObject.SetActive(false);
+            }
+        }
+
+        private bool TrySampleProjectedSlice(float dz, out SliceData result)
+        {
+            float fIdx = (dz / sliceStep) - 1f;
+            int idx0 = Mathf.Clamp(Mathf.FloorToInt(fIdx), 0, sliceCount - 2);
+            int idx1 = idx0 + 1;
+            float t = Mathf.Clamp01(fIdx - idx0);
+
+            SliceData a = _slices[idx0];
+            SliceData b = _slices[idx1];
+
+            result = new SliceData
+            {
+                worldZ = dz,
+                screenY = Mathf.Lerp(a.screenY, b.screenY, t),
+                centerX = Mathf.Lerp(a.centerX, b.centerX, t),
+                roadHalfW = Mathf.Lerp(a.roadHalfW, b.roadHalfW, t),
+                curbHalfW = Mathf.Lerp(a.curbHalfW, b.curbHalfW, t),
+                scale = Mathf.Lerp(a.scale, b.scale, t),
+                occluded = a.occluded && b.occluded
+            };
+            return true;
+        }
+
+        private OpponentSpriteSlot GetOrCreateOpponentSlot(int index)
+        {
+            while (_opponentPool.Count <= index)
+            {
+                GameObject shadowObj = new GameObject($"OpponentShadow_{_opponentPool.Count}");
+                shadowObj.transform.SetParent(transform, false);
+                SpriteRenderer shadowSr = shadowObj.AddComponent<SpriteRenderer>();
+                shadowSr.sprite = _shadowSprite;
+                shadowSr.color = new Color(0f, 0f, 0f, 0.42f);
+
+                GameObject bikeObj = new GameObject($"OpponentBike_{_opponentPool.Count}");
+                bikeObj.transform.SetParent(transform, false);
+                SpriteRenderer bikeSr = bikeObj.AddComponent<SpriteRenderer>();
+                bikeSr.sprite = _bikeSprite;
+
+                _opponentPool.Add(new OpponentSpriteSlot { bike = bikeSr, shadow = shadowSr });
+            }
+            return _opponentPool[index];
+        }
+
+        private void DrawDistantHills(float halfW, float horizonY)
         {
             int hillSegments = 12;
             float segW = (halfW * 2f) / hillSegments;
@@ -310,7 +427,6 @@ namespace RacingGame
         {
             if (isTree)
             {
-                // Trunk
                 float tw = 0.14f * scale;
                 float th = 0.65f * scale;
                 Color trunk = new Color(0.38f, 0.24f, 0.12f);
@@ -322,7 +438,6 @@ namespace RacingGame
                     trunk, trunk, trunk, trunk, 0f
                 );
 
-                // Foliage
                 float fw = 0.65f * scale;
                 float fh = 1.25f * scale;
                 Color leaf = new Color(0.10f, 0.42f, 0.16f);
@@ -337,7 +452,6 @@ namespace RacingGame
             }
             else
             {
-                // Highway reflector post
                 float pw = 0.09f * scale;
                 float ph = 0.55f * scale;
                 Color postCol = new Color(0.9f, 0.9f, 0.9f);
@@ -361,15 +475,15 @@ namespace RacingGame
 
         private void DrawMinimap(float halfW, float halfH)
         {
-            if (track == null || track.waypoints == null || track.waypoints.Length < 2) return;
+            IReadOnlyList<Vector2> wps = track.Waypoints;
+            if (wps == null || wps.Count < 2) return;
 
-            // Compute track bounding box
-            Vector2 min = track.waypoints[0];
-            Vector2 max = track.waypoints[0];
-            for (int i = 1; i < track.waypoints.Length; i++)
+            Vector2 min = wps[0];
+            Vector2 max = wps[0];
+            for (int i = 1; i < wps.Count; i++)
             {
-                min = Vector2.Min(min, track.waypoints[i]);
-                max = Vector2.Max(max, track.waypoints[i]);
+                min = Vector2.Min(min, wps[i]);
+                max = Vector2.Max(max, wps[i]);
             }
 
             Vector2 size = max - min;
@@ -377,7 +491,6 @@ namespace RacingGame
             float mapSize = 2.1f;
             Vector2 mapOrigin = new Vector2(halfW - mapSize - 0.35f, halfH - mapSize - 0.35f);
 
-            // Semi-transparent backing box
             Color bg = new Color(0f, 0f, 0f, 0.55f);
             AddQuad(
                 mapOrigin + new Vector2(-0.15f, -0.15f),
@@ -393,24 +506,39 @@ namespace RacingGame
                 return mapOrigin + norm * mapSize;
             }
 
-            // Track loop segments
-            int count = track.waypoints.Length;
+            int count = wps.Count;
             for (int i = 0; i < count; i++)
             {
-                Vector2 a = ToMap(track.waypoints[i]);
-                Vector2 b = ToMap(track.waypoints[(i + 1) % count]);
+                Vector2 a = ToMap(wps[i]);
+                Vector2 b = ToMap(wps[(i + 1) % count]);
                 AddLineQuad(a, b, 0.045f, new Color(0.85f, 0.85f, 0.9f, 0.95f));
             }
 
-            // Player dot
-            Vector2 p = ToMap(playerCar.physics.position);
-            float r = 0.085f;
-            Color pCol = playerCar.isOnTrack ? Color.yellow : Color.red;
+            // Draw AI dots first
+            for (int i = 0; i < _allCars.Count; i++)
+            {
+                Car c = _allCars[i];
+                if (c == null || c == playerCar) continue;
+                Vector2 p = ToMap(c.Physics.Position);
+                float r = 0.065f;
+                AddQuad(
+                    p + new Vector2(-r, -r),
+                    p + new Vector2(r, -r),
+                    p + new Vector2(r, r),
+                    p + new Vector2(-r, r),
+                    c.BikeColor, c.BikeColor, c.BikeColor, c.BikeColor, 0f
+                );
+            }
+
+            // Draw player dot on top
+            Vector2 playerPt = ToMap(playerCar.Physics.Position);
+            float pr = 0.088f;
+            Color pCol = playerCar.IsOnTrack ? Color.yellow : Color.red;
             AddQuad(
-                p + new Vector2(-r, -r),
-                p + new Vector2(r, -r),
-                p + new Vector2(r, r),
-                p + new Vector2(-r, r),
+                playerPt + new Vector2(-pr, -pr),
+                playerPt + new Vector2(pr, -pr),
+                playerPt + new Vector2(pr, pr),
+                playerPt + new Vector2(-pr, pr),
                 pCol, pCol, pCol, pCol, 0f
             );
         }
@@ -419,22 +547,21 @@ namespace RacingGame
         {
             if (_bikeRenderer == null || playerCar == null) return;
 
-            float speedNorm = Mathf.Clamp01(playerCar.physics.Speed / playerCar.physics.maxSpeed);
+            float speedNorm = Mathf.Clamp01(playerCar.Physics.Speed / playerCar.Physics.MaxSpeed);
             float vibe = Mathf.Sin(Time.time * 45f) * 0.025f * speedNorm;
-            if (!playerCar.isOnTrack && playerCar.physics.Speed > 3f)
+            if (!playerCar.IsOnTrack && playerCar.Physics.Speed > 3f)
             {
                 vibe += Mathf.Sin(Time.time * 75f) * 0.055f;
             }
 
             Vector3 bikePos = new Vector3(0f, -3.1f + vibe, -0.2f);
             _bikeRenderer.transform.position = bikePos;
-            _bikeRenderer.transform.rotation = Quaternion.Euler(0f, 0f, -playerCar.leanAngle * 24f);
+            _bikeRenderer.transform.rotation = Quaternion.Euler(0f, 0f, -playerCar.LeanAngle * 24f);
             _bikeRenderer.transform.localScale = Vector3.one * 2.8f;
 
-            // Flash slightly red-tinted when braking
-            _bikeRenderer.color = playerCar.lastInput.brake > 0.1f
+            _bikeRenderer.color = playerCar.LastInput.brake > 0.1f
                 ? new Color(1f, 0.82f, 0.82f, 1f)
-                : Color.white;
+                : playerCar.BikeColor;
 
             if (_shadowRenderer != null)
             {
@@ -445,7 +572,7 @@ namespace RacingGame
 
         private void AddLineQuad(Vector2 a, Vector2 b, float thickness, Color col)
         {
-            Vector2 dir = (b - a);
+            Vector2 dir = b - a;
             if (dir.sqrMagnitude < 0.00001f) return;
             Vector2 perp = new Vector2(-dir.y, dir.x).normalized * (thickness * 0.5f);
             AddQuad(a - perp, a + perp, b + perp, b - perp, col, col, col, col, 0f);
@@ -488,10 +615,10 @@ namespace RacingGame
 
             Color clear = new Color(0f, 0f, 0f, 0f);
             Color tire = new Color(0.12f, 0.12f, 0.14f);
-            Color bikeBody = new Color(0.88f, 0.18f, 0.18f);
+            Color bikeBody = new Color(0.95f, 0.95f, 0.95f);
             Color tailLight = new Color(1f, 0.25f, 0.15f);
             Color leather = new Color(0.18f, 0.20f, 0.26f);
-            Color jacket = new Color(0.15f, 0.45f, 0.90f);
+            Color jacket = new Color(0.85f, 0.88f, 0.96f);
             Color helmet = new Color(0.96f, 0.96f, 0.98f);
             Color visor = new Color(0.1f, 0.14f, 0.2f);
             Color chrome = new Color(0.75f, 0.78f, 0.82f);
@@ -507,22 +634,15 @@ namespace RacingGame
                         if (x >= 0 && x < w && y >= 0 && y < h) tex.SetPixel(x, y, c);
             }
 
-            // Rear tire
             Rect(13, 1, 18, 9, tire);
-            // Exhaust pipes
             Rect(11, 3, 12, 7, chrome);
             Rect(19, 3, 20, 7, chrome);
-            // Fairing & tail
             Rect(11, 8, 20, 15, bikeBody);
             Rect(14, 9, 17, 11, tailLight);
-            // Handlebars
             Rect(8, 16, 23, 17, chrome);
-            // Rider legs
             Rect(11, 10, 13, 17, leather);
             Rect(18, 10, 20, 17, leather);
-            // Rider torso / jacket
             Rect(11, 16, 20, 23, jacket);
-            // Helmet
             Rect(13, 24, 18, 29, helmet);
             Rect(14, 25, 17, 26, visor);
 

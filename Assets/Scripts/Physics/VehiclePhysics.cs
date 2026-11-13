@@ -5,38 +5,49 @@ namespace RacingGame
 {
     /// <summary>
     /// 2D vehicle physics simulation (engine, braking, aerodynamic drag, lateral tire grip,
-    /// and speed-dependent steering). Independent of who is driving (player or AI).
+    /// and speed-dependent steering).
+    /// Encapsulates state and parameters; independent of who is driving (Player or AI).
     /// </summary>
     [Serializable]
     public class VehiclePhysics
     {
         [Header("State")]
-        public Vector2 position;
-        public Vector2 velocity;
+        [SerializeField] private Vector2 position;
+        [SerializeField] private Vector2 velocity;
 
         [Tooltip("Heading angle in radians (0 = +X, PI/2 = +Y).")]
-        public float heading;
+        [SerializeField] private float heading;
 
         [Header("Vehicle Parameters")]
-        public float mass = 220f;
-        public float enginePower = 6200f;
-        public float brakePower = 8500f;
-        public float grip = 8.5f;
-        public float drag = 0.45f;
-        public float rollingResistance = 0.8f;
-        public float maxSpeed = 62f;
-        public float maxReverseSpeed = 8f;
-        public float turnRate = 2.4f;
+        [SerializeField] private float mass = 220f;
+        [SerializeField] private float enginePower = 6200f;
+        [SerializeField] private float brakePower = 8500f;
+        [SerializeField] private float grip = 8.5f;
+        [SerializeField] private float drag = 0.45f;
+        [SerializeField] private float rollingResistance = 0.8f;
+        [SerializeField] private float maxSpeed = 62f;
+        [SerializeField] private float maxReverseSpeed = 8f;
+        [SerializeField] private float turnRate = 2.4f;
 
-        // Current frame inputs (set via ApplyThrottle / ApplyBrake / ApplySteering)
         private float _throttleInput;
         private float _brakeInput;
         private float _steeringInput;
 
-        // Surface modifiers (e.g., off-road grass slows down and reduces grip)
         private float _surfaceDragMultiplier = 1f;
         private float _surfaceGripMultiplier = 1f;
         private float _surfaceMaxSpeedMultiplier = 1f;
+
+        public Vector2 Position => position;
+        public Vector2 Velocity => velocity;
+        public float Heading => heading;
+
+        public float Mass => mass;
+        public float EnginePower => enginePower;
+        public float BrakePower => brakePower;
+        public float Grip => grip;
+        public float Drag => drag;
+        public float MaxSpeed => maxSpeed;
+        public float TurnRate => turnRate;
 
         public Vector2 Forward => new Vector2(Mathf.Cos(heading), Mathf.Sin(heading));
         public Vector2 Right => new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading));
@@ -50,13 +61,22 @@ namespace RacingGame
         {
             position = startPosition;
             velocity = Vector2.zero;
-            heading = startHeadingRad;
+            heading = NormalizeAngle(startHeadingRad);
             _throttleInput = 0f;
             _brakeInput = 0f;
             _steeringInput = 0f;
             _surfaceDragMultiplier = 1f;
             _surfaceGripMultiplier = 1f;
             _surfaceMaxSpeedMultiplier = 1f;
+        }
+
+        public void ConfigureBaseStats(float newMass, float newEnginePower, float newBrakePower, float newGrip, float newMaxSpeed)
+        {
+            mass = Mathf.Max(50f, newMass);
+            enginePower = Mathf.Max(500f, newEnginePower);
+            brakePower = Mathf.Max(500f, newBrakePower);
+            grip = Mathf.Max(1f, newGrip);
+            maxSpeed = Mathf.Max(10f, newMaxSpeed);
         }
 
         public void ApplyThrottle(float amount)
@@ -81,6 +101,38 @@ namespace RacingGame
             _surfaceMaxSpeedMultiplier = Mathf.Clamp(maxSpeedMultiplier, 0.1f, 1.5f);
         }
 
+        /// <summary>
+        /// Applies an external position correction (e.g., track boundary or collision separation).
+        /// </summary>
+        public void TranslatePosition(Vector2 delta)
+        {
+            position += delta;
+        }
+
+        /// <summary>
+        /// Sets position directly in controlled track-projection / respawn scenarios.
+        /// </summary>
+        public void SetPosition(Vector2 newPosition)
+        {
+            position = newPosition;
+        }
+
+        /// <summary>
+        /// Applies an impulse/velocity adjustment (e.g., vehicle-to-vehicle bump).
+        /// </summary>
+        public void ApplyVelocityImpulse(Vector2 deltaVelocity)
+        {
+            velocity += deltaVelocity;
+        }
+
+        /// <summary>
+        /// Scales current velocity (e.g., wall or collision damping).
+        /// </summary>
+        public void ScaleVelocity(float factor)
+        {
+            velocity *= Mathf.Clamp01(factor);
+        }
+
         public void Update(float dt)
         {
             if (dt <= 0f) return;
@@ -92,17 +144,15 @@ namespace RacingGame
             float vForward = Vector2.Dot(velocity, fwd);
             float vLateral = Vector2.Dot(velocity, right);
 
-            // 1. Speed-dependent steering (no spinning in place at zero speed)
+            // 1. Speed-dependent steering (cannot spin in place at zero speed)
             float absForward = Mathf.Abs(vForward);
             float steerSpeedFactor = Mathf.Clamp01(absForward / 6f);
-            // Slightly reduce turn rate at extreme top speed for stability
             float highSpeedStability = Mathf.Lerp(1f, 0.65f, Mathf.Clamp01(absForward / maxSpeed));
             float steerDirection = vForward >= -0.1f ? 1f : -1f;
 
             heading -= _steeringInput * turnRate * steerSpeedFactor * highSpeedStability * steerDirection * dt;
             heading = NormalizeAngle(heading);
 
-            // Recompute basis vectors after steering
             fwd = Forward;
             right = Right;
 
@@ -123,7 +173,6 @@ namespace RacingGame
                 }
                 else if (_throttleInput < 0.05f)
                 {
-                    // Gentle reverse when nearly stopped and holding brake
                     forwardAccel -= brakeDecel * 0.25f;
                 }
             }
@@ -152,7 +201,7 @@ namespace RacingGame
                 vForward = 0f;
             }
 
-            // Clamp forward / reverse speed
+            // Clamp longitudinal speed
             float effectiveMaxSpeed = maxSpeed * _surfaceMaxSpeedMultiplier;
             vForward = Mathf.Clamp(vForward, -maxReverseSpeed, effectiveMaxSpeed);
 
@@ -160,7 +209,6 @@ namespace RacingGame
             float effectiveGrip = grip * _surfaceGripMultiplier;
             vLateral *= Mathf.Exp(-effectiveGrip * dt);
 
-            // Reconstruct world-space velocity and integrate position
             velocity = fwd * vForward + right * vLateral;
             position += velocity * dt;
         }

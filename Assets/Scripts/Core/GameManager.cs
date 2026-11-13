@@ -1,153 +1,236 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace RacingGame
 {
     /// <summary>
-    /// Phase 1 & 2 GameManager: initializes the WaypointTrack, player Car, InputHandler,
-    /// and RoadRashRenderer2D, runs fixed-timestep physics, and displays a basic test HUD.
+    /// Coordinates the race: WaypointTrack, player (PlayerDriver + InputHandler),
+    /// AI opponents (AIRacerDriver), polymorphic physics stepping, vehicle collisions,
+    /// LapCheckpointManager (laps/ranking) and RaceHUD.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
         [Header("Scene References")]
-        public WaypointTrack track;
-        public Car playerCar;
-        public InputHandler inputHandler;
-        public RoadRashRenderer2D roadRenderer;
+        [SerializeField] private WaypointTrack track;
+        [SerializeField] private Car playerCar;
+        [SerializeField] private InputHandler inputHandler;
+        [SerializeField] private PlayerDriver playerDriver;
+        [SerializeField] private RoadRashRenderer2D roadRenderer;
+        [SerializeField] private LapCheckpointManager lapManager;
+        [SerializeField] private RaceHUD raceHud;
 
-        private GUIStyle _speedStyle;
-        private GUIStyle _infoStyle;
-        private GUIStyle _warnStyle;
+        [Header("Race Settings")]
+        [SerializeField] private int aiOpponentCount = 4;
+        [SerializeField] private int totalLaps = 3;
+        [SerializeField] private float bikeCollisionRadius = 1.3f;
+
+        [Header("Starting Grid")]
+        [SerializeField] private float gridFirstRowOffset = 4f;
+        [SerializeField] private float gridRowSpacing = 6.5f;
+        [SerializeField] private float gridLaneOffset = 2.8f;
+
+        private readonly List<Car> _allCars = new List<Car>();
+        private readonly List<AIRacerDriver> _aiDrivers = new List<AIRacerDriver>();
+
+        public IReadOnlyList<Car> AllCars => _allCars;
+        public LapCheckpointManager LapManager => lapManager;
+
+        private static readonly (string name, float skill, float latOffset, Color color)[] DefaultAiProfiles =
+        {
+            ("Viper",  0.94f, -3.5f, new Color(0.20f, 0.85f, 0.35f)),
+            ("Blaze",  0.88f,  3.5f, new Color(1.00f, 0.55f, 0.12f)),
+            ("Shadow", 0.80f, -1.5f, new Color(0.72f, 0.32f, 0.96f)),
+            ("Nova",   0.72f,  1.8f, new Color(0.20f, 0.78f, 0.96f)),
+            ("Titan",  0.65f,  0.0f, new Color(0.95f, 0.85f, 0.22f)),
+        };
 
         private void Start()
         {
             SetupReferences();
-            ResetPlayerToStart();
+            SpawnOrSyncOpponents();
+            lapManager.Initialize(track, _allCars, totalLaps);
+            raceHud.Bind(playerCar, lapManager, track);
+            ResetRaceGrid();
         }
 
         private void SetupReferences()
         {
-            if (track == null)
+            track = FindOrCreate(track, "WaypointTrack");
+            inputHandler = GetOrAdd(inputHandler);
+            playerDriver = GetOrAdd(playerDriver);
+            lapManager = GetOrAdd(lapManager);
+            raceHud = GetOrAdd(raceHud);
+
+            playerDriver.SetDriverName("Player");
+            playerDriver.SetInputHandler(inputHandler);
+
+            playerCar = FindOrCreate(playerCar, "PlayerCar");
+            playerCar.ConfigureIdentity(true, new Color(0.95f, 0.24f, 0.24f));
+
+            roadRenderer = FindOrCreate(roadRenderer, "RoadRashRenderer2D");
+        }
+
+        private static T FindOrCreate<T>(T current, string objectName) where T : Component
+        {
+            if (current != null) return current;
+            T found = FindFirstObjectByType<T>();
+            if (found != null) return found;
+            return new GameObject(objectName).AddComponent<T>();
+        }
+
+        private T GetOrAdd<T>(T current) where T : Component
+        {
+            if (current != null) return current;
+            T found = FindFirstObjectByType<T>();
+            return found != null ? found : gameObject.AddComponent<T>();
+        }
+
+        private void SpawnOrSyncOpponents()
+        {
+            _allCars.Clear();
+            _aiDrivers.Clear();
+
+            if (playerCar != null)
             {
-                track = FindFirstObjectByType<WaypointTrack>();
-                if (track == null)
+                _allCars.Add(playerCar);
+            }
+
+            AIRacerDriver[] existingAis = FindObjectsByType<AIRacerDriver>(FindObjectsSortMode.None);
+            for (int i = 0; i < existingAis.Length; i++)
+            {
+                Car aiCar = existingAis[i].GetComponent<Car>();
+                if (aiCar != null && !_allCars.Contains(aiCar))
                 {
-                    GameObject trackObj = new GameObject("WaypointTrack");
-                    track = trackObj.AddComponent<WaypointTrack>();
+                    _allCars.Add(aiCar);
+                    _aiDrivers.Add(existingAis[i]);
                 }
             }
 
-            if (inputHandler == null)
+            for (int i = _aiDrivers.Count; i < aiOpponentCount; i++)
             {
-                inputHandler = FindFirstObjectByType<InputHandler>();
-                if (inputHandler == null)
-                {
-                    inputHandler = gameObject.AddComponent<InputHandler>();
-                }
+                var profile = DefaultAiProfiles[i % DefaultAiProfiles.Length];
+                GameObject aiObj = new GameObject($"AICar_{profile.name}");
+                Car aiCar = aiObj.AddComponent<Car>();
+                aiCar.ConfigureIdentity(false, profile.color);
+
+                AIRacerDriver aiDriver = aiObj.AddComponent<AIRacerDriver>();
+                aiDriver.Configure(profile.name, profile.skill, profile.latOffset);
+
+                _allCars.Add(aiCar);
+                _aiDrivers.Add(aiDriver);
             }
 
-            if (playerCar == null)
+            for (int i = 0; i < _aiDrivers.Count; i++)
             {
-                playerCar = FindFirstObjectByType<Car>();
-                if (playerCar == null)
-                {
-                    GameObject carObj = new GameObject("PlayerCar");
-                    playerCar = carObj.AddComponent<Car>();
-                }
+                _aiDrivers[i].SetAllCars(_allCars);
             }
 
-            if (roadRenderer == null)
+            if (roadRenderer != null)
             {
-                roadRenderer = FindFirstObjectByType<RoadRashRenderer2D>();
-                if (roadRenderer == null)
-                {
-                    GameObject renderObj = new GameObject("RoadRashRenderer2D");
-                    roadRenderer = renderObj.AddComponent<RoadRashRenderer2D>();
-                }
-            }
-
-            roadRenderer.track = track;
-            roadRenderer.playerCar = playerCar;
-            if (roadRenderer.targetCamera == null)
-            {
-                roadRenderer.targetCamera = Camera.main;
+                roadRenderer.SetSceneReferences(Camera.main, track, playerCar, _allCars);
             }
         }
 
-        public void ResetPlayerToStart()
+        /// <summary>
+        /// Places every racer on a 2-lane grid behind the finish line (player starts last,
+        /// Road Rash style) and resets lap progress.
+        /// </summary>
+        public void ResetRaceGrid()
         {
-            if (track == null || playerCar == null) return;
+            if (track == null || track.WaypointCount < 2) return;
 
-            Vector2 startPos = track.waypoints != null && track.waypoints.Length > 0
-                ? track.waypoints[0]
-                : Vector2.zero;
-            Vector2 startDir = track.GetTrackDirection(0);
-            float startHeading = Mathf.Atan2(startDir.y, startDir.x);
+            Vector2 origin = track.GetWaypoint(0);
+            Vector2 dir = track.GetTrackDirection(0);
+            Vector2 right = new Vector2(dir.y, -dir.x);
+            float heading = Mathf.Atan2(dir.y, dir.x);
 
-            playerCar.isPlayer = true;
-            playerCar.Initialize(inputHandler, startPos, startHeading, track);
+            int slot = 0;
+            for (int i = 0; i < _aiDrivers.Count; i++)
+            {
+                Car aiCar = _aiDrivers[i].GetComponent<Car>();
+                if (aiCar == null) continue;
+                aiCar.Initialize(_aiDrivers[i], GridSlotPosition(slot++, origin, dir, right), heading, track);
+            }
+
+            if (playerCar != null)
+            {
+                playerCar.Initialize(playerDriver, GridSlotPosition(slot, origin, dir, right), heading, track);
+            }
+
+            if (lapManager != null) lapManager.ResetRace();
+            if (raceHud != null) raceHud.ClearMessage();
+        }
+
+        private Vector2 GridSlotPosition(int slot, Vector2 origin, Vector2 dir, Vector2 right)
+        {
+            int row = slot / 2;
+            float side = (slot % 2 == 0) ? -gridLaneOffset : gridLaneOffset;
+            return origin - dir * (gridFirstRowOffset + row * gridRowSpacing) + right * side;
         }
 
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
             {
-                ResetPlayerToStart();
+                ResetRaceGrid();
             }
         }
 
         private void FixedUpdate()
         {
-            if (playerCar != null && track != null)
+            if (track == null) return;
+
+            float dt = Time.fixedDeltaTime;
+            for (int i = 0; i < _allCars.Count; i++)
             {
-                playerCar.StepPhysics(Time.fixedDeltaTime, track);
+                if (_allCars[i] != null)
+                {
+                    _allCars[i].StepPhysics(dt, track);
+                }
+            }
+
+            ResolveVehicleCollisions();
+
+            if (lapManager != null)
+            {
+                lapManager.Tick(dt);
             }
         }
 
-        private void OnGUI()
+        private void ResolveVehicleCollisions()
         {
-            if (playerCar == null) return;
+            float minDist = bikeCollisionRadius * 2f;
+            float minDistSq = minDist * minDist;
 
-            if (_speedStyle == null)
+            for (int i = 0; i < _allCars.Count; i++)
             {
-                _speedStyle = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = 28,
-                    fontStyle = FontStyle.Bold
-                };
-                _speedStyle.normal.textColor = Color.white;
+                Car a = _allCars[i];
+                if (a == null) continue;
 
-                _infoStyle = new GUIStyle(GUI.skin.label)
+                for (int j = i + 1; j < _allCars.Count; j++)
                 {
-                    fontSize = 15,
-                    fontStyle = FontStyle.Bold
-                };
-                _infoStyle.normal.textColor = new Color(0.92f, 0.94f, 0.98f);
+                    Car b = _allCars[j];
+                    if (b == null) continue;
 
-                _warnStyle = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = 18,
-                    fontStyle = FontStyle.Bold
-                };
-                _warnStyle.normal.textColor = new Color(1f, 0.35f, 0.25f);
+                    Vector2 delta = b.Physics.Position - a.Physics.Position;
+                    float distSq = delta.sqrMagnitude;
+
+                    if (distSq < minDistSq)
+                    {
+                        float dist = Mathf.Sqrt(distSq);
+                        Vector2 normal = dist > 0.001f ? delta / dist : Vector2.right;
+                        float overlap = (minDist - dist) * 0.5f;
+
+                        Vector2 relVel = b.Physics.Velocity - a.Physics.Velocity;
+                        float closingSpeed = Vector2.Dot(relVel, normal);
+                        Vector2 impulse = closingSpeed < 0f ? normal * (-closingSpeed * 0.45f) : Vector2.zero;
+
+                        a.ApplyCollisionPush(-normal * overlap, -impulse);
+                        b.ApplyCollisionPush(normal * overlap, impulse);
+                    }
+                }
             }
-
-            GUI.Box(new Rect(14, 14, 290, 118), GUIContent.none);
-            int kmh = Mathf.RoundToInt(Mathf.Abs(playerCar.physics.SpeedKmh));
-            GUI.Label(new Rect(26, 20, 260, 40), $"{kmh} km/h", _speedStyle);
-
-            string trackState = playerCar.isOnTrack ? "ON TRACK" : "OFF-ROAD (SLOW)";
-            GUIStyle stateStyle = playerCar.isOnTrack ? _infoStyle : _warnStyle;
-            GUI.Label(new Rect(26, 60, 260, 26), trackState, stateStyle);
-
-            int wpCount = track != null ? track.WaypointCount : 0;
-            GUI.Label(new Rect(26, 86, 260, 24),
-                $"Waypoint: {playerCar.currentWaypointIndex + 1}/{wpCount}  |  Dist: {playerCar.trackDistance:F0}m",
-                _infoStyle);
-
-            GUI.Label(new Rect(26, 108, 260, 22),
-                "W/Up: Ga | S/Down: Phanh | A/D: Lai | R: Reset",
-                _infoStyle);
         }
     }
 }

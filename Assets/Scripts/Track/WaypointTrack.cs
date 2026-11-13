@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RacingGame
@@ -17,27 +17,30 @@ namespace RacingGame
     {
         public Vector2 position;
         public Vector2 tangent;
-        public float curvature; // signed radians per meter (+ = left, - = right)
-        public float elevation; // pseudo-3D hill height for Road Rash feel
+        public float curvature;
+        public float elevation;
     }
 
     /// <summary>
     /// Represents a closed-loop racing circuit using 15-30 waypoints.
-    /// Provides track queries (GetNextWaypoint, GetTrackDirection, IsOnTrack)
-    /// and spline/curvature sampling for the Road Rash 2D pseudo-3D renderer.
+    /// Encapsulates waypoint data and exposes controlled track queries.
     /// </summary>
     public class WaypointTrack : MonoBehaviour
     {
         [Header("Track Geometry")]
-        public Vector2[] waypoints;
-        public float trackWidth = 16f;
-        public float maxOffRoadWidth = 28f;
+        [SerializeField] private Vector2[] waypoints;
+        [SerializeField] private float trackWidth = 16f;
+        [SerializeField] private float maxOffRoadWidth = 28f;
 
         private float[] _cumulativeDistances;
         private float _totalLength;
         private bool _cacheDirty = true;
 
+        public IReadOnlyList<Vector2> Waypoints => waypoints;
+        public float TrackWidth => trackWidth;
+        public float MaxOffRoadWidth => maxOffRoadWidth;
         public int WaypointCount => waypoints != null ? waypoints.Length : 0;
+
         public float TotalLength
         {
             get
@@ -61,10 +64,6 @@ namespace RacingGame
             _cacheDirty = true;
         }
 
-        /// <summary>
-        /// Builds a balanced 22-waypoint closed circuit (long straight, fast sweeper,
-        /// S-chicane, and hairpin) suitable for testing physics and Road Rash visuals.
-        /// </summary>
         [ContextMenu("Build Default 22-Waypoint Circuit")]
         public void BuildDefaultCircuit()
         {
@@ -97,11 +96,36 @@ namespace RacingGame
             EnsureCache();
         }
 
-        public Vector2 GetNextWaypoint(int currentIndex)
+        public Vector2 GetWaypoint(int index)
         {
             if (waypoints == null || waypoints.Length == 0) return Vector2.zero;
-            int next = ((currentIndex + 1) % waypoints.Length + waypoints.Length) % waypoints.Length;
-            return waypoints[next];
+            int safe = ((index % waypoints.Length) + waypoints.Length) % waypoints.Length;
+            return waypoints[safe];
+        }
+
+        /// <summary>
+        /// Distance along the closed track (meters) at which the given waypoint lies.
+        /// </summary>
+        public float GetDistanceAtWaypoint(int index)
+        {
+            EnsureCache();
+            if (waypoints == null || waypoints.Length == 0) return 0f;
+            int safe = ((index % waypoints.Length) + waypoints.Length) % waypoints.Length;
+            return _cumulativeDistances[safe];
+        }
+
+        /// <summary>
+        /// Smoothed direction at a waypoint (average of incoming and outgoing segment directions).
+        /// </summary>
+        public Vector2 GetDirectionAtWaypoint(int index)
+        {
+            Vector2 dir = GetTrackDirection(index - 1) + GetTrackDirection(index);
+            return dir.sqrMagnitude > 0.0001f ? dir.normalized : GetTrackDirection(index);
+        }
+
+        public Vector2 GetNextWaypoint(int currentIndex)
+        {
+            return GetWaypoint(currentIndex + 1);
         }
 
         public Vector2 GetTrackDirection(int index)
@@ -116,8 +140,7 @@ namespace RacingGame
 
         public bool IsOnTrack(Vector2 pos)
         {
-            TrackProjection proj = ProjectPosition(pos);
-            return proj.isOnTrack;
+            return ProjectPosition(pos).isOnTrack;
         }
 
         public TrackProjection ProjectPosition(Vector2 pos)
@@ -168,10 +191,6 @@ namespace RacingGame
             return result;
         }
 
-        /// <summary>
-        /// Samples smooth position, tangent, curvature, and hill elevation at distance s
-        /// along the closed track loop (used by the Road Rash 2D pseudo-3D renderer).
-        /// </summary>
         public TrackSample SampleAtDistance(float s)
         {
             EnsureCache();
@@ -189,7 +208,6 @@ namespace RacingGame
             s = WrapDistance(s);
             int count = waypoints.Length;
 
-            // Binary or linear search for segment
             int seg = 0;
             for (int i = 0; i < count; i++)
             {
@@ -213,13 +231,11 @@ namespace RacingGame
             Vector2 pos = CatmullRom(p0, p1, p2, p3, t);
             Vector2 tangent = CatmullRomTangent(p0, p1, p2, p3, t).normalized;
 
-            // Estimate signed curvature using a small forward step
             float step = 4f;
             Vector2 tanNext = SampleTangentRaw(s + step);
             float angleDiff = SignedAngleRad(tangent, tanNext);
             float curvature = angleDiff / step;
 
-            // Gentle rolling hills based on track distance for Road Rash horizon feel
             float normalizedS = (s / _totalLength) * Mathf.PI * 2f;
             float elevation = Mathf.Sin(normalizedS * 3f) * 3.5f + Mathf.Cos(normalizedS * 5f) * 1.5f;
 
