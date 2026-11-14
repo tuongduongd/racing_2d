@@ -30,14 +30,8 @@ namespace RacingGame
         public const int MaxUpgradeLevel = 5;
         public const float CostGrowthFactor = 1.5f;
 
-        // Baseline vehicle parameters before upgrades
-        public const float BaseMass = 220f;
-        public const float BaseEnginePower = 6200f;
-        public const float BaseBrakePower = 8500f;
-        public const float BaseGrip = 8.5f;
-        public const float BaseMaxSpeed = 62f;
-
         private readonly string _saveFilePath;
+        private VehicleStats _baseStats;
         private PlayerSaveData _data = new PlayerSaveData();
 
         public int Money => _data.money;
@@ -45,15 +39,26 @@ namespace RacingGame
         public int RacesWon => _data.racesWon;
         public float BestRaceTime => _data.bestRaceTime;
         public string SaveFilePath => _saveFilePath;
+        public VehicleStats BaseStats => _baseStats;
 
-        public CarUpgradeSystem() : this(Path.Combine(Application.persistentDataPath, "racing2d_save.json"))
+        public CarUpgradeSystem() : this(Path.Combine(Application.persistentDataPath, "racing2d_save.json"), VehicleStats.Default)
         {
         }
 
-        public CarUpgradeSystem(string customSavePath)
+        public CarUpgradeSystem(string customSavePath) : this(customSavePath, VehicleStats.Default)
+        {
+        }
+
+        public CarUpgradeSystem(string customSavePath, VehicleStats baseStats)
         {
             _saveFilePath = customSavePath;
+            _baseStats = baseStats.Sanitize();
             _data = new PlayerSaveData();
+        }
+
+        public void SetBaseStats(in VehicleStats baseStats)
+        {
+            _baseStats = baseStats.Sanitize();
         }
 
         public int GetLevel(UpgradeType type)
@@ -156,24 +161,31 @@ namespace RacingGame
         }
 
         /// <summary>
-        /// Applies all current upgrade levels idempotently onto VehiclePhysics from baseline stats.
+        /// Computes vehicle stats from baseline VehicleStats and current upgrade levels.
         /// </summary>
-        public void ApplyToCar(VehiclePhysics physics)
+        public VehicleStats ComputeUpgradedStats()
         {
-            if (physics == null) return;
-
             int engineLv = GetLevel(UpgradeType.Engine);
             int brakesLv = GetLevel(UpgradeType.Brakes);
             int gripLv = GetLevel(UpgradeType.Grip);
             int weightLv = GetLevel(UpgradeType.WeightReduction);
 
-            float newMass = BaseMass - weightLv * 14f;
-            float newEngine = BaseEnginePower + engineLv * 750f;
-            float newBrakes = BaseBrakePower + brakesLv * 1400f;
-            float newGrip = BaseGrip + gripLv * 1.3f;
-            float newMaxSpeed = BaseMaxSpeed + engineLv * 3.5f;
+            VehicleStats upgraded = _baseStats;
+            upgraded.mass = _baseStats.mass - weightLv * 14f;
+            upgraded.enginePower = _baseStats.enginePower + engineLv * 750f;
+            upgraded.brakePower = _baseStats.brakePower + brakesLv * 1400f;
+            upgraded.grip = _baseStats.grip + gripLv * 1.3f;
+            upgraded.maxSpeed = _baseStats.maxSpeed + engineLv * 3.5f;
+            return upgraded.Sanitize();
+        }
 
-            physics.ConfigureBaseStats(newMass, newEngine, newBrakes, newGrip, newMaxSpeed);
+        /// <summary>
+        /// Applies all current upgrade levels idempotently onto VehiclePhysics from baseline stats.
+        /// </summary>
+        public void ApplyToCar(VehiclePhysics physics)
+        {
+            if (physics == null) return;
+            physics.ConfigureStats(ComputeUpgradedStats());
         }
 
         public string GetUpgradeDisplayName(UpgradeType type)

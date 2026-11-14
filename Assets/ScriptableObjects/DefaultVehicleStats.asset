@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19a7a7f527ff62841976a6761d2532a6, type: 3}
+  m_Name: DefaultVehicleStats
+  m_EditorClassIdentifier: RacingGame::RacingGame.VehicleStatsAsset
+  stats:
+    mass: 220
+    enginePower: 6200
+    brakePower: 8500
+    grip: 8.5
+    drag: 0.45
+    rollingResistance: 0.8
+    maxSpeed: 62
+    maxReverseSpeed: 8
+    turnRate: 2.4

@@ -19,15 +19,7 @@ namespace RacingGame
         [SerializeField] private float heading;
 
         [Header("Vehicle Parameters")]
-        [SerializeField] private float mass = 220f;
-        [SerializeField] private float enginePower = 6200f;
-        [SerializeField] private float brakePower = 8500f;
-        [SerializeField] private float grip = 8.5f;
-        [SerializeField] private float drag = 0.45f;
-        [SerializeField] private float rollingResistance = 0.8f;
-        [SerializeField] private float maxSpeed = 62f;
-        [SerializeField] private float maxReverseSpeed = 8f;
-        [SerializeField] private float turnRate = 2.4f;
+        [SerializeField] private VehicleStats stats = VehicleStats.Default;
 
         private float _throttleInput;
         private float _brakeInput;
@@ -41,13 +33,16 @@ namespace RacingGame
         public Vector2 Velocity => velocity;
         public float Heading => heading;
 
-        public float Mass => mass;
-        public float EnginePower => enginePower;
-        public float BrakePower => brakePower;
-        public float Grip => grip;
-        public float Drag => drag;
-        public float MaxSpeed => maxSpeed;
-        public float TurnRate => turnRate;
+        public VehicleStats Stats => stats;
+        public float Mass => stats.mass;
+        public float EnginePower => stats.enginePower;
+        public float BrakePower => stats.brakePower;
+        public float Grip => stats.grip;
+        public float Drag => stats.drag;
+        public float RollingResistance => stats.rollingResistance;
+        public float MaxSpeed => stats.maxSpeed;
+        public float MaxReverseSpeed => stats.maxReverseSpeed;
+        public float TurnRate => stats.turnRate;
 
         public Vector2 Forward => new Vector2(Mathf.Cos(heading), Mathf.Sin(heading));
         public Vector2 Right => new Vector2(Mathf.Sin(heading), -Mathf.Cos(heading));
@@ -70,13 +65,20 @@ namespace RacingGame
             _surfaceMaxSpeedMultiplier = 1f;
         }
 
+        public void ConfigureStats(in VehicleStats newStats)
+        {
+            stats = newStats.Sanitize();
+        }
+
         public void ConfigureBaseStats(float newMass, float newEnginePower, float newBrakePower, float newGrip, float newMaxSpeed)
         {
-            mass = Mathf.Max(50f, newMass);
-            enginePower = Mathf.Max(500f, newEnginePower);
-            brakePower = Mathf.Max(500f, newBrakePower);
-            grip = Mathf.Max(1f, newGrip);
-            maxSpeed = Mathf.Max(10f, newMaxSpeed);
+            VehicleStats updated = stats;
+            updated.mass = newMass;
+            updated.enginePower = newEnginePower;
+            updated.brakePower = newBrakePower;
+            updated.grip = newGrip;
+            updated.maxSpeed = newMaxSpeed;
+            ConfigureStats(updated);
         }
 
         public void ApplyThrottle(float amount)
@@ -137,7 +139,7 @@ namespace RacingGame
         {
             if (dt <= 0f) return;
 
-            float safeMass = Mathf.Max(1f, mass);
+            float safeMass = Mathf.Max(1f, stats.mass);
             Vector2 fwd = Forward;
             Vector2 right = Right;
 
@@ -147,22 +149,22 @@ namespace RacingGame
             // 1. Speed-dependent steering (cannot spin in place at zero speed)
             float absForward = Mathf.Abs(vForward);
             float steerSpeedFactor = Mathf.Clamp01(absForward / 6f);
-            float highSpeedStability = Mathf.Lerp(1f, 0.65f, Mathf.Clamp01(absForward / maxSpeed));
+            float highSpeedStability = Mathf.Lerp(1f, 0.65f, Mathf.Clamp01(absForward / stats.maxSpeed));
             float steerDirection = vForward >= -0.1f ? 1f : -1f;
 
-            heading -= _steeringInput * turnRate * steerSpeedFactor * highSpeedStability * steerDirection * dt;
+            heading -= _steeringInput * stats.turnRate * steerSpeedFactor * highSpeedStability * steerDirection * dt;
             heading = NormalizeAngle(heading);
 
             fwd = Forward;
             right = Right;
 
             // 2. Longitudinal acceleration (throttle & brake)
-            float engineAccel = (_throttleInput * enginePower) / safeMass;
+            float engineAccel = (_throttleInput * stats.enginePower) / safeMass;
             float forwardAccel = engineAccel;
 
             if (_brakeInput > 0.01f)
             {
-                float brakeDecel = (_brakeInput * brakePower) / safeMass;
+                float brakeDecel = (_brakeInput * stats.brakePower) / safeMass;
                 if (vForward > 0.5f)
                 {
                     forwardAccel -= brakeDecel;
@@ -180,9 +182,9 @@ namespace RacingGame
             vForward += forwardAccel * dt;
 
             // 3. Aerodynamic drag & rolling resistance
-            float effectiveDrag = drag * _surfaceDragMultiplier;
+            float effectiveDrag = stats.drag * _surfaceDragMultiplier;
             float dragDecel = (effectiveDrag * vForward * Mathf.Abs(vForward)) / safeMass;
-            float rollingDecel = rollingResistance * _surfaceDragMultiplier * Mathf.Sign(vForward);
+            float rollingDecel = stats.rollingResistance * _surfaceDragMultiplier * Mathf.Sign(vForward);
 
             if (Mathf.Abs(vForward) > 0.05f)
             {
@@ -202,11 +204,11 @@ namespace RacingGame
             }
 
             // Clamp longitudinal speed
-            float effectiveMaxSpeed = maxSpeed * _surfaceMaxSpeedMultiplier;
-            vForward = Mathf.Clamp(vForward, -maxReverseSpeed, effectiveMaxSpeed);
+            float effectiveMaxSpeed = stats.maxSpeed * _surfaceMaxSpeedMultiplier;
+            vForward = Mathf.Clamp(vForward, -stats.maxReverseSpeed, effectiveMaxSpeed);
 
             // 4. Lateral tire grip (exponential damping of sideways slip)
-            float effectiveGrip = grip * _surfaceGripMultiplier;
+            float effectiveGrip = stats.grip * _surfaceGripMultiplier;
             vLateral *= Mathf.Exp(-effectiveGrip * dt);
 
             velocity = fwd * vForward + right * vLateral;

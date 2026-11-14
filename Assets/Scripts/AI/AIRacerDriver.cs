@@ -16,6 +16,9 @@ namespace RacingGame
         [SerializeField] private float maxSteerAngleDeg = 42f;
 
         [Header("AI Personality & Skill")]
+        [SerializeField] private AIProfile profile;
+        [Range(-0.15f, 0.15f)]
+        [SerializeField] private float skillOffset = 0f;
         [Range(0.4f, 1.0f)]
         [SerializeField] private float skillLevel = 0.85f;
         [SerializeField] private float preferredLateralOffset = 0f;
@@ -29,26 +32,112 @@ namespace RacingGame
         [SerializeField] private float stuckSpeedThreshold = 2.5f;
         [SerializeField] private float stuckTimeout = 2.5f;
 
+        [Header("Determinism")]
+        [SerializeField] private bool useCustomSeed;
+        [SerializeField] private int seed;
+
         private IReadOnlyList<Car> _allCars;
         private float _noiseSeed;
         private float _stuckTimer;
         private float _dynamicAvoidOffset;
+        private float _simulationTime;
+        private bool _hasSeed;
+        private int _seed;
 
         public int TargetWaypointIndex => targetWaypoint;
-        public float SkillLevel => skillLevel;
+        public AIProfile Profile => profile;
+        public float SkillOffset => skillOffset;
+        public float SkillLevel => profile != null
+            ? Mathf.Clamp(profile.SkillLevel + skillOffset, 0.4f, 1.0f)
+            : skillLevel;
         public float PreferredLateralOffset => preferredLateralOffset;
+        public bool HasSeed => _hasSeed;
+        public int Seed => _seed;
 
         private void Awake()
         {
-            _noiseSeed = Random.Range(0f, 100f);
+            if (useCustomSeed)
+            {
+                SetSeed(seed);
+            }
+            else
+            {
+                _noiseSeed = Random.Range(0f, 100f);
+            }
+        }
+
+        public void SetSeed(int randomSeed)
+        {
+            useCustomSeed = true;
+            seed = randomSeed;
+            _hasSeed = true;
+            _seed = randomSeed;
+            _noiseSeed = ComputeNoiseSeedFromSeed(randomSeed);
         }
 
         public void Configure(string aiName, float skill, float lateralOffset)
         {
             SetDriverName(aiName);
+            profile = null;
+            skillOffset = 0f;
             skillLevel = Mathf.Clamp(skill, 0.4f, 1.0f);
             preferredLateralOffset = lateralOffset;
-            _noiseSeed = Mathf.Abs(aiName.GetHashCode() % 1000) * 0.13f;
+            _noiseSeed = _hasSeed ? ComputeNoiseSeedFromSeed(_seed) : ComputeNoiseSeed(aiName);
+        }
+
+        public void Configure(string aiName, float skill, float lateralOffset, int randomSeed)
+        {
+            SetSeed(randomSeed);
+            Configure(aiName, skill, lateralOffset);
+        }
+
+        public void Configure(string aiName, AIProfile aiProfile, float lateralOffset, float racerSkillOffset = 0f)
+        {
+            SetDriverName(aiName);
+            preferredLateralOffset = lateralOffset;
+            ApplyProfile(aiProfile, racerSkillOffset);
+            _noiseSeed = _hasSeed ? ComputeNoiseSeedFromSeed(_seed) : ComputeNoiseSeed(aiName);
+        }
+
+        public void Configure(string aiName, AIProfile aiProfile, float lateralOffset, float racerSkillOffset, int randomSeed)
+        {
+            SetSeed(randomSeed);
+            Configure(aiName, aiProfile, lateralOffset, racerSkillOffset);
+        }
+
+        public void ApplyProfile(AIProfile aiProfile, float racerSkillOffset = 0f)
+        {
+            profile = aiProfile;
+            skillOffset = Mathf.Clamp(racerSkillOffset, -0.15f, 0.15f);
+            if (profile != null)
+            {
+                skillLevel = Mathf.Clamp(profile.SkillLevel + skillOffset, 0.4f, 1.0f);
+                minCornerSpeed = profile.MinCornerSpeed;
+                noiseAmplitude = profile.NoiseAmplitude;
+                noiseFrequency = profile.NoiseFrequency;
+            }
+        }
+
+        private static float ComputeNoiseSeed(string aiName)
+        {
+            if (string.IsNullOrEmpty(aiName)) return 0f;
+
+            unchecked
+            {
+                uint hash = 2166136261u;
+                for (int i = 0; i < aiName.Length; i++)
+                {
+                    hash ^= aiName[i];
+                    hash *= 16777619u;
+                }
+                return (hash % 1000u) * 0.13f;
+            }
+        }
+
+        private static float ComputeNoiseSeedFromSeed(int randomSeed)
+        {
+            var rng = new System.Random(randomSeed);
+            return (float)(rng.NextDouble() * 100.0);
         }
 
         public void SetAllCars(IReadOnlyList<Car> cars)
@@ -61,6 +150,15 @@ namespace RacingGame
             targetWaypoint = 1;
             _stuckTimer = 0f;
             _dynamicAvoidOffset = 0f;
+            _simulationTime = 0f;
+            if (_hasSeed)
+            {
+                _noiseSeed = ComputeNoiseSeedFromSeed(_seed);
+            }
+            else if (useCustomSeed)
+            {
+                SetSeed(seed);
+            }
         }
 
         public override VehicleInput DecideInput(Car car, WaypointTrack track)
@@ -71,6 +169,8 @@ namespace RacingGame
             }
 
             float dt = Time.fixedDeltaTime > 0f ? Time.fixedDeltaTime : 0.02f;
+            float decisionTime = _simulationTime;
+            _simulationTime += dt;
             int wpCount = track.WaypointCount;
 
             // 1. Stuck detection & automatic recovery
@@ -119,6 +219,15 @@ namespace RacingGame
             float clampedOffset = Mathf.Clamp(preferredLateralOffset + _dynamicAvoidOffset, -maxOffset, maxOffset);
             Vector2 aimPoint = baseTarget + segRight * clampedOffset;
 
+            ResolveDrivingTuning(
+                out float effectiveSkill,
+                out float topSpeedFactor,
+                out float cornerSpeedFloor,
+                out float brakeAggression,
+                out float throttleGain,
+                out float activeNoiseAmp,
+                out float activeNoiseFreq);
+
             // 5. Steering towards aimPoint (+ subtle skill-based human variation)
             Vector2 toTarget = (aimPoint - car.Physics.Position).normalized;
             float angleErrorRad = SignedAngleRad(car.Physics.Forward, toTarget);
@@ -126,8 +235,8 @@ namespace RacingGame
 
             // Note: negative angleError means target is to the right -> positive steering turns right
             float rawSteer = -angleErrorDeg / Mathf.Max(5f, maxSteerAngleDeg);
-            float imperfection = (1.05f - skillLevel) * noiseAmplitude;
-            float wobble = Mathf.Sin(Time.time * noiseFrequency + _noiseSeed) * imperfection;
+            float imperfection = (1.05f - effectiveSkill) * activeNoiseAmp;
+            float wobble = Mathf.Sin(decisionTime * activeNoiseFreq + _noiseSeed) * imperfection;
             float steer = Mathf.Clamp(rawSteer + wobble, -1f, 1f);
 
             // 6. Corner speed prediction & throttle/brake modulation
@@ -140,9 +249,8 @@ namespace RacingGame
             float upcomingTurn = Mathf.Max(turnAngle1, turnAngle2 * 0.85f);
 
             float sharpness = Mathf.Clamp01(upcomingTurn / 75f);
-            float topSpeedFactor = Mathf.Lerp(0.76f, 0.98f, skillLevel);
             float effectiveTopSpeed = car.Physics.MaxSpeed * topSpeedFactor;
-            float cornerTargetSpeed = Mathf.Lerp(effectiveTopSpeed, minCornerSpeed, sharpness * Mathf.Lerp(1.1f, 0.78f, skillLevel));
+            float cornerTargetSpeed = Mathf.Lerp(effectiveTopSpeed, cornerSpeedFloor, sharpness * brakeAggression);
 
             float currentSpeed = car.Physics.ForwardSpeed;
             float throttle = 0f;
@@ -154,16 +262,46 @@ namespace RacingGame
             }
             else if (currentSpeed > cornerTargetSpeed)
             {
-                throttle = 0.25f * skillLevel;
+                throttle = 0.25f * effectiveSkill;
             }
             else
             {
                 // Ease off throttle slightly if steering angle is very large
                 float steerThrottlePenalty = Mathf.Lerp(1f, 0.65f, Mathf.Abs(steer) * 0.5f);
-                throttle = Mathf.Clamp01(skillLevel * 1.05f) * steerThrottlePenalty;
+                throttle = throttleGain * steerThrottlePenalty;
             }
 
             return new VehicleInput(throttle, brake, steer);
+        }
+
+        private void ResolveDrivingTuning(
+            out float effectiveSkill,
+            out float topSpeedFactor,
+            out float cornerSpeedFloor,
+            out float brakeAggression,
+            out float throttleGain,
+            out float activeNoiseAmp,
+            out float activeNoiseFreq)
+        {
+            if (profile != null)
+            {
+                effectiveSkill = Mathf.Clamp(profile.SkillLevel + skillOffset, 0.4f, 1.0f);
+                topSpeedFactor = Mathf.Clamp(profile.TopSpeedFactor + skillOffset * 0.25f, 0.5f, 1.05f);
+                cornerSpeedFloor = Mathf.Max(5f, profile.MinCornerSpeed + skillOffset * 12f);
+                brakeAggression = Mathf.Clamp(profile.CornerBrakeAggression - skillOffset * 0.4f, 0.5f, 1.4f);
+                throttleGain = Mathf.Clamp(profile.ThrottleScale + skillOffset * 0.25f, 0.5f, 1.05f);
+                activeNoiseAmp = profile.NoiseAmplitude;
+                activeNoiseFreq = profile.NoiseFrequency;
+                return;
+            }
+
+            effectiveSkill = Mathf.Clamp(skillLevel, 0.4f, 1.0f);
+            topSpeedFactor = Mathf.Lerp(0.76f, 0.98f, effectiveSkill);
+            cornerSpeedFloor = minCornerSpeed;
+            brakeAggression = Mathf.Lerp(1.1f, 0.78f, effectiveSkill);
+            throttleGain = Mathf.Clamp01(effectiveSkill * 1.05f);
+            activeNoiseAmp = noiseAmplitude;
+            activeNoiseFreq = noiseFrequency;
         }
 
         private float ComputeAvoidanceOffset(Car self, WaypointTrack track)

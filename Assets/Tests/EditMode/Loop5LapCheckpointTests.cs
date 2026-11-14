@@ -155,5 +155,95 @@ namespace RacingGame.Tests
             Assert.AreEqual(2, p1.CompletedLaps);
             Assert.AreEqual(first, _manager.GetRanking()[0].Car);
         }
+
+        [Test]
+        public void WrongWay_MovingOppositeAboveMinSpeedSetsIsWrongWay()
+        {
+            Vector2 pos = new Vector2(20f, 0f);
+            Car car = CreateCar("WrongWayDriver", pos);
+            _manager.Initialize(_track, new[] { car }, 3);
+            RacerProgress p = _manager.GetProgress(car);
+
+            Vector2 forwardDir = _track.GetTrackDirection(0);
+            float reverseHeading = Mathf.Atan2(-forwardDir.y, -forwardDir.x);
+            car.ResetToTrackPoint(pos, reverseHeading, _track);
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 8f);
+
+            _manager.Tick(1f / 60f);
+
+            Assert.IsTrue(p.IsWrongWay, "Facing opposite to track direction with speed > wrongWayMinSpeed (4f) must set IsWrongWay.");
+        }
+
+        [Test]
+        public void WrongWay_StationaryOrAtOrBelowMinSpeedDoesNotFlag()
+        {
+            Vector2 pos = new Vector2(20f, 0f);
+            Car car = CreateCar("SlowReverseDriver", pos);
+            _manager.Initialize(_track, new[] { car }, 3);
+            RacerProgress p = _manager.GetProgress(car);
+
+            Vector2 forwardDir = _track.GetTrackDirection(0);
+            float reverseHeading = Mathf.Atan2(-forwardDir.y, -forwardDir.x);
+
+            // Stationary (speed = 0)
+            car.ResetToTrackPoint(pos, reverseHeading, _track);
+            _manager.Tick(1f / 60f);
+            Assert.IsFalse(p.IsWrongWay, "Stationary car facing backward must not be flagged as wrong-way.");
+
+            // Below threshold (speed = 3f < 4f)
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 3f);
+            _manager.Tick(1f / 60f);
+            Assert.IsFalse(p.IsWrongWay, "Car moving opposite below wrongWayMinSpeed must not be flagged as wrong-way.");
+
+            // Exact threshold (speed = 4f == wrongWayMinSpeed)
+            car.ResetToTrackPoint(pos, reverseHeading, _track);
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 4f);
+            _manager.Tick(1f / 60f);
+            Assert.IsFalse(p.IsWrongWay, "Car moving opposite at exact wrongWayMinSpeed (4f) must not be flagged as wrong-way.");
+        }
+
+        [Test]
+        public void WrongWay_TurningBackToForwardDirectionClearsIsWrongWay()
+        {
+            Vector2 pos = new Vector2(20f, 0f);
+            Car car = CreateCar("RecoveringDriver", pos);
+            _manager.Initialize(_track, new[] { car }, 3);
+            RacerProgress p = _manager.GetProgress(car);
+
+            Vector2 forwardDir = _track.GetTrackDirection(0);
+            float forwardHeading = Mathf.Atan2(forwardDir.y, forwardDir.x);
+            float reverseHeading = Mathf.Atan2(-forwardDir.y, -forwardDir.x);
+
+            car.ResetToTrackPoint(pos, reverseHeading, _track);
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 8f);
+            _manager.Tick(1f / 60f);
+            Assert.IsTrue(p.IsWrongWay, "Precondition: car should initially be flagged as wrong-way.");
+
+            car.ResetToTrackPoint(pos, forwardHeading, _track);
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 8f);
+            _manager.Tick(1f / 60f);
+            Assert.IsFalse(p.IsWrongWay, "Turning back to forward track direction must clear IsWrongWay.");
+        }
+
+        [Test]
+        public void WrongWay_FinishedRacerIsNotFlaggedEvenWhenFacingBackwardAtSpeed()
+        {
+            Car car = CreateCar("FinishedDriver", _track.GetWaypoint(0) - _track.GetTrackDirection(0) * 5f);
+            _manager.Initialize(_track, new[] { car }, 1);
+            RacerProgress p = _manager.GetProgress(car);
+
+            DriveFullLap(car);
+            Assert.IsTrue(p.IsFinished, "Precondition: racer must have finished the race.");
+
+            Vector2 pos = new Vector2(20f, 0f);
+            Vector2 forwardDir = _track.GetTrackDirection(0);
+            float reverseHeading = Mathf.Atan2(-forwardDir.y, -forwardDir.x);
+            car.ResetToTrackPoint(pos, reverseHeading, _track);
+            car.Physics.ApplyVelocityImpulse(car.Physics.Forward * 10f);
+
+            _manager.Tick(1f / 60f);
+
+            Assert.IsFalse(p.IsWrongWay, "Finished racer must never be flagged as wrong-way even when facing backward at speed.");
+        }
     }
 }

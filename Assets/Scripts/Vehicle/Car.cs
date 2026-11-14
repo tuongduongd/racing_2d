@@ -9,6 +9,7 @@ namespace RacingGame
     public class Car : MonoBehaviour
     {
         [Header("Core Physics")]
+        [SerializeField] private VehicleStatsAsset baseStatsAsset;
         [SerializeField] private VehiclePhysics physics = new VehiclePhysics();
 
         [Header("Identity & Visuals")]
@@ -31,6 +32,8 @@ namespace RacingGame
         private bool _kickHitLanded;
         private float _hitStaggerTimer;
 
+        public VehicleStatsAsset BaseStatsAsset => baseStatsAsset;
+        public VehicleStats BaseStats => baseStatsAsset != null ? baseStatsAsset.Stats : VehicleStats.Default;
         public VehiclePhysics Physics => physics;
         /// <summary>Position at the start of the last physics step (used for checkpoint crossing).</summary>
         public Vector2 PreviousPosition => _previousPosition;
@@ -56,6 +59,23 @@ namespace RacingGame
         public bool HasKickHitThisSwing => _kickHitLanded;
         public bool IsStaggered => _hitStaggerTimer > 0f;
         public float HitStaggerRemaining => _hitStaggerTimer;
+
+        private void Awake()
+        {
+            if (baseStatsAsset != null)
+            {
+                physics.ConfigureStats(baseStatsAsset.Stats);
+            }
+        }
+
+        public void SetBaseStatsAsset(VehicleStatsAsset statsAsset)
+        {
+            baseStatsAsset = statsAsset;
+            if (baseStatsAsset != null)
+            {
+                physics.ConfigureStats(baseStatsAsset.Stats);
+            }
+        }
 
         public void ConfigureIdentity(bool playerFlag, Color color)
         {

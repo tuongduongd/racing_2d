@@ -31,6 +31,12 @@ namespace RacingGame
         [SerializeField] private DifficultyLevel difficulty = DifficultyLevel.Normal;
         [SerializeField] private bool startInMainMenu = true;
 
+        [Header("Data Profiles")]
+        [SerializeField] private VehicleStatsAsset defaultVehicleStats;
+        [SerializeField] private AIProfile easyProfile;
+        [SerializeField] private AIProfile normalProfile;
+        [SerializeField] private AIProfile hardProfile;
+
         [Header("Starting Grid")]
         [SerializeField] private float gridFirstRowOffset = 4f;
         [SerializeField] private float gridRowSpacing = 6.5f;
@@ -44,6 +50,7 @@ namespace RacingGame
         private readonly List<Car> _allCars = new List<Car>();
         private readonly List<AIRacerDriver> _aiDrivers = new List<AIRacerDriver>();
         private readonly Dictionary<GameFlowState, RaceStateBase> _states = new Dictionary<GameFlowState, RaceStateBase>();
+        private readonly Dictionary<DifficultyLevel, AIProfile> _fallbackProfiles = new Dictionary<DifficultyLevel, AIProfile>();
 
         private CarUpgradeSystem _upgradeSystem;
         private RaceStateBase _currentState;
@@ -71,13 +78,13 @@ namespace RacingGame
         public float CountdownRemaining =>
             _currentState is CountdownState cs ? cs.RemainingSeconds : 0f;
 
-        private static readonly (string name, float skill, float latOffset, Color color)[] DefaultAiProfiles =
+        private static readonly (string name, float skillOffset, float latOffset, Color color)[] DefaultAiRacers =
         {
-            ("Viper",  0.94f, -3.5f, new Color(0.20f, 0.85f, 0.35f)),
-            ("Blaze",  0.88f,  3.5f, new Color(1.00f, 0.55f, 0.12f)),
-            ("Shadow", 0.80f, -1.5f, new Color(0.72f, 0.32f, 0.96f)),
-            ("Nova",   0.72f,  1.8f, new Color(0.20f, 0.78f, 0.96f)),
-            ("Titan",  0.65f,  0.0f, new Color(0.95f, 0.85f, 0.22f)),
+            ("Viper",   0.04f, -3.5f, new Color(0.20f, 0.85f, 0.35f)),
+            ("Blaze",   0.01f,  3.5f, new Color(1.00f, 0.55f, 0.12f)),
+            ("Shadow", -0.02f, -1.5f, new Color(0.72f, 0.32f, 0.96f)),
+            ("Nova",   -0.05f,  1.8f, new Color(0.20f, 0.78f, 0.96f)),
+            ("Titan",  -0.08f,  0.0f, new Color(0.95f, 0.85f, 0.22f)),
         };
 
         private void Awake()
@@ -110,6 +117,15 @@ namespace RacingGame
         private void OnDestroy()
         {
             UnbindAudioEvents();
+
+            foreach (AIProfile fallback in _fallbackProfiles.Values)
+            {
+                if (fallback != null)
+                {
+                    Destroy(fallback);
+                }
+            }
+            _fallbackProfiles.Clear();
         }
 
         private void SetupReferences()
@@ -167,15 +183,20 @@ namespace RacingGame
                 }
             }
 
+            AIProfile activeProfile = GetProfileForDifficulty(difficulty);
             for (int i = _aiDrivers.Count; i < aiOpponentCount; i++)
             {
-                var profile = DefaultAiProfiles[i % DefaultAiProfiles.Length];
-                GameObject aiObj = new GameObject($"AICar_{profile.name}");
+                var racer = DefaultAiRacers[i % DefaultAiRacers.Length];
+                GameObject aiObj = new GameObject($"AICar_{racer.name}");
                 Car aiCar = aiObj.AddComponent<Car>();
-                aiCar.ConfigureIdentity(false, profile.color);
+                if (defaultVehicleStats != null)
+                {
+                    aiCar.SetBaseStatsAsset(defaultVehicleStats);
+                }
+                aiCar.ConfigureIdentity(false, racer.color);
 
                 AIRacerDriver aiDriver = aiObj.AddComponent<AIRacerDriver>();
-                aiDriver.Configure(profile.name, profile.skill, profile.latOffset);
+                aiDriver.Configure(racer.name, activeProfile, racer.latOffset, racer.skillOffset);
 
                 _allCars.Add(aiCar);
                 _aiDrivers.Add(aiDriver);
@@ -263,6 +284,11 @@ namespace RacingGame
         {
             if (_upgradeSystem != null && playerCar != null)
             {
+                if (playerCar.BaseStatsAsset == null && defaultVehicleStats != null)
+                {
+                    playerCar.SetBaseStatsAsset(defaultVehicleStats);
+                }
+                _upgradeSystem.SetBaseStats(playerCar.BaseStats);
                 _upgradeSystem.ApplyToCar(playerCar.Physics);
             }
         }
@@ -359,20 +385,37 @@ namespace RacingGame
             }
         }
 
+        private AIProfile GetProfileForDifficulty(DifficultyLevel level)
+        {
+            AIProfile assigned = level switch
+            {
+                DifficultyLevel.Easy => easyProfile,
+                DifficultyLevel.Hard => hardProfile,
+                _ => normalProfile
+            };
+
+            if (assigned != null)
+            {
+                return assigned;
+            }
+
+            if (!_fallbackProfiles.TryGetValue(level, out AIProfile fallback) || fallback == null)
+            {
+                fallback = AIProfile.CreateDefault(level);
+                _fallbackProfiles[level] = fallback;
+            }
+
+            return fallback;
+        }
+
         private void ApplyDifficultyToAI()
         {
-            float offset = difficulty switch
-            {
-                DifficultyLevel.Easy => -0.14f,
-                DifficultyLevel.Hard => 0.06f,
-                _ => 0f
-            };
+            AIProfile activeProfile = GetProfileForDifficulty(difficulty);
 
             for (int i = 0; i < _aiDrivers.Count; i++)
             {
-                var profile = DefaultAiProfiles[i % DefaultAiProfiles.Length];
-                float tunedSkill = Mathf.Clamp(profile.skill + offset, 0.45f, 0.99f);
-                _aiDrivers[i].Configure(profile.name, tunedSkill, profile.latOffset);
+                var racer = DefaultAiRacers[i % DefaultAiRacers.Length];
+                _aiDrivers[i].Configure(racer.name, activeProfile, racer.latOffset, racer.skillOffset);
             }
         }
 
