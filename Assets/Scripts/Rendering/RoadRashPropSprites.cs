@@ -27,15 +27,27 @@ namespace RacingGame
 
         public static Sprite GetPropSprite(RoadsidePropKind kind)
         {
-            return kind switch
+            switch (kind)
             {
-                RoadsidePropKind.UtilityPole => _utilityPole ??= CreateUtilityPoleSprite(),
-                RoadsidePropKind.FencePost => _fencePost ??= CreateFencePostSprite(),
-                RoadsidePropKind.ChevronLeft => _chevronLeft ??= CreateChevronSprite(-1),
-                RoadsidePropKind.ChevronRight => _chevronRight ??= CreateChevronSprite(1),
-                RoadsidePropKind.Tree => _tree ??= CreateTreeSprite(),
-                _ => _milePost ??= CreateMilePostSprite()
-            };
+                case RoadsidePropKind.UtilityPole:
+                    if (_utilityPole == null) _utilityPole = CreateUtilityPoleSprite();
+                    return _utilityPole;
+                case RoadsidePropKind.FencePost:
+                    if (_fencePost == null) _fencePost = CreateFencePostSprite();
+                    return _fencePost;
+                case RoadsidePropKind.ChevronLeft:
+                    if (_chevronLeft == null) _chevronLeft = CreateChevronSprite(-1);
+                    return _chevronLeft;
+                case RoadsidePropKind.ChevronRight:
+                    if (_chevronRight == null) _chevronRight = CreateChevronSprite(1);
+                    return _chevronRight;
+                case RoadsidePropKind.Tree:
+                    if (_tree == null) _tree = CreateTreeSprite();
+                    return _tree;
+                default:
+                    if (_milePost == null) _milePost = CreateMilePostSprite();
+                    return _milePost;
+            }
         }
 
         private static Sprite CreateUtilityPoleSprite()

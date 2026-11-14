@@ -152,5 +152,22 @@ namespace RacingGame.Tests
                 Object.DestroyImmediate(drv2Go);
             }
         }
+
+        [Test]
+        public void PropSprites_RegenerateWhenDestroyedWithoutDomainReload()
+        {
+            foreach (RoadsidePropKind kind in System.Enum.GetValues(typeof(RoadsidePropKind)))
+            {
+                Sprite first = RoadRashPropSprites.GetPropSprite(kind);
+                Assert.IsTrue(first != null, $"Initial sprite missing for {kind}");
+
+                Object.DestroyImmediate(first);
+                Assert.IsTrue(first == null, $"Destroyed Unity Sprite should evaluate equal to null for {kind}");
+
+                Sprite regenerated = RoadRashPropSprites.GetPropSprite(kind);
+                Assert.IsTrue(regenerated != null, $"Regenerated sprite missing for {kind}");
+                Assert.IsTrue(regenerated.texture != null, $"Regenerated texture missing for {kind}");
+            }
+        }
     }
 }

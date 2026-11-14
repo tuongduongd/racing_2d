@@ -4,11 +4,9 @@ using UnityEngine;
 namespace RacingGame
 {
     /// <summary>
-    /// Renders a PS1 Road Rash-inspired pseudo-3D behind-the-bike view:
-    /// textured 4-lane asphalt highway with double yellow center lines, sloping valley hillsides,
-    /// parallax rocky mountains, horizon fog, pooled sprite roadside props (utility poles,
-    /// fence posts, chevron signs, trees), multi-pose rider/bike sprites with kick animation
-    /// and HDR brake lights, plus dynamic camera juice and VFX integration.
+    /// Renders a PS1 Road Rash-inspired pseudo-3D behind-the-bike view with unified
+    /// chase-camera projection so player bike, opponent bikes, road markings, and roadside props
+    /// share exact perspective scale, vertical ground placement, lateral spacing, and depth order.
     /// </summary>
     public class RoadRashRenderer2D : MonoBehaviour
     {
@@ -19,12 +17,15 @@ namespace RacingGame
         [SerializeField] private RaceVfxController vfxController;
 
         [Header("Pseudo-3D Projection")]
-        [SerializeField] private int sliceCount = 96;
-        [SerializeField] private float sliceStep = 2.0f;
+        [SerializeField] private int sliceCount = 104;
+        [SerializeField] private float sliceStep = 1.9f;
+        [SerializeField] private float firstSliceZ = 1.0f;
+        [SerializeField] private float playerCameraZ = 5.4f;
         [SerializeField] private float cameraHeight = 2.55f;
         [SerializeField] private float cameraDepth = 0.86f;
         [SerializeField] private float curveVisualGain = 2.55f;
         [SerializeField] private float hillVisualGain = 0.048f;
+        [SerializeField] private float bikeVisualScale = 2.05f;
 
         [Header("Camera Feel")]
         [SerializeField] private float baseOrthoSize = 5.0f;
@@ -52,6 +53,7 @@ namespace RacingGame
 
         private GameManager _gameManager;
         private SliceData[] _slices;
+        private SliceData _playerSlice;
         private float _horizonScroll;
         private float _wheelAnimPhase;
         private float _shakeTrauma;
@@ -172,7 +174,7 @@ namespace RacingGame
             Car other = a == playerCar ? b : a;
             if (other == playerCar)
             {
-                vfxController.EmitImpactSparks(new Vector3(0f, -2.1f, -0.3f), intensity);
+                vfxController.EmitImpactSparks(new Vector3(0f, _playerSlice.screenY + 0.8f, -0.3f), intensity);
                 return;
             }
 
@@ -181,8 +183,8 @@ namespace RacingGame
                 OpponentSpriteSlot slot = _opponentPool[i];
                 if (slot.isVisible && slot.boundCar == other)
                 {
-                    Vector3 playerPos = _bikeRenderer != null ? _bikeRenderer.transform.position : new Vector3(0f, -2.9f, -0.2f);
-                    Vector3 mid = Vector3.Lerp(playerPos, slot.lastScreenPos, 0.5f) + Vector3.up * 0.85f;
+                    Vector3 playerPos = _bikeRenderer != null ? _bikeRenderer.transform.position : new Vector3(0f, _playerSlice.screenY, -0.2f);
+                    Vector3 mid = Vector3.Lerp(playerPos, slot.lastScreenPos, 0.5f) + Vector3.up * 0.75f;
                     vfxController.EmitImpactSparks(mid, intensity);
                     return;
                 }
@@ -190,7 +192,7 @@ namespace RacingGame
 
             if (a == playerCar || b == playerCar)
             {
-                vfxController.EmitImpactSparks(new Vector3(0f, -2.0f, -0.3f), intensity);
+                vfxController.EmitImpactSparks(new Vector3(0f, _playerSlice.screenY + 0.8f, -0.3f), intensity);
             }
         }
 
@@ -203,7 +205,7 @@ namespace RacingGame
                 targetCamera.orthographicSize = baseOrthoSize;
                 targetCamera.transform.position = new Vector3(0f, 0f, -10f);
                 targetCamera.transform.rotation = Quaternion.identity;
-                targetCamera.backgroundColor = RoadRashVisualTheme.SkyTop;
+                targetCamera.backgroundColor = RoadRashVisualTheme.SkyHorizon;
             }
 
             if (vfxController == null)
@@ -247,12 +249,10 @@ namespace RacingGame
                 _shadowRenderer = shadowObj.AddComponent<SpriteRenderer>();
                 _shadowRenderer.sprite = RoadRashBikeSprites.GetShadowSprite();
                 _shadowRenderer.color = new Color(0f, 0f, 0f, 0.58f);
-                _shadowRenderer.sortingOrder = 499;
 
                 GameObject bikeObj = new GameObject("PlayerBikeSprite");
                 bikeObj.transform.SetParent(transform, false);
                 _bikeRenderer = bikeObj.AddComponent<SpriteRenderer>();
-                _bikeRenderer.sortingOrder = 500;
 
                 GameObject tailObj = new GameObject("PlayerTailLight");
                 tailObj.transform.SetParent(bikeObj.transform, false);
@@ -260,7 +260,6 @@ namespace RacingGame
                 tailObj.transform.localScale = new Vector3(0.42f, 0.22f, 1f);
                 _tailLightRenderer = tailObj.AddComponent<SpriteRenderer>();
                 _tailLightRenderer.sprite = RoadRashBikeSprites.GetTailLightSprite();
-                _tailLightRenderer.sortingOrder = 502;
             }
         }
 
@@ -288,8 +287,8 @@ namespace RacingGame
                 float speedNorm = Mathf.Clamp01(playerCar.Physics.Speed / Mathf.Max(1f, playerCar.Physics.MaxSpeed));
                 bool isRacing = _gameManager == null || _gameManager.CurrentFlowState == GameFlowState.Racing;
                 Vector3 tirePos = _bikeRenderer != null
-                    ? _bikeRenderer.transform.position + new Vector3(0f, 0.15f, -0.05f)
-                    : new Vector3(0f, -3.2f, -0.25f);
+                    ? _bikeRenderer.transform.position + new Vector3(0f, 0.12f, -0.05f)
+                    : new Vector3(0f, -3.5f, -0.25f);
                 vfxController.UpdateFrameEffects(Time.deltaTime, speedNorm, !playerCar.IsOnTrack, isRacing, tirePos);
             }
         }
@@ -335,26 +334,37 @@ namespace RacingGame
             float headingError = isMenuBackdrop ? 0f : SignedAngleRad(playerSample.tangent, playerCar.Physics.Forward);
             float baseElevation = playerSample.elevation;
 
-            float horizonY = halfH * 0.20f;
+            float horizonY = halfH * 0.22f;
 
-            // 1. Sky gradient (2 bands: cobalt top -> mid sky -> pale horizon haze)
+            // 1. Sky gradient (cobalt top -> mid sky -> pale horizon haze)
             float skyMidY = Mathf.Lerp(horizonY, halfH, 0.52f);
             AddQuad(
-                new Vector2(-halfW, skyMidY),
-                new Vector2(halfW, skyMidY),
-                new Vector2(halfW, halfH),
-                new Vector2(-halfW, halfH),
+                new Vector2(-halfW - 1f, skyMidY),
+                new Vector2(halfW + 1f, skyMidY),
+                new Vector2(halfW + 1f, halfH + 1f),
+                new Vector2(-halfW - 1f, halfH + 1f),
                 RoadRashVisualTheme.SkyMid, RoadRashVisualTheme.SkyMid,
                 RoadRashVisualTheme.SkyTop, RoadRashVisualTheme.SkyTop,
                 0f
             );
             AddQuad(
-                new Vector2(-halfW, horizonY),
-                new Vector2(halfW, horizonY),
-                new Vector2(halfW, skyMidY),
-                new Vector2(-halfW, skyMidY),
+                new Vector2(-halfW - 1f, horizonY),
+                new Vector2(halfW + 1f, horizonY),
+                new Vector2(halfW + 1f, skyMidY),
+                new Vector2(-halfW - 1f, skyMidY),
                 RoadRashVisualTheme.SkyHorizon, RoadRashVisualTheme.SkyHorizon,
                 RoadRashVisualTheme.SkyMid, RoadRashVisualTheme.SkyMid,
+                0f
+            );
+
+            // Base ground horizon cap so no background sky strip ever leaks below hills or at corners
+            AddQuad(
+                new Vector2(-halfW - 1f, -halfH - 1.5f),
+                new Vector2(halfW + 1f, -halfH - 1.5f),
+                new Vector2(halfW + 1f, horizonY),
+                new Vector2(-halfW - 1f, horizonY),
+                RoadRashVisualTheme.TerrainGrassDark, RoadRashVisualTheme.TerrainGrassDark,
+                RoadRashVisualTheme.SkyHorizon, RoadRashVisualTheme.SkyHorizon,
                 0f
             );
 
@@ -362,38 +372,44 @@ namespace RacingGame
             _horizonScroll -= scrollSpeed * (headingError + playerSample.curvature * 18f) * Time.deltaTime * 0.14f;
 
             // 2. Parallax mountains & valley hills
-            DrawSunGlow(halfW, horizonY);
+            DrawSunCircle(halfW, horizonY);
             DrawParallaxMountains(halfW, horizonY);
 
-            // 3. Project road slices
+            // 3. Project road slices anchored cleanly at playerCameraZ so baseS aligns under player's rear tire
             float curveAcc = 0f;
             float xOffset = 0f;
             float playerLatNorm = isMenuBackdrop ? 0f : playerCar.LateralOffset / Mathf.Max(1f, track.TrackWidth * 0.5f);
             float headingShift = Mathf.Tan(Mathf.Clamp(headingError, -0.7f, 0.7f)) * halfW * 0.85f;
+            float maxAheadZ = Mathf.Max(1f, (firstSliceZ + (sliceCount - 1) * sliceStep) - playerCameraZ);
 
             int validSlices = 0;
-            float maxDrawnY = -halfH;
+            float maxDrawnY = -halfH - 4.0f;
 
             for (int i = 0; i < sliceCount; i++)
             {
-                float worldZ = (i + 1) * sliceStep;
+                float worldZ = firstSliceZ + i * sliceStep;
+                float dzFromPlayer = worldZ - playerCameraZ;
                 float scale = cameraDepth / (worldZ * 0.135f + 0.34f);
-                float sampleS = track.WrapDistance(baseS + worldZ);
+                float sampleS = track.WrapDistance(baseS + dzFromPlayer);
                 TrackSample sample = track.SampleAtDistance(sampleS);
 
-                curveAcc += sample.curvature * sliceStep * curveVisualGain;
-                xOffset += curveAcc * 0.045f;
+                if (dzFromPlayer > 0f)
+                {
+                    float segDz = Mathf.Min(sliceStep, dzFromPlayer);
+                    curveAcc += sample.curvature * segDz * curveVisualGain;
+                    xOffset += curveAcc * (segDz / sliceStep) * 0.045f;
+                }
 
                 float hillDelta = (sample.elevation - baseElevation) * hillVisualGain * scale;
                 float projY = horizonY - cameraHeight * scale * 2.25f + hillDelta;
 
-                if (i == 0) projY = Mathf.Min(projY, -halfH * 0.99f);
                 bool occluded = projY < maxDrawnY;
                 float clampedY = Mathf.Max(projY, maxDrawnY);
 
                 float roadHalfW = (track.TrackWidth * 0.5f) * scale * 0.44f;
                 float shoulderHalfW = roadHalfW * 1.19f;
-                float centerX = xOffset - playerLatNorm * roadHalfW * 0.95f + headingShift * (i / (float)sliceCount);
+                float forwardT = Mathf.Clamp01(dzFromPlayer / maxAheadZ);
+                float centerX = xOffset - playerLatNorm * roadHalfW * 0.92f + headingShift * forwardT;
 
                 int stripe = Mathf.FloorToInt(sampleS / 5.5f);
                 bool isStartLine = sampleS < 4.5f || sampleS > track.TotalLength - 2.5f;
@@ -417,6 +433,11 @@ namespace RacingGame
                 validSlices++;
             }
 
+            if (!TrySampleAtCameraZ(playerCameraZ, out _playerSlice))
+            {
+                _playerSlice = _slices[0];
+            }
+
             // 4. Draw road, gravel shoulders, flanking valley embankments, and 4-lane markings
             for (int i = 0; i < validSlices - 1; i++)
             {
@@ -424,8 +445,10 @@ namespace RacingGame
                 SliceData b = _slices[i + 1];
                 if (b.screenY <= a.screenY + 0.0001f) continue;
 
-                float fogA = Mathf.SmoothStep(0.32f, 1.0f, i / (float)(validSlices - 1)) * 0.85f;
-                float fogB = Mathf.SmoothStep(0.32f, 1.0f, (i + 1) / (float)(validSlices - 1)) * 0.85f;
+                float tA = i / (float)(validSlices - 1);
+                float tB = (i + 1) / (float)(validSlices - 1);
+                float fogA = SmoothFactor(0.45f, 1.0f, tA) * 0.88f;
+                float fogB = SmoothFactor(0.45f, 1.0f, tB) * 0.88f;
 
                 bool even = (a.stripeIndex % 2) == 0;
                 Color earthA = Color.Lerp(even ? RoadRashVisualTheme.TerrainEarthLight : RoadRashVisualTheme.TerrainEarthDark, RoadRashVisualTheme.SkyHorizon, fogA);
@@ -441,29 +464,29 @@ namespace RacingGame
                 float uvYb = b.worldS * 0.15f;
 
                 // Left sloping hillside embankment (earthy brown like screenshot left slope)
-                float leftSlopeRiseA = 0.75f * a.scale;
-                float leftSlopeRiseB = 0.75f * b.scale;
+                float leftSlopeRiseA = i == 0 ? 0f : 0.72f * a.scale;
+                float leftSlopeRiseB = 0.72f * b.scale;
                 AddTexturedQuad(
-                    new Vector2(-halfW - 1.2f, a.screenY + leftSlopeRiseA),
+                    new Vector2(-halfW - 1.5f, a.screenY + leftSlopeRiseA),
                     new Vector2(a.centerX - a.shoulderHalfW, a.screenY),
                     new Vector2(b.centerX - b.shoulderHalfW, b.screenY),
-                    new Vector2(-halfW - 1.2f, b.screenY + leftSlopeRiseB),
+                    new Vector2(-halfW - 1.5f, b.screenY + leftSlopeRiseB),
                     earthA, grassA, grassB, earthB,
                     new Vector2(-3.5f, uvYa), new Vector2(-1f, uvYa), new Vector2(-1f, uvYb), new Vector2(-3.5f, uvYb),
-                    0.30f
+                    0.28f
                 );
 
                 // Right valley grass & rolling slope
-                float rightSlopeRiseA = 0.35f * a.scale;
-                float rightSlopeRiseB = 0.35f * b.scale;
+                float rightSlopeRiseA = i == 0 ? 0f : 0.34f * a.scale;
+                float rightSlopeRiseB = 0.34f * b.scale;
                 AddTexturedQuad(
                     new Vector2(a.centerX + a.shoulderHalfW, a.screenY),
-                    new Vector2(halfW + 1.2f, a.screenY + rightSlopeRiseA),
-                    new Vector2(halfW + 1.2f, b.screenY + rightSlopeRiseB),
+                    new Vector2(halfW + 1.5f, a.screenY + rightSlopeRiseA),
+                    new Vector2(halfW + 1.5f, b.screenY + rightSlopeRiseB),
                     new Vector2(b.centerX + b.shoulderHalfW, b.screenY),
                     grassA, earthA, earthB, grassB,
                     new Vector2(1f, uvYa), new Vector2(3.5f, uvYa), new Vector2(3.5f, uvYb), new Vector2(1f, uvYb),
-                    0.28f
+                    0.26f
                 );
 
                 // Gravel/dirt road shoulders
@@ -485,7 +508,7 @@ namespace RacingGame
                     new Vector2(b.centerX - b.roadHalfW, b.screenY),
                     roadA, roadA, roadB, roadB,
                     new Vector2(-1f, uvYa), new Vector2(1f, uvYa), new Vector2(1f, uvYb), new Vector2(-1f, uvYb),
-                    0.22f
+                    0.20f
                 );
 
                 if (a.isStartLine)
@@ -536,7 +559,7 @@ namespace RacingGame
             _mesh.SetColors(_colors);
             _mesh.RecalculateBounds();
 
-            // 5. Render pooled roadside sprite props (utility poles, fence posts, chevron signs, trees)
+            // 5. Render pooled roadside sprite props
             UpdateRoadsideProps(validSlices);
         }
 
@@ -561,30 +584,45 @@ namespace RacingGame
             }
         }
 
-        private void DrawSunGlow(float halfW, float horizonY)
+        private void DrawSunCircle(float halfW, float horizonY)
         {
-            float sunX = -halfW * 0.45f + (_horizonScroll * 0.15f % 4f);
-            float sunY = horizonY + 1.8f;
-            float r = 0.95f;
-            Color center = RoadRashVisualTheme.SunGlow;
-            Color edge = new Color(RoadRashVisualTheme.SkyMid.r, RoadRashVisualTheme.SkyMid.g, RoadRashVisualTheme.SkyMid.b, 0f);
-            AddQuad(
-                new Vector2(sunX - r, sunY - r),
-                new Vector2(sunX + r, sunY - r),
-                new Vector2(sunX + r, sunY + r),
-                new Vector2(sunX - r, sunY + r),
-                edge, edge, center, center, 0f
-            );
+            float sunX = -halfW * 0.42f + (_horizonScroll * 0.12f % 3.5f);
+            float sunY = horizonY + 1.65f;
+            float radius = 0.72f;
+            Color centerCol = new Color(RoadRashVisualTheme.SunGlow.r, RoadRashVisualTheme.SunGlow.g, RoadRashVisualTheme.SunGlow.b, 0.55f);
+            Color edgeCol = new Color(RoadRashVisualTheme.SkyMid.r, RoadRashVisualTheme.SkyMid.g, RoadRashVisualTheme.SkyMid.b, 0f);
+
+            const int segs = 16;
+            int centerIdx = _verts.Count;
+            _verts.Add(new Vector3(sunX, sunY, 0f));
+            _uvs.Add(Vector2.zero);
+            _uv1s.Add(Vector2.zero);
+            _colors.Add(centerCol);
+
+            for (int i = 0; i <= segs; i++)
+            {
+                float ang = (i / (float)segs) * Mathf.PI * 2f;
+                _verts.Add(new Vector3(sunX + Mathf.Cos(ang) * radius, sunY + Mathf.Sin(ang) * radius, 0f));
+                _uvs.Add(Vector2.zero);
+                _uv1s.Add(Vector2.zero);
+                _colors.Add(edgeCol);
+            }
+
+            for (int i = 0; i < segs; i++)
+            {
+                _tris.Add(centerIdx);
+                _tris.Add(centerIdx + 1 + i);
+                _tris.Add(centerIdx + 2 + i);
+            }
         }
 
         private void DrawParallaxMountains(float halfW, float horizonY)
         {
-            // Far rocky ridge (like screenshot's jagged distant brown/slate mountains)
             const int farSegs = 22;
-            float farW = (halfW * 2f + 1.6f) / farSegs;
+            float farW = (halfW * 2f + 2.0f) / farSegs;
             for (int i = 0; i < farSegs; i++)
             {
-                float x0 = -halfW - 0.8f + i * farW;
+                float x0 = -halfW - 1.0f + i * farW;
                 float x1 = x0 + farW;
                 float u0 = i * 0.65f + _horizonScroll * 0.45f;
                 float u1 = (i + 1) * 0.65f + _horizonScroll * 0.45f;
@@ -602,12 +640,11 @@ namespace RacingGame
                 );
             }
 
-            // Mid olive-green rolling hills
             const int midSegs = 18;
-            float midW = (halfW * 2f + 1.6f) / midSegs;
+            float midW = (halfW * 2f + 2.0f) / midSegs;
             for (int i = 0; i < midSegs; i++)
             {
-                float x0 = -halfW - 0.8f + i * midW;
+                float x0 = -halfW - 1.0f + i * midW;
                 float x1 = x0 + midW;
                 float u0 = i * 0.72f + _horizonScroll * 0.85f + 1.4f;
                 float u1 = (i + 1) * 0.72f + _horizonScroll * 0.85f + 1.4f;
@@ -639,35 +676,35 @@ namespace RacingGame
                 int prevSlot9 = Mathf.FloorToInt(_slices[i - 1].worldS / 9f);
                 if (slot9 == prevSlot9) continue;
 
-                float fog = Mathf.SmoothStep(0.35f, 1.0f, i / (float)(validSlices - 1)) * 0.82f;
+                float fog = SmoothFactor(0.45f, 1.0f, i / (float)(validSlices - 1)) * 0.84f;
                 Color tint = Color.Lerp(Color.white, RoadRashVisualTheme.SkyHorizon, fog);
                 int baseOrder = Mathf.Clamp(475 - Mathf.RoundToInt(s.worldZ * 2.5f), 15, 475);
 
-                // Left side: wooden fence posts every 9m + occasional utility pole on straightaways
-                float leftX = s.centerX - s.shoulderHalfW - s.scale * 0.95f;
-                PlaceProp(propIdx++, RoadsidePropKind.FencePost, leftX, s.screenY + s.scale * 0.10f, s.scale * 1.1f, baseOrder, tint);
+                // Left embankment: wooden fence posts every 9m
+                float leftX = s.centerX - s.shoulderHalfW - s.scale * 0.85f;
+                PlaceProp(propIdx++, RoadsidePropKind.FencePost, leftX, s.screenY + s.scale * 0.08f, s.scale * 1.15f, baseOrder, tint);
 
-                // Every 18m: tall wooden telephone pole on left or right
+                // Every 18m: tall wooden telephone pole on left roadside (like screenshot)
                 if ((slot9 % 2) == 0)
                 {
-                    float poleX = s.centerX - s.shoulderHalfW - s.scale * 1.65f;
-                    PlaceProp(propIdx++, RoadsidePropKind.UtilityPole, poleX, s.screenY + s.scale * 0.16f, s.scale * 1.38f, baseOrder + 1, tint);
+                    float poleX = s.centerX - s.shoulderHalfW - s.scale * 1.45f;
+                    PlaceProp(propIdx++, RoadsidePropKind.UtilityPole, poleX, s.screenY + s.scale * 0.14f, s.scale * 1.45f, baseOrder + 1, tint);
                 }
 
-                // Sharp curve chevron warning signs on outer edge!
+                // Sharp curve chevron warning signs on outer edge
                 if (Mathf.Abs(s.curvature) > 0.012f && (slot9 % 2) == 0)
                 {
                     bool rightTurn = s.curvature > 0f;
                     RoadsidePropKind signKind = rightTurn ? RoadsidePropKind.ChevronRight : RoadsidePropKind.ChevronLeft;
                     float signSide = rightTurn ? -1f : 1f;
                     float signX = s.centerX + signSide * (s.shoulderHalfW + s.scale * 0.65f);
-                    PlaceProp(propIdx++, signKind, signX, s.screenY + s.scale * 0.04f, s.scale * 1.25f, baseOrder + 2, tint);
+                    PlaceProp(propIdx++, signKind, signX, s.screenY + s.scale * 0.04f, s.scale * 1.3f, baseOrder + 2, tint);
                 }
                 else if ((slot9 % 3) == 0)
                 {
-                    float rightX = s.centerX + s.shoulderHalfW + s.scale * 1.45f;
+                    float rightX = s.centerX + s.shoulderHalfW + s.scale * 1.35f;
                     RoadsidePropKind rightKind = (slot9 % 6) == 0 ? RoadsidePropKind.Tree : RoadsidePropKind.MilePost;
-                    PlaceProp(propIdx++, rightKind, rightX, s.screenY + s.scale * 0.08f, s.scale * (rightKind == RoadsidePropKind.Tree ? 1.55f : 1.0f), baseOrder, tint);
+                    PlaceProp(propIdx++, rightKind, rightX, s.screenY + s.scale * 0.06f, s.scale * (rightKind == RoadsidePropKind.Tree ? 1.6f : 1.05f), baseOrder, tint);
                 }
             }
 
@@ -704,40 +741,48 @@ namespace RacingGame
             _wheelAnimPhase += Time.deltaTime * Mathf.Lerp(2f, 22f, speedNorm);
             int animFrame = Mathf.FloorToInt(_wheelAnimPhase);
 
-            float vibe = Mathf.Sin(Time.time * 42f) * 0.018f * speedNorm;
+            float vibe = Mathf.Sin(Time.time * 42f) * 0.015f * speedNorm;
             if (!isMenuBackdrop && !playerCar.IsOnTrack && playerCar.Physics.Speed > 3f)
             {
-                vibe += Mathf.Sin(Time.time * 75f) * 0.055f;
+                vibe += Mathf.Sin(Time.time * 75f) * 0.050f;
             }
+
+            float pScale = _playerSlice.scale * bikeVisualScale;
+            float pGroundY = _playerSlice.screenY;
+            int playerOrder = Mathf.Clamp(480 - Mathf.RoundToInt(playerCameraZ * 2.5f), 20, 480);
 
             BikeSpriteSet set = RoadRashBikeSprites.GetOrCreateSet(playerCar.BikeColor);
             BikePose pose = ResolveBikePose(playerCar);
             _bikeRenderer.sprite = RoadRashBikeSprites.SelectPoseSprite(set, pose, animFrame);
             _bikeRenderer.color = Color.white;
+            _bikeRenderer.sortingOrder = playerOrder;
 
-            Vector3 bikePos = new Vector3(0f, -3.55f + vibe, -0.2f);
+            Vector3 bikePos = new Vector3(0f, pGroundY + vibe, -0.2f);
             _bikeRenderer.transform.position = bikePos;
             float rollDeg = playerCar.IsKicking ? -playerCar.KickDirection * 6f : -playerCar.LeanAngle * 14f;
             _bikeRenderer.transform.rotation = Quaternion.Euler(0f, 0f, rollDeg);
-            _bikeRenderer.transform.localScale = Vector3.one * 1.95f;
+            _bikeRenderer.transform.localScale = Vector3.one * pScale;
 
             if (_tailLightRenderer != null)
             {
                 bool braking = !isMenuBackdrop && playerCar.LastInput.brake > 0.1f;
                 _tailLightRenderer.color = braking ? RoadRashVisualTheme.TailLightBrakeHdr : RoadRashVisualTheme.TailLightIdle;
                 _tailLightRenderer.transform.localScale = braking ? new Vector3(0.55f, 0.30f, 1f) : new Vector3(0.38f, 0.18f, 1f);
+                _tailLightRenderer.sortingOrder = playerOrder + 1;
             }
 
             if (_shadowRenderer != null)
             {
-                _shadowRenderer.transform.position = new Vector3(playerCar.LeanAngle * 0.16f, -3.58f, -0.1f);
-                _shadowRenderer.transform.localScale = new Vector3(1.65f, 0.85f, 1f);
+                _shadowRenderer.transform.position = new Vector3(playerCar.LeanAngle * 0.10f * _playerSlice.scale, pGroundY - 0.02f * _playerSlice.scale, -0.1f);
+                _shadowRenderer.transform.localScale = new Vector3(1.55f * pScale * 0.52f, 0.82f * pScale * 0.52f, 1f);
+                _shadowRenderer.sortingOrder = playerOrder - 1;
             }
         }
 
         private void UpdateOpponentBikeVisuals(bool isMenuBackdrop)
         {
-            float maxVisibleZ = sliceCount * sliceStep;
+            float maxAheadDz = (firstSliceZ + (sliceCount - 1) * sliceStep) - playerCameraZ - sliceStep;
+            float minBehindDz = -(playerCameraZ - 1.5f);
             float totalLen = track.TotalLength;
             float playerS = isMenuBackdrop ? _idleDemoScroll : playerCar.TrackDistance;
             int animFrame = Mathf.FloorToInt(_wheelAnimPhase);
@@ -752,9 +797,10 @@ namespace RacingGame
                 if (dz < -totalLen * 0.5f) dz += totalLen;
                 if (dz > totalLen * 0.5f) dz -= totalLen;
 
-                if (dz >= 0.8f && dz <= maxVisibleZ - sliceStep)
+                if (dz >= minBehindDz && dz <= maxAheadDz)
                 {
-                    if (TrySampleProjectedSlice(dz, out SliceData slice) && !slice.occluded)
+                    float oppZ = playerCameraZ + dz;
+                    if (TrySampleAtCameraZ(oppZ, out SliceData slice) && !slice.occluded)
                     {
                         OpponentSpriteSlot slot = GetOrCreateOpponentSlot(slotIdx++);
                         slot.boundCar = other;
@@ -763,11 +809,11 @@ namespace RacingGame
                         slot.shadow.gameObject.SetActive(true);
 
                         float otherLatNorm = other.LateralOffset / Mathf.Max(1f, track.TrackWidth * 0.5f);
-                        float screenX = slice.centerX + otherLatNorm * slice.roadHalfW * 0.95f;
-                        float spriteScale = slice.scale * 1.72f;
+                        float screenX = slice.centerX + otherLatNorm * slice.roadHalfW * 0.92f;
+                        float spriteScale = slice.scale * bikeVisualScale;
 
-                        int order = Mathf.Clamp(480 - Mathf.RoundToInt(dz * 2.5f), 20, 480);
-                        float fog = Mathf.SmoothStep(0.45f, 1.0f, dz / maxVisibleZ) * 0.72f;
+                        int order = Mathf.Clamp(480 - Mathf.RoundToInt(oppZ * 2.5f), 20, 495);
+                        float fog = SmoothFactor(0.45f, 1.0f, oppZ / (firstSliceZ + sliceCount * sliceStep)) * 0.72f;
                         Color fogTint = Color.Lerp(Color.white, RoadRashVisualTheme.SkyHorizon, fog);
 
                         BikeSpriteSet set = RoadRashBikeSprites.GetOrCreateSet(other.BikeColor);
@@ -792,7 +838,7 @@ namespace RacingGame
                             slot.tailLight.sortingOrder = order + 1;
                         }
 
-                        slot.shadow.transform.position = new Vector3(screenX + other.LeanAngle * 0.08f * slice.scale, slice.screenY - 0.03f * slice.scale, -0.1f);
+                        slot.shadow.transform.position = new Vector3(screenX + other.LeanAngle * 0.10f * slice.scale, slice.screenY - 0.02f * slice.scale, -0.1f);
                         slot.shadow.transform.localScale = new Vector3(1.55f * spriteScale * 0.52f, 0.82f * spriteScale * 0.52f, 1f);
                         slot.shadow.sortingOrder = order - 1;
                     }
@@ -827,9 +873,9 @@ namespace RacingGame
             return BikePose.Upright;
         }
 
-        private bool TrySampleProjectedSlice(float dz, out SliceData result)
+        private bool TrySampleAtCameraZ(float cameraZ, out SliceData result)
         {
-            float fIdx = (dz / sliceStep) - 1f;
+            float fIdx = (cameraZ - firstSliceZ) / sliceStep;
             int idx0 = Mathf.Clamp(Mathf.FloorToInt(fIdx), 0, sliceCount - 2);
             int idx1 = idx0 + 1;
             float t = Mathf.Clamp01(fIdx - idx0);
@@ -839,7 +885,7 @@ namespace RacingGame
 
             result = new SliceData
             {
-                worldZ = dz,
+                worldZ = cameraZ,
                 screenY = Mathf.Lerp(a.screenY, b.screenY, t),
                 centerX = Mathf.Lerp(a.centerX, b.centerX, t),
                 roadHalfW = Mathf.Lerp(a.roadHalfW, b.roadHalfW, t),
@@ -931,6 +977,12 @@ namespace RacingGame
             _tris.Add(idx);
             _tris.Add(idx + 3);
             _tris.Add(idx + 2);
+        }
+
+        private static float SmoothFactor(float edge0, float edge1, float x)
+        {
+            float t = Mathf.Clamp01((x - edge0) / Mathf.Max(0.0001f, edge1 - edge0));
+            return t * t * (3f - 2f * t);
         }
 
         private static float SignedAngleRad(Vector2 from, Vector2 to)
