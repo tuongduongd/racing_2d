@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a139117f16347f742aec50eeab99243c, type: 3}
+  m_Name: Skin_ShopeeFood
+  m_EditorClassIdentifier: RacingGame::RacingGame.BikeSkinData
+  skinId: 1
+  displayName: Shopee Food
+  tagline: "Chi\u1EBFn th\u1EA7n \u0111\u01A1n cam"
+  primaryColor: {r: 0.93, g: 0.3, b: 0.18, a: 1}
+  secondaryColor: {r: 1, g: 0.93, b: 0.88, a: 1}
+  helmetColor: {r: 0.93, g: 0.3, b: 0.18, a: 1}
+  customMaterial: {fileID: 0}
+  customTexture: {fileID: 0}
+  customSprite: {fileID: 0}
+  customLogoSprite: {fileID: 0}

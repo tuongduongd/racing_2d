@@ -81,6 +81,10 @@ namespace RacingGame
             if (_gameManager != null)
             {
                 _gameManager.RacerKicked += HandleRacerKicked;
+                if (_gameManager.ObstacleSystem != null)
+                {
+                    _gameManager.ObstacleSystem.ObstacleHit += HandleObstacleHit;
+                }
             }
 
             EnsureBuilt();
@@ -109,7 +113,17 @@ namespace RacingGame
             if (_gameManager != null)
             {
                 _gameManager.RacerKicked -= HandleRacerKicked;
+                if (_gameManager.ObstacleSystem != null)
+                {
+                    _gameManager.ObstacleSystem.ObstacleHit -= HandleObstacleHit;
+                }
             }
+        }
+
+        private void HandleObstacleHit(Car car, TrackObstacle obstacle)
+        {
+            if (car != _player || obstacle == null) return;
+            ShowFlash("⚠ VA CHẠM CHƯỚNG NGẠI VẬT!", RoadRashVisualTheme.DangerRed, 1.0f);
         }
 
         private void HandleLapCompleted(RacerProgress progress)
@@ -186,8 +200,23 @@ namespace RacingGame
 
             if (_trackStateText != null)
             {
-                _trackStateText.text = _player.IsOnTrack ? "ON ROAD" : "OFF-ROAD!";
-                _trackStateText.color = _player.IsOnTrack ? RoadRashVisualTheme.AccentGreen : RoadRashVisualTheme.DangerRed;
+                bool policeNear = _gameManager != null && _gameManager.PoliceController != null &&
+                                  _gameManager.PoliceController.IsPlayerInWarningRange;
+                if (!_player.IsOnTrack)
+                {
+                    _trackStateText.text = "OFF-ROAD!";
+                    _trackStateText.color = RoadRashVisualTheme.DangerRed;
+                }
+                else if (policeNear)
+                {
+                    _trackStateText.text = "CẢNH SÁT ĐUỔI!";
+                    _trackStateText.color = _gameManager.PoliceController.CurrentSirenColor;
+                }
+                else
+                {
+                    _trackStateText.text = "ON ROAD";
+                    _trackStateText.color = RoadRashVisualTheme.AccentGreen;
+                }
             }
 
             if (_needleRect != null)
@@ -579,9 +608,9 @@ namespace RacingGame
             barRt.anchoredPosition = new Vector2(16f, -184f);
             barRt.sizeDelta = new Vector2(300f, 30f);
 
-            Button menuBtn = RoadRashUiSprites.CreateBevelButton(bar.transform, "MenuBtn", "Menu [Esc]", RoadRashVisualTheme.MetalMid, 12);
+            Button menuBtn = RoadRashUiSprites.CreateBevelButton(bar.transform, "MenuBtn", "Pause [Esc]", RoadRashVisualTheme.MetalMid, 12);
             SetFixedRect(menuBtn.GetComponent<RectTransform>(), 0f, 0f, 92f, 28f);
-            menuBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
+            menuBtn.onClick.AddListener(() => _gameManager?.TogglePause());
 
             Button restartBtn = RoadRashUiSprites.CreateBevelButton(bar.transform, "RestartBtn", "Đua lại [R]", RoadRashVisualTheme.MetalMid, 12);
             SetFixedRect(restartBtn.GetComponent<RectTransform>(), 98f, 0f, 92f, 28f);

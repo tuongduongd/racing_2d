@@ -92,14 +92,14 @@ namespace RacingGame
             Keyboard kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.rKey.wasPressedThisFrame)
+                if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame)
                 {
-                    gm.StartRace();
+                    gm.TogglePause();
                     return;
                 }
-                if (kb.escapeKey.wasPressedThisFrame)
+                if (!gm.IsPaused && kb.rKey.wasPressedThisFrame)
                 {
-                    gm.TransitionTo(GameFlowState.MainMenu);
+                    gm.StartRace();
                     return;
                 }
             }

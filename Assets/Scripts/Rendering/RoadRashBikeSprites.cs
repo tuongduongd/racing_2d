@@ -36,7 +36,7 @@ namespace RacingGame
     public static class RoadRashBikeSprites
     {
         private const int Size = 64;
-        private static readonly Dictionary<uint, BikeSpriteSet> Cache = new Dictionary<uint, BikeSpriteSet>();
+        private static readonly Dictionary<ulong, BikeSpriteSet> Cache = new Dictionary<ulong, BikeSpriteSet>();
         private static Sprite _shadowSprite;
         private static Sprite _tailLightSprite;
 
@@ -101,8 +101,30 @@ namespace RacingGame
 
         public static BikeSpriteSet GetOrCreateSet(Color primaryColor)
         {
-            Color32 c32 = primaryColor;
-            uint key = ((uint)c32.r << 16) | ((uint)c32.g << 8) | c32.b;
+            return GetOrCreateSet(
+                primaryColor,
+                new Color(0.92f, 0.93f, 0.96f),
+                new Color(0.96f, 0.97f, 0.99f));
+        }
+
+        public static BikeSpriteSet GetOrCreateSet(BikeSkinData skin)
+        {
+            if (skin == null)
+            {
+                return GetOrCreateSet(RoadRashVisualTheme.PlayerJacketBlue);
+            }
+            return GetOrCreateSet(skin.PrimaryColor, skin.SecondaryColor, skin.HelmetColor);
+        }
+
+        public static BikeSpriteSet GetOrCreateSet(Color primaryColor, Color secondaryColor, Color helmetColor)
+        {
+            Color32 p = primaryColor;
+            Color32 s = secondaryColor;
+            Color32 h = helmetColor;
+            ulong key = ((ulong)p.r << 56) | ((ulong)p.g << 48) | ((ulong)p.b << 40)
+                      | ((ulong)s.r << 32) | ((ulong)s.g << 24) | ((ulong)s.b << 16)
+                      | ((ulong)h.r << 8) | h.b;
+
             if (Cache.TryGetValue(key, out BikeSpriteSet existing) && existing != null && existing.Upright0 != null)
             {
                 return existing;
@@ -110,15 +132,15 @@ namespace RacingGame
 
             BikeSpriteSet set = new BikeSpriteSet
             {
-                Upright0 = BuildBikeSprite(primaryColor, 0f, 0, false, 0),
-                Upright1 = BuildBikeSprite(primaryColor, 0f, 0, true, 0),
-                LeanLeft1 = BuildBikeSprite(primaryColor, -0.45f, 0, false, 0),
-                LeanLeft2 = BuildBikeSprite(primaryColor, -0.95f, 0, true, 0),
-                LeanRight1 = BuildBikeSprite(primaryColor, 0.45f, 0, false, 0),
-                LeanRight2 = BuildBikeSprite(primaryColor, 0.95f, 0, true, 0),
-                KickLeft = BuildBikeSprite(primaryColor, 0.28f, -1, false, 0),
-                KickRight = BuildBikeSprite(primaryColor, -0.28f, 1, false, 0),
-                HitStagger = BuildBikeSprite(primaryColor, 0.55f, 0, false, 1)
+                Upright0 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0f, 0, false, 0),
+                Upright1 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0f, 0, true, 0),
+                LeanLeft1 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, -0.45f, 0, false, 0),
+                LeanLeft2 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, -0.95f, 0, true, 0),
+                LeanRight1 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0.45f, 0, false, 0),
+                LeanRight2 = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0.95f, 0, true, 0),
+                KickLeft = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0.28f, -1, false, 0),
+                KickRight = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, -0.28f, 1, false, 0),
+                HitStagger = BuildBikeSprite(primaryColor, secondaryColor, helmetColor, 0.55f, 0, false, 1)
             };
 
             Cache[key] = set;
@@ -141,7 +163,7 @@ namespace RacingGame
             };
         }
 
-        private static Sprite BuildBikeSprite(Color primary, float leanAmount, int kickDir, bool altWheelFrame, int stagger)
+        private static Sprite BuildBikeSprite(Color primary, Color secondary, Color helmet, float leanAmount, int kickDir, bool altWheelFrame, int stagger)
         {
             Texture2D tex = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             {
@@ -164,10 +186,10 @@ namespace RacingGame
             Color suitBase = primary;
             Color suitLight = Color.Lerp(primary, Color.white, 0.28f);
             Color suitDark = Color.Lerp(primary, Color.black, 0.38f);
-            Color whitePanel = new Color(0.92f, 0.93f, 0.96f);
-            Color whiteShade = new Color(0.70f, 0.73f, 0.78f);
-            Color helmetWhite = new Color(0.96f, 0.97f, 0.99f);
-            Color helmetShade = new Color(0.74f, 0.77f, 0.83f);
+            Color whitePanel = secondary;
+            Color whiteShade = Color.Lerp(secondary, Color.black, 0.24f);
+            Color helmetWhite = helmet;
+            Color helmetShade = Color.Lerp(helmet, Color.black, 0.24f);
             Color visorDark = new Color(0.12f, 0.15f, 0.21f);
             Color tailRed = new Color(0.95f, 0.16f, 0.12f);
             Color bootWhite = new Color(0.90f, 0.91f, 0.94f);

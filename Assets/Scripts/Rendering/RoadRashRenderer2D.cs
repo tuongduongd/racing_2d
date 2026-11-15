@@ -48,6 +48,7 @@ namespace RacingGame
         private readonly List<Color> _colors = new List<Color>(8192);
 
         private SpriteRenderer _bikeRenderer;
+        private Material _defaultBikeMaterial;
         private SpriteRenderer _shadowRenderer;
         private SpriteRenderer _tailLightRenderer;
 
@@ -81,6 +82,7 @@ namespace RacingGame
             public SpriteRenderer bike;
             public SpriteRenderer shadow;
             public SpriteRenderer tailLight;
+            public SpriteRenderer sirenBeacon;
             public Car boundCar;
             public Vector3 lastScreenPos;
             public bool isVisible;
@@ -253,6 +255,7 @@ namespace RacingGame
                 GameObject bikeObj = new GameObject("PlayerBikeSprite");
                 bikeObj.transform.SetParent(transform, false);
                 _bikeRenderer = bikeObj.AddComponent<SpriteRenderer>();
+                _defaultBikeMaterial = _bikeRenderer.sharedMaterial;
 
                 GameObject tailObj = new GameObject("PlayerTailLight");
                 tailObj.transform.SetParent(bikeObj.transform, false);
@@ -684,11 +687,22 @@ namespace RacingGame
                 float leftX = s.centerX - s.shoulderHalfW - s.scale * 0.85f;
                 PlaceProp(propIdx++, RoadsidePropKind.FencePost, leftX, s.screenY + s.scale * 0.08f, s.scale * 1.15f, baseOrder, tint);
 
-                // Every 18m: tall wooden telephone pole on left roadside (like screenshot)
+                // Every 18m: alternating utility poles and modern street lamps on left roadside
                 if ((slot9 % 2) == 0)
                 {
                     float poleX = s.centerX - s.shoulderHalfW - s.scale * 1.45f;
-                    PlaceProp(propIdx++, RoadsidePropKind.UtilityPole, poleX, s.screenY + s.scale * 0.14f, s.scale * 1.45f, baseOrder + 1, tint);
+                    RoadsidePropKind leftTallKind = ((slot9 / 2) % 2 == 0) ? RoadsidePropKind.StreetLamp : RoadsidePropKind.UtilityPole;
+                    PlaceProp(propIdx++, leftTallKind, poleX, s.screenY + s.scale * 0.14f, s.scale * 1.45f, baseOrder + 1, tint);
+                }
+
+                // Every 45m: sponsor billboard or palm tree cluster
+                if ((slot9 % 5) == 0)
+                {
+                    bool billboardLeft = ((slot9 / 5) % 2 == 0);
+                    float sideSign = billboardLeft ? -1f : 1f;
+                    float boardX = s.centerX + sideSign * (s.shoulderHalfW + s.scale * 2.25f);
+                    RoadsidePropKind landmarkKind = ((slot9 / 5) % 3 == 0) ? RoadsidePropKind.Billboard : RoadsidePropKind.PalmTree;
+                    PlaceProp(propIdx++, landmarkKind, boardX, s.screenY + s.scale * 0.06f, s.scale * 1.55f, baseOrder - 1, tint);
                 }
 
                 // Sharp curve chevron warning signs on outer edge
@@ -705,6 +719,42 @@ namespace RacingGame
                     float rightX = s.centerX + s.shoulderHalfW + s.scale * 1.35f;
                     RoadsidePropKind rightKind = (slot9 % 6) == 0 ? RoadsidePropKind.Tree : RoadsidePropKind.MilePost;
                     PlaceProp(propIdx++, rightKind, rightX, s.screenY + s.scale * 0.06f, s.scale * (rightKind == RoadsidePropKind.Tree ? 1.6f : 1.05f), baseOrder, tint);
+                }
+            }
+
+            // Render active on-track obstacles (traffic cones, oil barrels, road barriers, oil slicks)
+            if (_gameManager != null && _gameManager.ObstacleSystem != null && track != null && playerCar != null)
+            {
+                bool isMenuBackdrop = _gameManager.CurrentFlowState == GameFlowState.MainMenu ||
+                                      _gameManager.CurrentFlowState == GameFlowState.UpgradeShop;
+                float playerS = isMenuBackdrop ? _idleDemoScroll : playerCar.TrackDistance;
+                float totalLen = Mathf.Max(1f, track.TotalLength);
+                float maxAheadDz = (firstSliceZ + (sliceCount - 1) * sliceStep) - playerCameraZ - sliceStep;
+                float minBehindDz = -(playerCameraZ - 1.2f);
+                var obstacles = _gameManager.ObstacleSystem.Obstacles;
+
+                for (int i = 0; i < obstacles.Count; i++)
+                {
+                    var obs = obstacles[i];
+                    if (obs == null || obs.IsOnCooldown) continue;
+
+                    float dz = obs.TrackDistance - playerS;
+                    if (dz < -totalLen * 0.5f) dz += totalLen;
+                    if (dz > totalLen * 0.5f) dz -= totalLen;
+
+                    if (dz >= minBehindDz && dz <= maxAheadDz)
+                    {
+                        float obsZ = playerCameraZ + dz;
+                        if (TrySampleAtCameraZ(obsZ, out SliceData obsSlice) && !obsSlice.occluded)
+                        {
+                            float latNorm = obs.LateralOffset / Mathf.Max(1f, track.TrackWidth * 0.5f);
+                            float screenX = obsSlice.centerX + latNorm * obsSlice.roadHalfW * 0.92f;
+                            int order = Mathf.Clamp(478 - Mathf.RoundToInt(obsZ * 2.5f), 18, 492);
+                            float fog = SmoothFactor(0.45f, 1.0f, obsZ / (firstSliceZ + sliceCount * sliceStep)) * 0.72f;
+                            Color obsTint = Color.Lerp(Color.white, RoadRashVisualTheme.SkyHorizon, fog);
+                            PlaceProp(propIdx++, obs.VisualPropKind, screenX, obsSlice.screenY, obsSlice.scale * 1.20f, order, obsTint);
+                        }
+                    }
                 }
             }
 
@@ -751,9 +801,29 @@ namespace RacingGame
             float pGroundY = _playerSlice.screenY;
             int playerOrder = Mathf.Clamp(480 - Mathf.RoundToInt(playerCameraZ * 2.5f), 20, 480);
 
-            BikeSpriteSet set = RoadRashBikeSprites.GetOrCreateSet(playerCar.BikeColor);
-            BikePose pose = ResolveBikePose(playerCar);
-            _bikeRenderer.sprite = RoadRashBikeSprites.SelectPoseSprite(set, pose, animFrame);
+            BikeSkinData activeSkin = playerCar.ActiveSkin;
+            if (activeSkin != null && activeSkin.CustomMaterial != null)
+            {
+                _bikeRenderer.sharedMaterial = activeSkin.CustomMaterial;
+            }
+            else if (_defaultBikeMaterial != null)
+            {
+                _bikeRenderer.sharedMaterial = _defaultBikeMaterial;
+            }
+
+            Sprite overrideSprite = activeSkin != null ? activeSkin.GetOverrideSprite() : null;
+            if (overrideSprite != null)
+            {
+                _bikeRenderer.sprite = overrideSprite;
+            }
+            else
+            {
+                BikeSpriteSet set = activeSkin != null
+                    ? RoadRashBikeSprites.GetOrCreateSet(activeSkin)
+                    : RoadRashBikeSprites.GetOrCreateSet(playerCar.BikeColor);
+                BikePose pose = ResolveBikePose(playerCar);
+                _bikeRenderer.sprite = RoadRashBikeSprites.SelectPoseSprite(set, pose, animFrame);
+            }
             _bikeRenderer.color = Color.white;
             _bikeRenderer.sortingOrder = playerOrder;
 
@@ -838,6 +908,18 @@ namespace RacingGame
                             slot.tailLight.sortingOrder = order + 1;
                         }
 
+                        if (slot.sirenBeacon != null)
+                        {
+                            bool isPolice = _gameManager != null && _gameManager.PoliceController != null &&
+                                            other == _gameManager.PoliceController.PoliceCar;
+                            slot.sirenBeacon.gameObject.SetActive(isPolice);
+                            if (isPolice)
+                            {
+                                slot.sirenBeacon.color = _gameManager.PoliceController.CurrentSirenColor;
+                                slot.sirenBeacon.sortingOrder = order + 2;
+                            }
+                        }
+
                         slot.shadow.transform.position = new Vector3(screenX + other.LeanAngle * 0.10f * slice.scale, slice.screenY - 0.02f * slice.scale, -0.1f);
                         slot.shadow.transform.localScale = new Vector3(1.55f * spriteScale * 0.52f, 0.82f * spriteScale * 0.52f, 1f);
                         slot.shadow.sortingOrder = order - 1;
@@ -917,11 +999,20 @@ namespace RacingGame
                 SpriteRenderer tailSr = tailObj.AddComponent<SpriteRenderer>();
                 tailSr.sprite = RoadRashBikeSprites.GetTailLightSprite();
 
+                GameObject sirenObj = new GameObject($"OpponentSiren_{_opponentPool.Count}");
+                sirenObj.transform.SetParent(bikeObj.transform, false);
+                sirenObj.transform.localPosition = new Vector3(0f, 1.48f, -0.03f);
+                sirenObj.transform.localScale = new Vector3(0.65f, 0.65f, 1f);
+                SpriteRenderer sirenSr = sirenObj.AddComponent<SpriteRenderer>();
+                sirenSr.sprite = RoadRashPropSprites.GetPropSprite(RoadsidePropKind.PoliceSirenBeacon);
+                sirenObj.SetActive(false);
+
                 _opponentPool.Add(new OpponentSpriteSlot
                 {
                     bike = bikeSr,
                     shadow = shadowSr,
-                    tailLight = tailSr
+                    tailLight = tailSr,
+                    sirenBeacon = sirenSr
                 });
             }
             return _opponentPool[index];

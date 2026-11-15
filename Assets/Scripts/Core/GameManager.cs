@@ -21,7 +21,12 @@ namespace RacingGame
         [SerializeField] private LapCheckpointManager lapManager;
         [SerializeField] private RaceHUD raceHud;
         [SerializeField] private GameMenuUI menuUi;
+        [SerializeField] private PauseMenuUI pauseMenuUi;
         [SerializeField] private RaceAudioController audioController;
+        [SerializeField] private SkinManager skinManager;
+        [SerializeField] private EnvironmentDecorator environmentDecorator;
+        [SerializeField] private TrackObstacleSystem obstacleSystem;
+        [SerializeField] private PoliceChaseController policeController;
 
         [Header("Race Settings")]
         [SerializeField] private int aiOpponentCount = 4;
@@ -66,8 +71,16 @@ namespace RacingGame
         public Car PlayerCar => playerCar;
         public WaypointTrack Track => track;
         public LapCheckpointManager LapManager => lapManager;
+        private bool _isPaused;
+
         public CarUpgradeSystem UpgradeSystem => _upgradeSystem;
         public RaceAudioController AudioController => audioController;
+        public SkinManager SkinManager => skinManager;
+        public EnvironmentDecorator EnvironmentDecorator => environmentDecorator;
+        public TrackObstacleSystem ObstacleSystem => obstacleSystem;
+        public PoliceChaseController PoliceController => policeController;
+        public PauseMenuUI PauseMenuUi => pauseMenuUi;
+        public bool IsPaused => _isPaused;
 
         public GameFlowState CurrentFlowState => _currentState != null ? _currentState.StateType : GameFlowState.MainMenu;
         public DifficultyLevel Difficulty => difficulty;
@@ -89,14 +102,25 @@ namespace RacingGame
 
         private void Awake()
         {
-            _upgradeSystem = new CarUpgradeSystem();
-            _upgradeSystem.Load();
+            EnsureStatesInitialized();
+        }
 
-            _states[GameFlowState.MainMenu] = new MainMenuState();
-            _states[GameFlowState.Countdown] = new CountdownState(countdownDuration);
-            _states[GameFlowState.Racing] = new RacingState();
-            _states[GameFlowState.Finished] = new FinishedState();
-            _states[GameFlowState.UpgradeShop] = new UpgradeShopState();
+        private void EnsureStatesInitialized()
+        {
+            if (_upgradeSystem == null)
+            {
+                _upgradeSystem = new CarUpgradeSystem();
+                _upgradeSystem.Load();
+            }
+
+            if (_states.Count == 0)
+            {
+                _states[GameFlowState.MainMenu] = new MainMenuState();
+                _states[GameFlowState.Countdown] = new CountdownState(countdownDuration);
+                _states[GameFlowState.Racing] = new RacingState();
+                _states[GameFlowState.Finished] = new FinishedState();
+                _states[GameFlowState.UpgradeShop] = new UpgradeShopState();
+            }
         }
 
         private void Start()
@@ -104,18 +128,27 @@ namespace RacingGame
             SetupReferences();
             SpawnOrSyncOpponents();
             ApplyPlayerUpgrades();
+            skinManager.ApplyToCar(playerCar);
             ApplyDifficultyToAI();
 
-            lapManager.Initialize(track, _allCars, totalLaps);
+            lapManager.Initialize(track, new List<Car>(_allCars), totalLaps);
+            EnsurePoliceSetup();
+            environmentDecorator.RebuildEnvironment(track);
+            obstacleSystem.SpawnObstacles(track);
+
             BindAudioEvents();
             raceHud.Bind(this, playerCar, lapManager, track);
             menuUi.Bind(this);
+            pauseMenuUi.Bind(this);
 
-            TransitionTo(startInMainMenu ? GameFlowState.MainMenu : GameFlowState.Countdown);
+            bool shouldStartDirectly = !startInMainMenu || SkinManager.AutoStartRaceOnGameplayLoad;
+            SkinManager.AutoStartRaceOnGameplayLoad = false;
+            TransitionTo(shouldStartDirectly ? GameFlowState.Countdown : GameFlowState.MainMenu);
         }
 
         private void OnDestroy()
         {
+            Time.timeScale = 1f;
             UnbindAudioEvents();
 
             foreach (AIProfile fallback in _fallbackProfiles.Values)
@@ -136,15 +169,36 @@ namespace RacingGame
             lapManager = GetOrAdd(lapManager);
             raceHud = GetOrAdd(raceHud);
             menuUi = GetOrAdd(menuUi);
+            pauseMenuUi = GetOrAdd(pauseMenuUi);
             audioController = GetOrAdd(audioController);
+            skinManager = GetOrAdd(skinManager);
+            skinManager.EnsureInitialized();
+            environmentDecorator = GetOrAdd(environmentDecorator);
+            obstacleSystem = GetOrAdd(obstacleSystem);
+            policeController = GetOrAdd(policeController);
 
             playerDriver.SetDriverName("Player");
             playerDriver.SetInputHandler(inputHandler);
 
             playerCar = FindOrCreate(playerCar, "PlayerCar");
             playerCar.ConfigureIdentity(true, RoadRashVisualTheme.PlayerJacketBlue);
+            skinManager.ApplyToCar(playerCar);
 
             roadRenderer = FindOrCreate(roadRenderer, "RoadRashRenderer2D");
+        }
+
+        private void EnsurePoliceSetup()
+        {
+            if (policeController == null) policeController = GetOrAdd(policeController);
+            Car copCar = policeController.EnsurePoliceUnit(playerCar, track, defaultVehicleStats);
+            if (copCar != null && !_allCars.Contains(copCar))
+            {
+                _allCars.Add(copCar);
+                if (roadRenderer != null)
+                {
+                    roadRenderer.SetSceneReferences(Camera.main, track, playerCar, _allCars);
+                }
+            }
         }
 
         private static T FindOrCreate<T>(T current, string objectName) where T : Component
@@ -215,22 +269,81 @@ namespace RacingGame
 
         public void TransitionTo(GameFlowState targetState)
         {
+            EnsureStatesInitialized();
             if (!_states.TryGetValue(targetState, out RaceStateBase next)) return;
 
+            ResumeGame();
             _currentState?.Exit(this);
             _currentState = next;
             _currentState.Enter(this);
         }
 
+        public void PauseGame()
+        {
+            if (CurrentFlowState != GameFlowState.Racing && CurrentFlowState != GameFlowState.Countdown)
+            {
+                return;
+            }
+
+            _isPaused = true;
+            Time.timeScale = 0f;
+            if (pauseMenuUi == null) pauseMenuUi = GetComponent<PauseMenuUI>();
+            if (pauseMenuUi != null) pauseMenuUi.RefreshState();
+        }
+
+        public void ResumeGame()
+        {
+            _isPaused = false;
+            Time.timeScale = 1f;
+            if (pauseMenuUi == null) pauseMenuUi = GetComponent<PauseMenuUI>();
+            if (pauseMenuUi != null) pauseMenuUi.RefreshState();
+        }
+
+        public void TogglePause()
+        {
+            if (_isPaused)
+            {
+                ResumeGame();
+            }
+            else
+            {
+                PauseGame();
+            }
+        }
+
         public void StartRace()
         {
+            ResumeGame();
             ApplyPlayerUpgrades();
+            skinManager?.ApplyToCar(playerCar);
             ApplyDifficultyToAI();
             lapManager.SetTotalLaps(totalLaps);
             _prizeAwardedForCurrentRace = false;
             _lastPrizeEarned = 0;
             _lastFinishPosition = 0;
             TransitionTo(GameFlowState.Countdown);
+        }
+
+        public bool SelectPlayerSkin(DriverBrandSkin brand)
+        {
+            if (skinManager == null)
+            {
+                skinManager = GetOrAdd(skinManager);
+            }
+            bool changed = skinManager.SelectSkin(brand, playerCar);
+            if (changed && audioController != null)
+            {
+                audioController.PlayUpgradeResult(true);
+            }
+            return changed;
+        }
+
+        public void QuitGame()
+        {
+            Application.Quit();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#endif
         }
 
         public void OpenGarage()
@@ -315,13 +428,29 @@ namespace RacingGame
                 playerCar.Initialize(playerDriver, GridSlotPosition(slot, origin, dir, right), heading, track);
             }
 
+            EnsurePoliceSetup();
+            if (policeController != null)
+            {
+                policeController.ResetPoliceOnGrid(playerCar, track);
+            }
+
+            if (environmentDecorator != null)
+            {
+                environmentDecorator.RebuildEnvironment(track);
+            }
+
+            if (obstacleSystem != null)
+            {
+                obstacleSystem.SpawnObstacles(track);
+            }
+
             if (lapManager != null) lapManager.ResetRace();
             if (raceHud != null) raceHud.ClearMessage();
         }
 
         public void StepRaceSimulation(float dt)
         {
-            if (track == null) return;
+            if (track == null || _isPaused) return;
 
             for (int i = 0; i < _allCars.Count; i++)
             {
@@ -341,6 +470,16 @@ namespace RacingGame
 
             ResolveKickAttacks();
             ResolveVehicleCollisions();
+
+            if (obstacleSystem != null)
+            {
+                obstacleSystem.StepObstacles(track, _allCars, dt);
+            }
+
+            if (policeController != null)
+            {
+                policeController.TickPursuit(dt);
+            }
 
             if (lapManager != null)
             {
@@ -428,6 +567,26 @@ namespace RacingGame
 
         private void Update()
         {
+            if (CurrentFlowState == GameFlowState.Countdown)
+            {
+                var kb = UnityEngine.InputSystem.Keyboard.current;
+                if (kb != null && (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame))
+                {
+                    TogglePause();
+                    return;
+                }
+            }
+
+            if (_isPaused)
+            {
+                var kb = UnityEngine.InputSystem.Keyboard.current;
+                if (kb != null && (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame))
+                {
+                    ResumeGame();
+                }
+                return;
+            }
+
             _currentState?.Update(this, Time.deltaTime);
 
             if (audioController != null && playerCar != null &&
@@ -440,6 +599,7 @@ namespace RacingGame
 
         private void FixedUpdate()
         {
+            if (_isPaused) return;
             _currentState?.FixedUpdate(this, Time.fixedDeltaTime);
         }
 

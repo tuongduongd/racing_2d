@@ -15,6 +15,7 @@ namespace RacingGame
         [Header("Identity & Visuals")]
         [SerializeField] private bool isPlayer = true;
         [SerializeField] private Color bikeColor = new Color(0.92f, 0.22f, 0.22f);
+        [SerializeField] private BikeSkinData activeSkin;
 
         private Driver _driver;
         private bool _isOnTrack = true;
@@ -40,6 +41,7 @@ namespace RacingGame
         public Driver Driver => _driver;
         public bool IsPlayer => isPlayer;
         public Color BikeColor => bikeColor;
+        public BikeSkinData ActiveSkin => activeSkin;
         public string RacerName => _driver != null ? _driver.DriverName : gameObject.name;
 
         public bool IsOnTrack => _isOnTrack;
@@ -81,6 +83,15 @@ namespace RacingGame
         {
             isPlayer = playerFlag;
             bikeColor = color;
+        }
+
+        public void ApplySkin(BikeSkinData skin)
+        {
+            activeSkin = skin;
+            if (skin != null)
+            {
+                bikeColor = skin.PrimaryColor;
+            }
         }
 
         public void Initialize(Driver driver, Vector2 startPos, float startHeadingRad, WaypointTrack track)
