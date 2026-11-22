@@ -193,5 +193,122 @@ namespace RacingGame.Tests
                 }
             }
         }
+
+        [Test]
+        public void RaceHudOverhaul_BuildsFourCornerTmpLayout_HandlesObserverEvents_AndUnsubscribesInOnDisableAndOnDestroy()
+        {
+            var trackGo = new GameObject("HudTestTrack");
+            var playerGo = new GameObject("HudTestPlayer");
+            var aiGo = new GameObject("HudTestAi");
+            var sysGo = new GameObject("HudTestSystems");
+            RaceHUD raceHud = null;
+            Canvas hudCanvas = null;
+
+            try
+            {
+                var track = trackGo.AddComponent<WaypointTrack>();
+                track.BuildDefaultCircuit();
+
+                Vector2 wp0 = track.GetWaypoint(0);
+                Vector2 dir0 = track.GetTrackDirection(0);
+                float heading = Mathf.Atan2(dir0.y, dir0.x);
+
+                var playerCar = playerGo.AddComponent<Car>();
+                var playerDriver = playerGo.AddComponent<PlayerDriver>();
+                playerDriver.SetDriverName("Player");
+                playerCar.Initialize(playerDriver, wp0, heading, track);
+
+                var aiCar = aiGo.AddComponent<Car>();
+                var aiDriver = aiGo.AddComponent<AIRacerDriver>();
+                aiDriver.SetDriverName("Viper");
+                aiCar.Initialize(aiDriver, wp0 - dir0 * 3f, heading, track);
+
+                var gm = sysGo.AddComponent<GameManager>();
+                var lapManager = sysGo.AddComponent<LapCheckpointManager>();
+                lapManager.Initialize(track, new[] { playerCar, aiCar }, 3);
+
+                var obsSystem = sysGo.AddComponent<TrackObstacleSystem>();
+                obsSystem.EnableObstacles = true;
+
+                raceHud = sysGo.AddComponent<RaceHUD>();
+                raceHud.Bind(gm, playerCar, lapManager, track, obsSystem);
+                hudCanvas = raceHud.HudCanvas;
+
+                Assert.IsNotNull(hudCanvas, "RaceHUD must build its overlay Canvas.");
+                Assert.GreaterOrEqual(
+                    hudCanvas.GetComponentsInChildren<TMP_Text>(true).Length,
+                    12,
+                    "RaceHUD should use TextMeshPro across its 4-corner layout.");
+
+                raceHud.RefreshHudImmediate(GameFlowState.Racing);
+
+                Assert.AreEqual("1st", raceHud.CurrentRankText);
+                Assert.AreEqual("000", raceHud.CurrentSpeedText);
+                Assert.AreEqual("G1", raceHud.CurrentGearText);
+                Assert.AreEqual("ON ROAD", raceHud.CurrentTrackStateText);
+                Assert.AreEqual("LAP 1/3", raceHud.CurrentLapText);
+                Assert.AreEqual("00:00.00", raceHud.CurrentTimerText);
+                Assert.AreEqual(2, raceHud.LeaderboardRowCount);
+                Assert.GreaterOrEqual(raceHud.MinimapDotCount, 1);
+
+                Assert.IsFalse(raceHud.IsCountdownVisible, "Countdown center overlay must stay hidden during Racing.");
+                Assert.IsFalse(raceHud.IsWrongWayVisible, "Wrong-way center overlay must stay hidden unless going backward.");
+
+                raceHud.RefreshHudImmediate(GameFlowState.Countdown);
+                Assert.IsTrue(raceHud.IsCountdownVisible, "Countdown center overlay must activate during Countdown.");
+                raceHud.RefreshHudImmediate(GameFlowState.Racing);
+                Assert.IsFalse(raceHud.IsCountdownVisible);
+
+                // Verify Observer subscription triggers tactical flash on obstacle collision
+                Assert.IsTrue(raceHud.IsSubscribed);
+                obsSystem.AddManualObstacle(ObstacleKind.OilBarrel, playerCar.TrackDistance, playerCar.LateralOffset, 2.5f);
+                obsSystem.StepObstacles(track, new[] { playerCar }, 0.02f);
+                Assert.IsTrue(raceHud.IsFlashVisible, "ObstacleHit should activate the tactical flash banner.");
+                StringAssert.Contains("VA CHẠM", raceHud.CurrentFlashText);
+
+                // Verify OnDisable cleanly unsubscribes all Observer events
+                // (In EditMode without PlayMode loop, invoke Unity lifecycle callbacks explicitly)
+                const System.Reflection.BindingFlags lifecycleFlags =
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+                var onDisableMethod = typeof(RaceHUD).GetMethod("OnDisable", lifecycleFlags);
+                var onEnableMethod = typeof(RaceHUD).GetMethod("OnEnable", lifecycleFlags);
+                var onDestroyMethod = typeof(RaceHUD).GetMethod("OnDestroy", lifecycleFlags);
+                Assert.IsNotNull(onDisableMethod, "RaceHUD must implement OnDisable() to unsubscribe Observer events.");
+                Assert.IsNotNull(onEnableMethod, "RaceHUD must implement OnEnable() to re-subscribe Observer events.");
+                Assert.IsNotNull(onDestroyMethod, "RaceHUD must implement OnDestroy() to unsubscribe Observer events.");
+
+                raceHud.ClearMessage();
+                Assert.IsFalse(raceHud.IsFlashVisible);
+                raceHud.enabled = false;
+                onDisableMethod.Invoke(raceHud, null);
+                Assert.IsFalse(raceHud.IsSubscribed, "OnDisable must unsubscribe all Observer events.");
+
+                obsSystem.AddManualObstacle(ObstacleKind.TrafficCone, playerCar.TrackDistance, playerCar.LateralOffset, 2.5f);
+                obsSystem.StepObstacles(track, new[] { playerCar }, 5f);
+                Assert.IsFalse(raceHud.IsFlashVisible, "Disabled RaceHUD must not react to ObstacleHit.");
+
+                // Re-enable -> re-subscribes, then Destroy -> OnDestroy unsubscribes without NullReferenceException
+                raceHud.enabled = true;
+                onEnableMethod.Invoke(raceHud, null);
+                Assert.IsTrue(raceHud.IsSubscribed, "OnEnable should re-subscribe when already bound.");
+
+                obsSystem.AddManualObstacle(ObstacleKind.RoadBarrier, playerCar.TrackDistance, playerCar.LateralOffset, 2.5f);
+                onDestroyMethod.Invoke(raceHud, null);
+                Assert.IsFalse(raceHud.IsSubscribed, "OnDestroy must unsubscribe all Observer events.");
+                Object.DestroyImmediate(raceHud);
+                raceHud = null;
+
+                Assert.DoesNotThrow(() => obsSystem.StepObstacles(track, new[] { playerCar }, 5f));
+            }
+            finally
+            {
+                if (raceHud != null) Object.DestroyImmediate(raceHud);
+                if (hudCanvas != null) Object.DestroyImmediate(hudCanvas.gameObject);
+                Object.DestroyImmediate(sysGo);
+                Object.DestroyImmediate(aiGo);
+                Object.DestroyImmediate(playerGo);
+                Object.DestroyImmediate(trackGo);
+            }
+        }
     }
 }
