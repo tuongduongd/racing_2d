@@ -27,6 +27,8 @@ namespace RacingGame
 
         private GameManager _gameManager;
         private SkinManager _skinManager;
+        private MapManager _mapManager;
+        private CarUpgradeSystem _standaloneUpgradeSystem;
 
         private Canvas _canvas;
         private GameObject _menuPanel;
@@ -38,6 +40,19 @@ namespace RacingGame
         // Main Menu & Lobby elements
         private Text _menuStatsText;
         private Text _selectedSkinStatusText;
+        private Text _mapNameText;
+        private Text _mapMetaText;
+        private Text _mapDescText;
+        private Image _mapAccentStrip;
+        private Button _mapActionButton;
+        private Image _mapActionBtnImg;
+        private Text _mapActionBtnLabel;
+        private RectTransform _mapTabsContainer;
+        private readonly List<MapTabWidgets> _mapTabs = new List<MapTabWidgets>();
+        private int _browsedMapIndex;
+        private string _mapFeedbackMsg;
+        private Color _mapFeedbackColor;
+        private float _mapFeedbackUntil;
         private readonly Dictionary<DifficultyLevel, Image> _diffBtnImgs = new Dictionary<DifficultyLevel, Image>();
         private readonly Dictionary<int, Image> _lapBtnImgs = new Dictionary<int, Image>();
         private readonly List<SkinCardWidgets> _skinCards = new List<SkinCardWidgets>();
@@ -61,6 +76,14 @@ namespace RacingGame
         private float _dispGripBar;
 
         private readonly List<UpgradeCardWidgets> _upgradeCards = new List<UpgradeCardWidgets>();
+
+        private class MapTabWidgets
+        {
+            public string MapId;
+            public Button Button;
+            public Image Bg;
+            public Text Label;
+        }
 
         private class SkinCardWidgets
         {
@@ -97,6 +120,84 @@ namespace RacingGame
         public Canvas MenuCanvas => _canvas;
         public Button OuterQuitButton => _outerQuitButtonX;
         public int SkinCardCount => _skinCards.Count;
+        public int MapCount => ResolveMapManager() != null ? _mapManager.MapCount : 0;
+        public TrackDefinition SelectedMap => ResolveMapManager() != null ? _mapManager.SelectedMap : null;
+        public int SelectedMapIndex => ResolveMapManager() != null ? _mapManager.SelectedIndex : 0;
+        public TrackDefinition BrowsedMap => ResolveMapManager() != null ? (_mapManager.GetMapAt(_browsedMapIndex) ?? _mapManager.SelectedMap) : null;
+        public int BrowsedMapIndex => _browsedMapIndex;
+        public int MapTabCount => _mapTabs.Count;
+        public Button MapActionButton => _mapActionButton;
+        public string MapActionButtonLabel => _mapActionBtnLabel != null ? _mapActionBtnLabel.text : string.Empty;
+        public string MapNameDisplayText => _mapNameText != null ? _mapNameText.text : string.Empty;
+        public bool IsBrowsedMapLocked
+        {
+            get
+            {
+                MapManager mm = ResolveMapManager();
+                TrackDefinition browsed = BrowsedMap;
+                return mm != null && browsed != null && !mm.IsMapUnlocked(browsed.MapId);
+            }
+        }
+
+        public void BindStandaloneSaveSystem(CarUpgradeSystem saveSystem)
+        {
+            _standaloneUpgradeSystem = saveSystem;
+            if (_mapManager != null && saveSystem != null)
+            {
+                _mapManager.BindSaveSystem(saveSystem);
+                _browsedMapIndex = _mapManager.SelectedIndex;
+                RefreshMenu();
+            }
+        }
+
+        private CarUpgradeSystem ResolveUpgradeSystem()
+        {
+            if (_gameManager != null && _gameManager.UpgradeSystem != null)
+            {
+                return _gameManager.UpgradeSystem;
+            }
+
+            if (_standaloneUpgradeSystem == null)
+            {
+                if (isStandaloneLobbyScene || Application.isPlaying)
+                {
+                    _standaloneUpgradeSystem = new CarUpgradeSystem();
+                    _standaloneUpgradeSystem.Load();
+                }
+                else
+                {
+                    _standaloneUpgradeSystem = new CarUpgradeSystem(null);
+                }
+            }
+
+            return _standaloneUpgradeSystem;
+        }
+
+        private MapManager ResolveMapManager()
+        {
+            if (_mapManager == null)
+            {
+                _mapManager = _gameManager != null ? _gameManager.MapManager : FindAnyObjectByType<MapManager>();
+                if (_mapManager == null && _gameManager != null)
+                {
+                    _mapManager = _gameManager.GetComponent<MapManager>();
+                    if (_mapManager == null) _mapManager = _gameManager.gameObject.AddComponent<MapManager>();
+                }
+            }
+            if (_mapManager != null)
+            {
+                CarUpgradeSystem upg = ResolveUpgradeSystem();
+                if (upg != null && _mapManager.SaveSystem != upg)
+                {
+                    _mapManager.BindSaveSystem(upg);
+                }
+                else
+                {
+                    _mapManager.EnsureInitialized();
+                }
+            }
+            return _mapManager;
+        }
 
         private void Start()
         {
@@ -106,21 +207,42 @@ namespace RacingGame
                 _gameManager = FindAnyObjectByType<GameManager>();
                 if (_gameManager == null)
                 {
-                    _skinManager = FindAnyObjectByType<SkinManager>();
-                    if (_skinManager == null)
-                    {
-                        _skinManager = gameObject.AddComponent<SkinManager>();
-                    }
-                    _skinManager.EnsureInitialized();
-                    Car previewCar = FindAnyObjectByType<Car>();
-                    if (previewCar != null)
-                    {
-                        _skinManager.ApplyToCar(previewCar);
-                    }
-                    EnsureBuilt();
-                    RefreshMenu();
+                    InitializeStandaloneLobby();
                 }
             }
+        }
+
+        public void InitializeStandaloneLobby()
+        {
+            _skinManager = FindAnyObjectByType<SkinManager>();
+            if (_skinManager == null)
+            {
+                _skinManager = gameObject.AddComponent<SkinManager>();
+            }
+            _skinManager.EnsureInitialized();
+            Car previewCar = FindAnyObjectByType<Car>();
+            if (previewCar != null)
+            {
+                _skinManager.ApplyToCar(previewCar);
+            }
+
+            if (ResolveMapManager() == null)
+            {
+                _mapManager = gameObject.AddComponent<MapManager>();
+                CarUpgradeSystem upg = ResolveUpgradeSystem();
+                if (upg != null) _mapManager.BindSaveSystem(upg);
+                else _mapManager.EnsureInitialized();
+            }
+            _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
+            WaypointTrack track = FindAnyObjectByType<WaypointTrack>();
+            EnvironmentDecorator env = FindAnyObjectByType<EnvironmentDecorator>();
+            if (track != null)
+            {
+                _mapManager.ApplySelectedMapToTrack(track, env);
+            }
+
+            EnsureBuilt();
+            RefreshMenu();
         }
 
         public void Bind(GameManager gameManager)
@@ -133,9 +255,12 @@ namespace RacingGame
                 if (_skinManager == null) _skinManager = gameManager.gameObject.AddComponent<SkinManager>();
             }
             _skinManager?.EnsureInitialized();
+            ResolveMapManager();
+            _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
 
             _confirmResetPending = false;
             _shopFeedbackUntil = 0f;
+            _mapFeedbackMsg = null;
             EnsureBuilt();
             RefreshMenu();
             RefreshGarage(true);
@@ -171,6 +296,168 @@ namespace RacingGame
 
             RefreshSkinCards();
             return changed;
+        }
+
+        /// <summary>
+        /// Chuyển đổi Map đang xem/chọn ở sảnh chờ; nếu map đã mở khóa thì chọn và cập nhật nền đường đua xem trước trực tiếp.
+        /// </summary>
+        public TrackDefinition StepMapFromLobby(int delta)
+        {
+            MapManager mm = ResolveMapManager();
+            if (mm == null || mm.MapCount == 0) return null;
+
+            _mapFeedbackMsg = null;
+            int count = mm.MapCount;
+            int current = Mathf.Clamp(_browsedMapIndex, 0, count - 1);
+            int nextIdx = ((current + delta) % count + count) % count;
+            return FocusOrSelectMapIndex(nextIdx);
+        }
+
+        public bool SelectMapFromLobby(string mapId)
+        {
+            MapManager mm = ResolveMapManager();
+            if (mm == null) return false;
+
+            _mapFeedbackMsg = null;
+            int idx = mm.GetMapIndex(mapId);
+            if (idx >= 0)
+            {
+                _browsedMapIndex = idx;
+            }
+
+            bool changed;
+            if (_gameManager != null)
+            {
+                changed = _gameManager.SelectPlayerMap(mapId);
+                _mapManager = _gameManager.MapManager;
+            }
+            else
+            {
+                WaypointTrack track = FindAnyObjectByType<WaypointTrack>();
+                EnvironmentDecorator env = FindAnyObjectByType<EnvironmentDecorator>();
+                changed = mm.SelectMap(mapId, track, env);
+            }
+
+            RefreshMapCarousel();
+            return changed;
+        }
+
+        public bool TryUnlockMapFromLobby(string mapId)
+        {
+            MapManager mm = ResolveMapManager();
+            if (mm == null) return false;
+
+            TrackDefinition target = mm.GetMap(mapId);
+            if (target == null) return false;
+
+            if (mm.IsMapUnlocked(target.MapId))
+            {
+                return SelectMapFromLobby(target.MapId);
+            }
+
+            int cost = mm.GetMapUnlockCost(target.MapId);
+            bool unlocked;
+            if (_gameManager != null)
+            {
+                unlocked = _gameManager.TryUnlockPlayerMap(target.MapId);
+                _mapManager = _gameManager.MapManager;
+            }
+            else
+            {
+                unlocked = mm.TryPurchaseMapUnlock(target.MapId);
+                if (unlocked)
+                {
+                    WaypointTrack track = FindAnyObjectByType<WaypointTrack>();
+                    EnvironmentDecorator env = FindAnyObjectByType<EnvironmentDecorator>();
+                    mm.SelectMap(target.MapId, track, env);
+                }
+            }
+
+            int idx = mm.GetMapIndex(target.MapId);
+            if (idx >= 0) _browsedMapIndex = idx;
+
+            if (unlocked)
+            {
+                SetMapFeedback($"Đã mở khóa và chọn {target.DisplayName}!", RoadRashVisualTheme.AccentGreen);
+                RefreshMenu();
+            }
+            else
+            {
+                SetMapFeedback($"Không đủ tiền! Cần ${cost} để mở khóa {target.DisplayName}.", RoadRashVisualTheme.DangerRed);
+                RefreshMapCarousel();
+            }
+
+            return unlocked;
+        }
+
+        private TrackDefinition FocusOrSelectMapIndex(int index)
+        {
+            MapManager mm = ResolveMapManager();
+            if (mm == null || mm.MapCount == 0) return null;
+
+            int safeIdx = ((index % mm.MapCount) + mm.MapCount) % mm.MapCount;
+            _browsedMapIndex = safeIdx;
+            TrackDefinition candidate = mm.GetMapAt(safeIdx);
+            if (candidate == null) return null;
+
+            if (mm.IsMapUnlocked(candidate.MapId))
+            {
+                if (_gameManager != null)
+                {
+                    _gameManager.SelectPlayerMap(candidate.MapId);
+                    _mapManager = _gameManager.MapManager;
+                }
+                else
+                {
+                    WaypointTrack track = FindAnyObjectByType<WaypointTrack>();
+                    EnvironmentDecorator env = FindAnyObjectByType<EnvironmentDecorator>();
+                    mm.SelectMap(candidate.MapId, track, env);
+                }
+            }
+
+            RefreshMapCarousel();
+            return candidate;
+        }
+
+        private void OnMapActionButtonClicked()
+        {
+            TrackDefinition browsed = BrowsedMap;
+            if (browsed == null) return;
+
+            MapManager mm = ResolveMapManager();
+            if (mm == null) return;
+
+            if (mm.IsMapUnlocked(browsed.MapId))
+            {
+                SelectMapFromLobby(browsed.MapId);
+            }
+            else
+            {
+                TryUnlockMapFromLobby(browsed.MapId);
+            }
+        }
+
+        private void OnPlayButtonClicked()
+        {
+            if (IsBrowsedMapLocked)
+            {
+                TrackDefinition browsed = BrowsedMap;
+                int cost = ResolveMapManager() != null && browsed != null
+                    ? _mapManager.GetMapUnlockCost(browsed.MapId)
+                    : 0;
+                SetMapFeedback($"Map đang khóa! Bấm MỞ KHÓA (${cost}) hoặc chọn map đã mở.", RoadRashVisualTheme.DangerRed);
+                RefreshMapCarousel();
+                return;
+            }
+
+            TriggerPlay();
+        }
+
+        private void SetMapFeedback(string msg, Color color)
+        {
+            _mapFeedbackMsg = msg;
+            _mapFeedbackColor = color;
+            _mapFeedbackUntil = Time.unscaledTime + 2.5f;
         }
 
         public void TriggerPlay()
@@ -215,6 +502,11 @@ namespace RacingGame
                 {
                     _outerQuitButtonX.gameObject.SetActive(true);
                 }
+                if (!string.IsNullOrEmpty(_mapFeedbackMsg) && Time.unscaledTime > _mapFeedbackUntil)
+                {
+                    _mapFeedbackMsg = null;
+                    RefreshMapCarousel();
+                }
                 return;
             }
 
@@ -233,6 +525,11 @@ namespace RacingGame
                 if (showMenu)
                 {
                     _confirmResetPending = false;
+                    _mapFeedbackMsg = null;
+                    if (_mapManager != null)
+                    {
+                        _browsedMapIndex = _mapManager.SelectedIndex;
+                    }
                     RefreshMenu();
                 }
             }
@@ -245,6 +542,11 @@ namespace RacingGame
 
             if (showMenu)
             {
+                if (!string.IsNullOrEmpty(_mapFeedbackMsg) && Time.unscaledTime > _mapFeedbackUntil)
+                {
+                    _mapFeedbackMsg = null;
+                    RefreshMapCarousel();
+                }
                 RefreshMenuDynamic();
             }
             else if (showGarage)
@@ -261,7 +563,7 @@ namespace RacingGame
         {
             if (_menuStatsText != null)
             {
-                CarUpgradeSystem upg = _gameManager != null ? _gameManager.UpgradeSystem : null;
+                CarUpgradeSystem upg = ResolveUpgradeSystem();
                 int money = upg != null ? upg.Money : 200;
                 int won = upg != null ? upg.RacesWon : 0;
                 int played = upg != null ? upg.RacesPlayed : 0;
@@ -285,7 +587,184 @@ namespace RacingGame
             }
 
             RefreshSkinCards();
+            RefreshMapCarousel();
             RefreshMenuDynamic();
+        }
+
+        private void RefreshMapCarousel()
+        {
+            MapManager mm = ResolveMapManager();
+            if (mm == null || mm.MapCount == 0) return;
+
+            EnsureMapTabsSynced(mm);
+
+            _browsedMapIndex = Mathf.Clamp(_browsedMapIndex, 0, mm.MapCount - 1);
+            TrackDefinition displayMap = mm.GetMapAt(_browsedMapIndex) ?? mm.SelectedMap;
+            if (displayMap == null) return;
+
+            bool isUnlocked = mm.IsMapUnlocked(displayMap.MapId);
+            bool isSelected = mm.SelectedMap != null && mm.SelectedMap.MapId == displayMap.MapId;
+            int idx = _browsedMapIndex + 1;
+            int total = mm.MapCount;
+
+            if (_mapAccentStrip != null && displayMap.Theme != null)
+            {
+                _mapAccentStrip.color = isUnlocked
+                    ? displayMap.Theme.CenterYellowLine
+                    : new Color(0.55f, 0.25f, 0.25f);
+            }
+
+            if (_mapNameText != null)
+            {
+                string prefix = isUnlocked ? "ĐƯỜNG ĐUA" : "[ĐÃ KHÓA] ĐƯỜNG ĐUA";
+                _mapNameText.text = $"{prefix} ({idx}/{total}): {displayMap.DisplayName.ToUpperInvariant()}";
+                _mapNameText.color = isUnlocked
+                    ? RoadRashVisualTheme.HudYellow
+                    : new Color(0.95f, 0.54f, 0.45f);
+            }
+
+            if (_mapMetaText != null)
+            {
+                string stars = new string('★', displayMap.DifficultyStars) + new string('☆', Mathf.Max(0, 5 - displayMap.DifficultyStars));
+                float best = mm.GetBestTime(displayMap.MapId);
+                string bestStr = best > 0f ? RaceHUD.FormatTime(best) : "--:--.--";
+                string policeTag = displayMap.EnablePoliceChase ? "CS: BẬT" : "CS: TẮT";
+                string lockTag = isUnlocked
+                    ? (isSelected ? "Đang chọn" : "Đã mở")
+                    : $"Khóa (${mm.GetMapUnlockCost(displayMap.MapId)})";
+                _mapMetaText.text =
+                    $"{displayMap.LaneCount} Làn ({displayMap.TotalTrackWidth:0}m)  |  {stars}  |  x{displayMap.RewardMultiplier:0.0}  |  {policeTag}  |  {lockTag}  |  {bestStr}";
+            }
+
+            if (_mapDescText != null)
+            {
+                if (!string.IsNullOrEmpty(_mapFeedbackMsg))
+                {
+                    _mapDescText.text = _mapFeedbackMsg;
+                    _mapDescText.color = _mapFeedbackColor;
+                }
+                else
+                {
+                    _mapDescText.text = displayMap.Description;
+                    _mapDescText.color = new Color(0.76f, 0.80f, 0.86f);
+                }
+            }
+
+            if (_mapActionButton != null && _mapActionBtnImg != null && _mapActionBtnLabel != null)
+            {
+                if (!isUnlocked)
+                {
+                    int cost = mm.GetMapUnlockCost(displayMap.MapId);
+                    CarUpgradeSystem upg = ResolveUpgradeSystem();
+                    bool canAfford = upg != null && upg.Money >= cost;
+                    _mapActionBtnLabel.text = $"MỞ KHÓA (${cost})";
+                    _mapActionBtnImg.color = canAfford
+                        ? new Color(0.20f, 0.62f, 0.30f)
+                        : new Color(0.48f, 0.24f, 0.22f);
+                    _mapActionBtnLabel.color = Color.white;
+                }
+                else if (isSelected)
+                {
+                    _mapActionBtnLabel.text = "✓ ĐANG CHỌN";
+                    _mapActionBtnImg.color = RoadRashVisualTheme.HudYellow;
+                    _mapActionBtnLabel.color = new Color(0.10f, 0.10f, 0.12f);
+                }
+                else
+                {
+                    _mapActionBtnLabel.text = "CHỌN MAP";
+                    _mapActionBtnImg.color = new Color(0.20f, 0.44f, 0.74f);
+                    _mapActionBtnLabel.color = Color.white;
+                }
+            }
+
+            for (int i = 0; i < _mapTabs.Count; i++)
+            {
+                MapTabWidgets tab = _mapTabs[i];
+                TrackDefinition tabDef = mm.GetMapAt(i);
+                if (tabDef == null) continue;
+
+                bool tabUnlocked = mm.IsMapUnlocked(tabDef.MapId);
+                bool tabSelected = mm.SelectedMap != null && mm.SelectedMap.MapId == tabDef.MapId;
+                bool tabBrowsed = i == _browsedMapIndex;
+
+                string shortName = tabDef.DisplayName;
+                if (shortName.Length > 15) shortName = shortName.Substring(0, 14) + "…";
+
+                if (!tabUnlocked)
+                {
+                    tab.Label.text = $"[KHÓA] {shortName}";
+                    tab.Bg.color = tabBrowsed ? new Color(0.46f, 0.24f, 0.24f) : new Color(0.20f, 0.16f, 0.18f);
+                    tab.Label.color = new Color(0.92f, 0.72f, 0.72f);
+                }
+                else if (tabSelected)
+                {
+                    tab.Label.text = $"▶ {shortName}";
+                    tab.Bg.color = RoadRashVisualTheme.HudYellow;
+                    tab.Label.color = new Color(0.10f, 0.10f, 0.12f);
+                }
+                else
+                {
+                    tab.Label.text = shortName;
+                    tab.Bg.color = tabBrowsed ? new Color(0.26f, 0.36f, 0.50f) : RoadRashVisualTheme.MetalMid;
+                    tab.Label.color = Color.white;
+                }
+            }
+        }
+
+        private void EnsureMapTabsSynced(MapManager mm)
+        {
+            if (_mapTabsContainer == null || mm == null) return;
+
+            bool needsRebuild = _mapTabs.Count != mm.MapCount;
+            if (!needsRebuild)
+            {
+                for (int i = 0; i < _mapTabs.Count; i++)
+                {
+                    TrackDefinition def = mm.GetMapAt(i);
+                    if (def == null || _mapTabs[i].MapId != def.MapId)
+                    {
+                        needsRebuild = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!needsRebuild) return;
+
+            for (int i = _mapTabsContainer.childCount - 1; i >= 0; i--)
+            {
+                GameObject child = _mapTabsContainer.GetChild(i).gameObject;
+                if (Application.isPlaying) Destroy(child);
+                else DestroyImmediate(child);
+            }
+            _mapTabs.Clear();
+
+            int count = mm.MapCount;
+            if (count <= 0) return;
+
+            const float totalWidth = 688f;
+            const float gap = 6f;
+            float tabWidth = (totalWidth - gap * (count - 1)) / count;
+
+            for (int i = 0; i < count; i++)
+            {
+                TrackDefinition def = mm.GetMapAt(i);
+                if (def == null) continue;
+
+                int capturedIdx = i;
+                Button tabBtn = RoadRashUiSprites.CreateBevelButton(
+                    _mapTabsContainer, $"MapTab_{i}", def.DisplayName, RoadRashVisualTheme.MetalMid, 11);
+                PlaceTopLeft(tabBtn.GetComponent<RectTransform>(), i * (tabWidth + gap), 0f, tabWidth, 24f);
+                tabBtn.onClick.AddListener(() => FocusOrSelectMapIndex(capturedIdx));
+
+                _mapTabs.Add(new MapTabWidgets
+                {
+                    MapId = def.MapId,
+                    Button = tabBtn,
+                    Bg = tabBtn.GetComponent<Image>(),
+                    Label = tabBtn.GetComponentInChildren<Text>()
+                });
+            }
         }
 
         private void RefreshSkinCards()
@@ -462,7 +941,7 @@ namespace RacingGame
 
         private void BuildMainMenuPanel()
         {
-            _menuPanel = CreateCenteredPanel(_canvas.transform, "MainMenuPanel", 760f, 610f);
+            _menuPanel = CreateCenteredPanel(_canvas.transform, "MainMenuPanel", 760f, 696f);
 
             // 1. Khung Banner / Logo ở đầu Sảnh Chờ
             GameObject bannerObj = new GameObject("LobbyBanner");
@@ -523,22 +1002,67 @@ namespace RacingGame
                 BuildSkinCard(brand, x, cardY, cardWidth, cardHeight);
             }
 
+            // 2b. Map Carousel + Lock/Unlock + Map Tabs (Chọn Map đường đua + Live Preview nền phía sau)
+            GameObject mapBox = new GameObject("MapSelectorBox");
+            mapBox.transform.SetParent(_menuPanel.transform, false);
+            Image mapBoxBg = mapBox.AddComponent<Image>();
+            mapBoxBg.sprite = RoadRashUiSprites.GetPanelSprite();
+            mapBoxBg.type = Image.Type.Sliced;
+            mapBoxBg.color = new Color(0.10f, 0.12f, 0.17f, 0.94f);
+            PlaceTopLeft(mapBoxBg.rectTransform, 26f, -340f, 708f, 108f);
+
+            GameObject stripObj = new GameObject("MapAccentStrip");
+            stripObj.transform.SetParent(mapBox.transform, false);
+            _mapAccentStrip = stripObj.AddComponent<Image>();
+            _mapAccentStrip.raycastTarget = false;
+            _mapAccentStrip.color = RoadRashVisualTheme.HudYellow;
+            PlaceTopLeft(_mapAccentStrip.rectTransform, 4f, -4f, 700f, 5f);
+
+            Button prevMapBtn = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "PrevMapBtn", "◀", RoadRashVisualTheme.MetalMid, 18);
+            PlaceTopLeft(prevMapBtn.GetComponent<RectTransform>(), 10f, -14f, 40f, 54f);
+            prevMapBtn.onClick.AddListener(() => StepMapFromLobby(-1));
+
+            Button nextMapBtn = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "NextMapBtn", "▶", RoadRashVisualTheme.MetalMid, 18);
+            PlaceTopLeft(nextMapBtn.GetComponent<RectTransform>(), 658f, -14f, 40f, 54f);
+            nextMapBtn.onClick.AddListener(() => StepMapFromLobby(1));
+
+            _mapNameText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapNameText", "ĐƯỜNG ĐUA (1/4): PHỐ SÁNG BAN MAI", 14, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleLeft, FontStyle.Bold);
+            PlaceTopLeft(_mapNameText.rectTransform, 58f, -11f, 446f, 22f);
+
+            _mapMetaText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapMetaText", "4 Làn (16m)  |  ★★☆☆☆  |  x1.0  |  --:--.--", 11, Color.white, TextAnchor.MiddleLeft, FontStyle.Normal);
+            PlaceTopLeft(_mapMetaText.rectTransform, 58f, -33f, 446f, 18f);
+
+            _mapDescText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapDescText", "Đường phố 4 làn cổ điển với khúc cua vừa phải.", 11, new Color(0.76f, 0.80f, 0.86f), TextAnchor.MiddleLeft, FontStyle.Italic);
+            PlaceTopLeft(_mapDescText.rectTransform, 58f, -51f, 446f, 18f);
+
+            _mapActionButton = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "MapActionBtn", "✓ ĐANG CHỌN", RoadRashVisualTheme.HudYellow, 12);
+            PlaceTopLeft(_mapActionButton.GetComponent<RectTransform>(), 510f, -15f, 140f, 52f);
+            _mapActionBtnImg = _mapActionButton.GetComponent<Image>();
+            _mapActionBtnLabel = _mapActionButton.GetComponentInChildren<Text>();
+            _mapActionButton.onClick.AddListener(OnMapActionButtonClicked);
+
+            GameObject tabsObj = new GameObject("MapTabsRow");
+            tabsObj.transform.SetParent(mapBox.transform, false);
+            _mapTabsContainer = tabsObj.AddComponent<RectTransform>();
+            PlaceTopLeft(_mapTabsContainer, 10f, -75f, 688f, 26f);
+            _mapTabs.Clear();
+
             // 3. Hàng chọn Độ khó AI & Số vòng đua
             Text diffLabel = RoadRashUiSprites.CreateStyledText(_menuPanel.transform, "DiffLabel", "Độ khó AI:", 14, Color.white);
-            PlaceTopLeft(diffLabel.rectTransform, 26f, -348f, 95f, 30f);
+            PlaceTopLeft(diffLabel.rectTransform, 26f, -458f, 95f, 30f);
 
-            AddDifficultyButton(118f, -348f, DifficultyLevel.Easy, "Dễ");
-            AddDifficultyButton(206f, -348f, DifficultyLevel.Normal, "Vừa");
-            AddDifficultyButton(294f, -348f, DifficultyLevel.Hard, "Khó");
+            AddDifficultyButton(118f, -458f, DifficultyLevel.Easy, "Dễ");
+            AddDifficultyButton(206f, -458f, DifficultyLevel.Normal, "Vừa");
+            AddDifficultyButton(294f, -458f, DifficultyLevel.Hard, "Khó");
 
             Text lapLabel = RoadRashUiSprites.CreateStyledText(_menuPanel.transform, "LapLabel", "Số vòng:", 14, Color.white);
-            PlaceTopLeft(lapLabel.rectTransform, 398f, -348f, 76f, 30f);
+            PlaceTopLeft(lapLabel.rectTransform, 398f, -458f, 76f, 30f);
 
             for (int i = 0; i < LapChoices.Length; i++)
             {
                 int laps = LapChoices[i];
                 Button btn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, $"LapBtn_{laps}", $"{laps}V", RoadRashVisualTheme.MetalMid, 13);
-                PlaceTopLeft(btn.GetComponent<RectTransform>(), 474f + i * 66f, -348f, 60f, 30f);
+                PlaceTopLeft(btn.GetComponent<RectTransform>(), 474f + i * 66f, -458f, 60f, 30f);
                 _lapBtnImgs[laps] = btn.GetComponent<Image>();
                 btn.onClick.AddListener(() =>
                 {
@@ -554,8 +1078,8 @@ namespace RacingGame
                 "▶  PLAY (BẮT ĐẦU ĐUA)",
                 new Color(0.18f, 0.64f, 0.28f),
                 21);
-            PlaceTopLeft(playBtn.GetComponent<RectTransform>(), 26f, -394f, 445f, 52f);
-            playBtn.onClick.AddListener(TriggerPlay);
+            PlaceTopLeft(playBtn.GetComponent<RectTransform>(), 26f, -502f, 445f, 50f);
+            playBtn.onClick.AddListener(OnPlayButtonClicked);
 
             Button garageBtn = RoadRashUiSprites.CreateBevelButton(
                 _menuPanel.transform,
@@ -563,7 +1087,7 @@ namespace RacingGame
                 "NÂNG CẤP XE (GARAGE)",
                 new Color(0.20f, 0.42f, 0.74f),
                 15);
-            PlaceTopLeft(garageBtn.GetComponent<RectTransform>(), 485f, -394f, 249f, 52f);
+            PlaceTopLeft(garageBtn.GetComponent<RectTransform>(), 485f, -502f, 249f, 50f);
             garageBtn.onClick.AddListener(() =>
             {
                 _confirmResetPending = false;
@@ -572,7 +1096,7 @@ namespace RacingGame
 
             // 5. Hàng Âm thanh + Xóa dữ liệu + Thoát Game
             Button muteBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "MuteBtn", "Âm thanh: BẬT", RoadRashVisualTheme.MetalMid, 13);
-            PlaceTopLeft(muteBtn.GetComponent<RectTransform>(), 26f, -460f, 220f, 34f);
+            PlaceTopLeft(muteBtn.GetComponent<RectTransform>(), 26f, -564f, 220f, 34f);
             _menuMuteLabel = muteBtn.GetComponentInChildren<Text>();
             muteBtn.onClick.AddListener(() =>
             {
@@ -581,14 +1105,24 @@ namespace RacingGame
             });
 
             Button resetBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "ResetBtn", "Xóa dữ liệu lưu", new Color(0.52f, 0.24f, 0.22f), 13);
-            PlaceTopLeft(resetBtn.GetComponent<RectTransform>(), 260f, -460f, 230f, 34f);
+            PlaceTopLeft(resetBtn.GetComponent<RectTransform>(), 260f, -564f, 230f, 34f);
             _resetBtnLabel = resetBtn.GetComponentInChildren<Text>();
             resetBtn.onClick.AddListener(() =>
             {
                 if (_confirmResetPending)
                 {
-                    _gameManager?.ResetSaveData();
+                    if (_gameManager != null)
+                    {
+                        _gameManager.ResetSaveData();
+                    }
+                    else
+                    {
+                        ResolveUpgradeSystem()?.ResetProgress();
+                        ResolveMapManager()?.ResetProgress();
+                    }
+                    _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
                     _confirmResetPending = false;
+                    _mapFeedbackMsg = null;
                     RefreshMenu();
                 }
                 else
@@ -599,20 +1133,20 @@ namespace RacingGame
             });
 
             Button quitLobbyBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "QuitLobbyBtn", "✕ THOÁT GAME", new Color(0.72f, 0.18f, 0.18f), 13);
-            PlaceTopLeft(quitLobbyBtn.GetComponent<RectTransform>(), 504f, -460f, 230f, 34f);
+            PlaceTopLeft(quitLobbyBtn.GetComponent<RectTransform>(), 504f, -564f, 230f, 34f);
             quitLobbyBtn.onClick.AddListener(TriggerQuit);
 
             Text controls = RoadRashUiSprites.CreateStyledText(
                 _menuPanel.transform, "ControlsHint",
                 "W/↑ Ga  |  S/↓ Phanh  |  A/D Lái  |  SPACE Đá đối thủ  |  M Tắt/Bật tiếng",
                 12, new Color(0.80f, 0.84f, 0.90f), TextAnchor.MiddleCenter);
-            PlaceTop(controls.rectTransform, -510f, 700f, 22f);
+            PlaceTop(controls.rectTransform, -612f, 700f, 22f);
 
             Text skinHint = RoadRashUiSprites.CreateStyledText(
                 _menuPanel.transform, "SkinEditorHint",
-                "Mẹo Editor: Gắn Material / Texture2D riêng cho từng hãng trong Assets/ScriptableObjects/Skins/",
+                "Mẹo Editor: Gắn Material / Texture / Map Theme trong Assets/ScriptableObjects/",
                 11, new Color(0.68f, 0.78f, 0.90f), TextAnchor.MiddleCenter);
-            PlaceTop(skinHint.rectTransform, -536f, 700f, 20f);
+            PlaceTop(skinHint.rectTransform, -636f, 700f, 20f);
         }
 
         private void BuildSkinCard(DriverBrandSkin brand, float x, float y, float w, float h)

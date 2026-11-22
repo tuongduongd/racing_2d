@@ -418,7 +418,7 @@ namespace RacingGame
             _prizeText.text = $"Thưởng hạng {_gameManager.LastFinishPosition}: +${_gameManager.LastPrizeEarned}   |   Tổng tiền: ${totalMoney}";
         }
 
-        private void RebuildMinimapTexture()
+        public void RebuildMinimapTexture()
         {
             if (_minimapImg == null || _track == null) return;
             Texture2D tex = RoadRashUiSprites.BuildTrackMinimapTexture(_track, 160, out _mapMin, out _mapMaxDim);

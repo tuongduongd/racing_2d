@@ -119,6 +119,81 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &73549254
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 73549257}
+  - component: {fileID: 73549255}
+  - component: {fileID: 73549256}
+  m_Layer: 0
+  m_Name: RoadRashRenderer2D
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &73549255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73549254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40946aa155e04124b9ee118bc0faad8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RacingGame::RacingGame.RoadRashRenderer2D
+  targetCamera: {fileID: 519420031}
+  track: {fileID: 1976658576}
+  playerCar: {fileID: 2099585159}
+  vfxController: {fileID: 0}
+  defaultTheme: {fileID: 11400000, guid: 8d6c2b395f6694248a7c2377564d75d3, type: 2}
+  sliceCount: 104
+  sliceStep: 1.9
+  firstSliceZ: 1
+  playerCameraZ: 5.4
+  cameraHeight: 2.55
+  cameraDepth: 0.86
+  curveVisualGain: 2.1
+  hillVisualGain: 0.048
+  bikeVisualScale: 2.05
+  baseOrthoSize: 5
+  maxSpeedOrthoBoost: 0.22
+  maxCameraRollDeg: 1.5
+--- !u!114 &73549256
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73549254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce0d9252848f205438aa7f2412e8042c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RacingGame::RacingGame.RaceVfxController
+  customVolumeProfile: {fileID: 0}
+--- !u!4 &73549257
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73549254}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -256,6 +331,85 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &602805202
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 602805205}
+  - component: {fileID: 602805204}
+  - component: {fileID: 602805203}
+  m_Layer: 0
+  m_Name: EventSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &602805203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 602805202}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 01614664b831546d2ae94a42149d80ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.UI.InputSystemUIInputModule
+  m_SendPointerHoverToParent: 1
+  m_MoveRepeatDelay: 0.5
+  m_MoveRepeatRate: 0.1
+  m_XRTrackingOrigin: {fileID: 0}
+  m_ActionsAsset: {fileID: -944628639613478452, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_PointAction: {fileID: -1654692200621890270, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_MoveAction: {fileID: -8784545083839296357, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_SubmitAction: {fileID: 392368643174621059, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_CancelAction: {fileID: 7727032971491509709, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_LeftClickAction: {fileID: 3001919216989983466, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_MiddleClickAction: {fileID: -2185481485913320682, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_RightClickAction: {fileID: -4090225696740746782, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_ScrollWheelAction: {fileID: 6240969308177333660, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_TrackedDevicePositionAction: {fileID: 6564999863303420839, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_TrackedDeviceOrientationAction: {fileID: 7970375526676320489, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
+  m_DeselectOnBackgroundClick: 1
+  m_PointerBehavior: 0
+  m_CursorLockBehavior: 0
+  m_ScrollDeltaPerTick: 6
+--- !u!114 &602805204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 602805202}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76c392e42b5098c458856cdf6ecaaaa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventSystem
+  m_FirstSelected: {fileID: 0}
+  m_sendNavigationEvents: 1
+  m_DragThreshold: 10
+--- !u!4 &602805205
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 602805202}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0
@@ -360,7 +514,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &713209492
+--- !u!1 &680330527
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -368,155 +522,20 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 713209495}
-  - component: {fileID: 713209493}
-  - component: {fileID: 713209494}
-  m_Layer: 0
-  m_Name: RoadRashRenderer2D
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &713209493
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713209492}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40946aa155e04124b9ee118bc0faad8d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: RacingGame::RacingGame.RoadRashRenderer2D
-  targetCamera: {fileID: 519420031}
-  track: {fileID: 1857714613}
-  playerCar: {fileID: 1018194513}
-  vfxController: {fileID: 0}
-  sliceCount: 104
-  sliceStep: 1.9
-  firstSliceZ: 1
-  playerCameraZ: 5.4
-  cameraHeight: 2.55
-  cameraDepth: 0.86
-  curveVisualGain: 2.55
-  hillVisualGain: 0.048
-  bikeVisualScale: 2.05
-  baseOrthoSize: 5
-  maxSpeedOrthoBoost: 0.34
-  maxCameraRollDeg: 2
---- !u!114 &713209494
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713209492}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ce0d9252848f205438aa7f2412e8042c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: RacingGame::RacingGame.RaceVfxController
-  customVolumeProfile: {fileID: 0}
---- !u!4 &713209495
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713209492}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1018194512
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1018194514}
-  - component: {fileID: 1018194513}
-  m_Layer: 0
-  m_Name: PlayerCar
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1018194513
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1018194512}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2191ba0be6b9712489351c412d58dbf4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: RacingGame::RacingGame.Car
-  baseStatsAsset: {fileID: 0}
-  physics:
-    position: {x: 0, y: 0}
-    velocity: {x: 0, y: 0}
-    heading: 0
-    stats:
-      mass: 220
-      enginePower: 6200
-      brakePower: 8500
-      grip: 8.5
-      drag: 0.45
-      rollingResistance: 0.8
-      maxSpeed: 62
-      maxReverseSpeed: 8
-      turnRate: 2.4
-  isPlayer: 1
-  bikeColor: {r: 0.16, g: 0.44, b: 0.92, a: 1}
-  activeSkin: {fileID: 0}
---- !u!4 &1018194514
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1018194512}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1022443256
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1022443269}
-  - component: {fileID: 1022443268}
-  - component: {fileID: 1022443267}
-  - component: {fileID: 1022443266}
-  - component: {fileID: 1022443265}
-  - component: {fileID: 1022443264}
-  - component: {fileID: 1022443263}
-  - component: {fileID: 1022443262}
-  - component: {fileID: 1022443261}
-  - component: {fileID: 1022443260}
-  - component: {fileID: 1022443259}
-  - component: {fileID: 1022443258}
-  - component: {fileID: 1022443257}
+  - component: {fileID: 680330541}
+  - component: {fileID: 680330540}
+  - component: {fileID: 680330539}
+  - component: {fileID: 680330538}
+  - component: {fileID: 680330537}
+  - component: {fileID: 680330536}
+  - component: {fileID: 680330535}
+  - component: {fileID: 680330534}
+  - component: {fileID: 680330533}
+  - component: {fileID: 680330532}
+  - component: {fileID: 680330531}
+  - component: {fileID: 680330530}
+  - component: {fileID: 680330529}
+  - component: {fileID: 680330528}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -524,13 +543,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1022443257
+--- !u!114 &680330528
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e43be440db34ea747876c2133ba5ed36, type: 3}
@@ -543,13 +562,13 @@ MonoBehaviour:
   sirenFlashFrequency: 9
   policeCar: {fileID: 0}
   policeDriver: {fileID: 0}
---- !u!114 &1022443258
+--- !u!114 &680330529
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 685fa3071a06462419d357f219a89a10, type: 3}
@@ -566,13 +585,13 @@ MonoBehaviour:
   useFixedSeed: 0
   fixedSeed: 2026
   customObstacleSprites: []
---- !u!114 &1022443259
+--- !u!114 &680330530
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7bd4ccfc7fe6b5644b3e5685a5bf1a84, type: 3}
@@ -583,13 +602,31 @@ MonoBehaviour:
   propDensity: 1
   environmentSeed: 1995
   customRoadsideSprites: []
---- !u!114 &1022443260
+--- !u!114 &680330531
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e917fe4196f08e45b676fabea68de59, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RacingGame::RacingGame.MapManager
+  mapAssets:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  forceUnlockAllMaps: 0
+--- !u!114 &680330532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 99cfd3bbe607ff64b9c6a75818582a5d, type: 3}
@@ -601,13 +638,13 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   selectedBrand: 0
---- !u!114 &1022443261
+--- !u!114 &680330533
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9313b744f88d11c4c84506464a26347b, type: 3}
@@ -615,25 +652,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: RacingGame::RacingGame.RaceAudioController
   isMuted: 0
   masterVolume: 0.45
---- !u!114 &1022443262
+--- !u!114 &680330534
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 05bd796713a63c2458862d07550e1138, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.PauseMenuUI
---- !u!114 &1022443263
+--- !u!114 &680330535
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c296dec298f12a7409ab98237e296f6a, type: 3}
@@ -645,26 +682,26 @@ MonoBehaviour:
   bannerSubtitle: "XANH SM  \u2022  SHOPEE FOOD  \u2022  GRAB  \u2022  AHAMOVE"
   isStandaloneLobbyScene: 0
   gameplaySceneName: SampleScene
---- !u!114 &1022443264
+--- !u!114 &680330536
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 60665092c2ebcb24e9055c4413c4a283, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.RaceHUD
   lapMessageDuration: 2.4
---- !u!114 &1022443265
+--- !u!114 &680330537
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0901dd3e408b66d4eaf152a0593b5bd5, type: 3}
@@ -675,32 +712,33 @@ MonoBehaviour:
   gateExtraMargin: 2
   wrongWayDotThreshold: -0.2
   wrongWayMinSpeed: 4
---- !u!114 &1022443266
+--- !u!114 &680330538
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9b34f65eafdd9d4dae3a9568ee858cf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.GameManager
-  track: {fileID: 1857714613}
-  playerCar: {fileID: 1018194513}
-  inputHandler: {fileID: 1022443268}
-  playerDriver: {fileID: 1022443267}
-  roadRenderer: {fileID: 713209493}
-  lapManager: {fileID: 1022443265}
-  raceHud: {fileID: 1022443264}
-  menuUi: {fileID: 1022443263}
-  pauseMenuUi: {fileID: 1022443262}
-  audioController: {fileID: 1022443261}
-  skinManager: {fileID: 1022443260}
-  environmentDecorator: {fileID: 1022443259}
-  obstacleSystem: {fileID: 1022443258}
-  policeController: {fileID: 1022443257}
+  track: {fileID: 1976658576}
+  playerCar: {fileID: 2099585159}
+  inputHandler: {fileID: 680330540}
+  playerDriver: {fileID: 680330539}
+  roadRenderer: {fileID: 73549255}
+  lapManager: {fileID: 680330537}
+  raceHud: {fileID: 680330536}
+  menuUi: {fileID: 680330535}
+  pauseMenuUi: {fileID: 680330534}
+  audioController: {fileID: 680330533}
+  skinManager: {fileID: 680330532}
+  mapManager: {fileID: 680330531}
+  environmentDecorator: {fileID: 680330530}
+  obstacleSystem: {fileID: 680330529}
+  policeController: {fileID: 680330528}
   aiOpponentCount: 4
   totalLaps: 3
   countdownDuration: 3
@@ -717,40 +755,40 @@ MonoBehaviour:
   kickReachForward: 3.5
   kickReachLateral: 3.6
   kickLateralImpulse: 14.5
---- !u!114 &1022443267
+--- !u!114 &680330539
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6f73c4acbf0a42b4282986091bc624ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.PlayerDriver
   driverName: Player
-  inputHandler: {fileID: 1022443268}
---- !u!114 &1022443268
+  inputHandler: {fileID: 680330540}
+--- !u!114 &680330540
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4b97c6022107746419eedb0ed49eccbf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.InputHandler
   steerResponseSpeed: 9
---- !u!4 &1022443269
+--- !u!4 &680330541
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1022443256}
+  m_GameObject: {fileID: 680330527}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -759,7 +797,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1527352421
+--- !u!1 &901000407
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -767,8 +805,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1527352423}
-  - component: {fileID: 1527352422}
+  - component: {fileID: 901000409}
+  - component: {fileID: 901000408}
   m_Layer: 0
   m_Name: Global PostProcess Volume
   m_TagString: Untagged
@@ -776,13 +814,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1527352422
+--- !u!114 &901000408
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1527352421}
+  m_GameObject: {fileID: 901000407}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
@@ -793,13 +831,13 @@ MonoBehaviour:
   blendDistance: 0
   weight: 1
   sharedProfile: {fileID: 11400000, guid: 3f9215ea0144899419cfbc0957140d3f, type: 2}
---- !u!4 &1527352423
+--- !u!4 &901000409
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1527352421}
+  m_GameObject: {fileID: 901000407}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -808,7 +846,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1686157190
+--- !u!1 &1976658575
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -816,87 +854,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1686157193}
-  - component: {fileID: 1686157192}
-  - component: {fileID: 1686157191}
-  m_Layer: 0
-  m_Name: EventSystem
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1686157191
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1686157190}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 01614664b831546d2ae94a42149d80ac, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.UI.InputSystemUIInputModule
-  m_SendPointerHoverToParent: 1
-  m_MoveRepeatDelay: 0.5
-  m_MoveRepeatRate: 0.1
-  m_XRTrackingOrigin: {fileID: 0}
-  m_ActionsAsset: {fileID: -944628639613478452, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_PointAction: {fileID: -1654692200621890270, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_MoveAction: {fileID: -8784545083839296357, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_SubmitAction: {fileID: 392368643174621059, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_CancelAction: {fileID: 7727032971491509709, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_LeftClickAction: {fileID: 3001919216989983466, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_MiddleClickAction: {fileID: -2185481485913320682, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_RightClickAction: {fileID: -4090225696740746782, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_ScrollWheelAction: {fileID: 6240969308177333660, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_TrackedDevicePositionAction: {fileID: 6564999863303420839, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_TrackedDeviceOrientationAction: {fileID: 7970375526676320489, guid: ca9f5fa95ffab41fb9a615ab714db018, type: 3}
-  m_DeselectOnBackgroundClick: 1
-  m_PointerBehavior: 0
-  m_CursorLockBehavior: 0
-  m_ScrollDeltaPerTick: 6
---- !u!114 &1686157192
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1686157190}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 76c392e42b5098c458856cdf6ecaaaa1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventSystem
-  m_FirstSelected: {fileID: 0}
-  m_sendNavigationEvents: 1
-  m_DragThreshold: 10
---- !u!4 &1686157193
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1686157190}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1857714612
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1857714614}
-  - component: {fileID: 1857714613}
+  - component: {fileID: 1976658577}
+  - component: {fileID: 1976658576}
   m_Layer: 0
   m_Name: WaypointTrack
   m_TagString: Untagged
@@ -904,50 +863,93 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1857714613
+--- !u!114 &1976658576
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1857714612}
+  m_GameObject: {fileID: 1976658575}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d6294cc7af9c5194b8fc593485fee8b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.WaypointTrack
-  waypoints:
-  - {x: 0, y: 0}
-  - {x: 90, y: 0}
-  - {x: 180, y: 0}
-  - {x: 260, y: 15}
-  - {x: 320, y: 60}
-  - {x: 345, y: 125}
-  - {x: 325, y: 195}
-  - {x: 270, y: 240}
-  - {x: 200, y: 255}
-  - {x: 145, y: 220}
-  - {x: 115, y: 165}
-  - {x: 70, y: 145}
-  - {x: 20, y: 175}
-  - {x: -25, y: 235}
-  - {x: -95, y: 265}
-  - {x: -175, y: 245}
-  - {x: -225, y: 185}
-  - {x: -235, y: 110}
-  - {x: -200, y: 45}
-  - {x: -140, y: 8}
-  - {x: -75, y: -4}
-  - {x: -35, y: 0}
+  trackDefinition: {fileID: 0}
+  waypoints: []
+  laneCount: 4
+  laneWidth: 4
   trackWidth: 16
-  maxOffRoadWidth: 28
---- !u!4 &1857714614
+  maxOffRoadWidth: 25
+--- !u!4 &1976658577
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1857714612}
+  m_GameObject: {fileID: 1976658575}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2099585158
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2099585160}
+  - component: {fileID: 2099585159}
+  m_Layer: 0
+  m_Name: PlayerCar
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2099585159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2099585158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2191ba0be6b9712489351c412d58dbf4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RacingGame::RacingGame.Car
+  baseStatsAsset: {fileID: 0}
+  physics:
+    position: {x: 0, y: 0}
+    velocity: {x: 0, y: 0}
+    heading: 0
+    stats:
+      mass: 220
+      enginePower: 4800
+      brakePower: 7800
+      grip: 9.2
+      drag: 0.48
+      rollingResistance: 0.8
+      maxSpeed: 48
+      maxReverseSpeed: 8
+      turnRate: 2.4
+  isPlayer: 1
+  bikeColor: {r: 0.16, g: 0.44, b: 0.92, a: 1}
+  activeSkin: {fileID: 0}
+--- !u!4 &2099585160
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2099585158}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -962,9 +964,9 @@ SceneRoots:
   m_Roots:
   - {fileID: 519420032}
   - {fileID: 619394802}
-  - {fileID: 1686157193}
-  - {fileID: 1527352423}
-  - {fileID: 1857714614}
-  - {fileID: 1018194514}
-  - {fileID: 713209495}
-  - {fileID: 1022443269}
+  - {fileID: 602805205}
+  - {fileID: 901000409}
+  - {fileID: 1976658577}
+  - {fileID: 2099585160}
+  - {fileID: 73549257}
+  - {fileID: 680330541}

@@ -16,6 +16,7 @@ namespace RacingGame.Editor
         private const string DataFolder = "Assets/ScriptableObjects";
         private const string AiFolder = "Assets/ScriptableObjects/AI";
         private const string SkinsFolder = "Assets/ScriptableObjects/Skins";
+        private const string MapsFolder = "Assets/ScriptableObjects/Maps";
         private const string VehicleStatsPath = DataFolder + "/DefaultVehicleStats.asset";
         private const string EasyProfilePath = AiFolder + "/AIProfile_Easy.asset";
         private const string NormalProfilePath = AiFolder + "/AIProfile_Normal.asset";
@@ -26,13 +27,26 @@ namespace RacingGame.Editor
         private const string SkinGrabPath = SkinsFolder + "/Skin_Grab.asset";
         private const string SkinAhamovePath = SkinsFolder + "/Skin_Ahamove.asset";
 
+        private const string MapThemeValleyPath = MapsFolder + "/MapTheme_Valley.asset";
+        private const string MapThemeCityPath = MapsFolder + "/MapTheme_City.asset";
+        private const string ThemeCityMorningPath = MapsFolder + "/Theme_CityMorning.asset";
+        private const string ThemeCoastalHighwayPath = MapsFolder + "/Theme_CoastalHighway.asset";
+        private const string ThemeNeonNightPath = MapsFolder + "/Theme_NeonNightExpress.asset";
+
+        private const string MapCityMorningPath = MapsFolder + "/Map_01_CityMorning.asset";
+        private const string MapCoastalHighwayPath = MapsFolder + "/Map_02_CoastalHighway.asset";
+        private const string MapNeonNightPath = MapsFolder + "/Map_03_NeonNightExpress.asset";
+        private const string MapCityDistrictPath = MapsFolder + "/Map_04_CityNightDistrict.asset";
+
         private const string LobbyScenePath = "Assets/Scenes/LobbyScene.unity";
         private const string SampleScenePath = "Assets/Scenes/SampleScene.unity";
+
+        private static MapTheme _cachedValleyTheme;
 
         [MenuItem("RacingGame/Create Default Data Assets")]
         public static void CreateDefaultDataAssets()
         {
-            EnsureDefaultDataAssets(out _, out _, out _, out _, out _);
+            EnsureDefaultDataAssets(out _, out _, out _, out _, out _, out _);
         }
 
         public static void EnsureDefaultDataAssets(
@@ -46,6 +60,7 @@ namespace RacingGame.Editor
                 out easyProfile,
                 out normalProfile,
                 out hardProfile,
+                out _,
                 out _);
         }
 
@@ -56,9 +71,27 @@ namespace RacingGame.Editor
             out AIProfile hardProfile,
             out BikeSkinData[] skinAssets)
         {
+            EnsureDefaultDataAssets(
+                out vehicleStats,
+                out easyProfile,
+                out normalProfile,
+                out hardProfile,
+                out skinAssets,
+                out _);
+        }
+
+        public static void EnsureDefaultDataAssets(
+            out VehicleStatsAsset vehicleStats,
+            out AIProfile easyProfile,
+            out AIProfile normalProfile,
+            out AIProfile hardProfile,
+            out BikeSkinData[] skinAssets,
+            out TrackDefinition[] mapAssets)
+        {
             EnsureFolderExists("Assets", "ScriptableObjects");
             EnsureFolderExists(DataFolder, "AI");
             EnsureFolderExists(DataFolder, "Skins");
+            EnsureFolderExists(DataFolder, "Maps");
 
             vehicleStats = AssetDatabase.LoadAssetAtPath<VehicleStatsAsset>(VehicleStatsPath);
             if (vehicleStats == null)
@@ -78,6 +111,21 @@ namespace RacingGame.Editor
                 LoadOrCreateSkinAsset(SkinShopeeFoodPath, DriverBrandSkin.ShopeeFood),
                 LoadOrCreateSkinAsset(SkinGrabPath, DriverBrandSkin.Grab),
                 LoadOrCreateSkinAsset(SkinAhamovePath, DriverBrandSkin.Ahamove)
+            };
+
+            MapTheme valleyTheme = LoadOrCreateThemeAsset(MapThemeValleyPath, MapTheme.CreateValleyPreset);
+            MapTheme cityDistrictTheme = LoadOrCreateThemeAsset(MapThemeCityPath, MapTheme.CreateCityDistrictPreset);
+            MapTheme cityTheme = LoadOrCreateThemeAsset(ThemeCityMorningPath, MapTheme.CreateCityMorningPreset);
+            MapTheme coastalTheme = LoadOrCreateThemeAsset(ThemeCoastalHighwayPath, MapTheme.CreateCoastalHighwayPreset);
+            MapTheme neonTheme = LoadOrCreateThemeAsset(ThemeNeonNightPath, MapTheme.CreateNeonNightExpressPreset);
+            _cachedValleyTheme = valleyTheme;
+
+            mapAssets = new[]
+            {
+                LoadOrCreateMapAsset(MapCityMorningPath, () => TrackDefinition.CreateCityMorningPreset(cityTheme)),
+                LoadOrCreateMapAsset(MapCoastalHighwayPath, () => TrackDefinition.CreateCoastalHighwayPreset(coastalTheme)),
+                LoadOrCreateMapAsset(MapNeonNightPath, () => TrackDefinition.CreateNeonNightExpressPreset(neonTheme)),
+                LoadOrCreateMapAsset(MapCityDistrictPath, () => TrackDefinition.CreateCityDistrictPreset(cityDistrictTheme))
             };
 
             AssetDatabase.SaveAssets();
@@ -106,6 +154,28 @@ namespace RacingGame.Editor
             return skin;
         }
 
+        private static MapTheme LoadOrCreateThemeAsset(string assetPath, System.Func<MapTheme> factory)
+        {
+            MapTheme theme = AssetDatabase.LoadAssetAtPath<MapTheme>(assetPath);
+            if (theme != null) return theme;
+
+            theme = factory();
+            theme.name = Path.GetFileNameWithoutExtension(assetPath);
+            AssetDatabase.CreateAsset(theme, assetPath);
+            return theme;
+        }
+
+        private static TrackDefinition LoadOrCreateMapAsset(string assetPath, System.Func<TrackDefinition> factory)
+        {
+            TrackDefinition map = AssetDatabase.LoadAssetAtPath<TrackDefinition>(assetPath);
+            if (map != null) return map;
+
+            map = factory();
+            map.name = Path.GetFileNameWithoutExtension(assetPath);
+            AssetDatabase.CreateAsset(map, assetPath);
+            return map;
+        }
+
         private static void EnsureFolderExists(string parentFolder, string childFolderName)
         {
             string fullPath = $"{parentFolder}/{childFolderName}";
@@ -131,7 +201,8 @@ namespace RacingGame.Editor
                 out _,
                 out _,
                 out _,
-                out BikeSkinData[] skinAssets);
+                out BikeSkinData[] skinAssets,
+                out TrackDefinition[] mapAssets);
 
             EnsureFolderExists("Assets", "Scenes");
             Scene lobbyScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -161,10 +232,17 @@ namespace RacingGame.Editor
                 vol.sharedProfile = profile;
             }
 
-            // Tạo đường đua nền + xe mẫu người chơi hiển thị trực tiếp skin đang chọn ở sảnh chờ
+            // Tạo đường đua nền + xe mẫu người chơi hiển thị trực tiếp skin & map đang chọn ở sảnh chờ
             GameObject trackObj = new GameObject("WaypointTrack");
             WaypointTrack track = trackObj.AddComponent<WaypointTrack>();
-            track.BuildDefaultCircuit();
+            if (mapAssets != null && mapAssets.Length > 0)
+            {
+                track.ApplyTrackDefinition(mapAssets[0]);
+            }
+            else
+            {
+                track.BuildDefaultCircuit();
+            }
 
             GameObject carObj = new GameObject("PlayerCar");
             Car playerCar = carObj.AddComponent<Car>();
@@ -181,11 +259,19 @@ namespace RacingGame.Editor
             GameObject rendererObj = new GameObject("RoadRashRenderer2D");
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
+            AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
 
             GameObject lobbyObj = new GameObject("LobbyController");
             SkinManager skinManager = lobbyObj.AddComponent<SkinManager>();
             AssignSkinAssetsSerialized(skinManager, skinAssets);
+            MapManager mapManager = lobbyObj.AddComponent<MapManager>();
+            AssignMapAssetsSerialized(mapManager, mapAssets);
+            EnvironmentDecorator envDecorator = lobbyObj.AddComponent<EnvironmentDecorator>();
+            if (mapAssets != null && mapAssets.Length > 0)
+            {
+                envDecorator.RebuildEnvironment(track, mapAssets[0].Theme);
+            }
 
             GameMenuUI menuUi = lobbyObj.AddComponent<GameMenuUI>();
             SerializedObject menuSo = new SerializedObject(menuUi);
@@ -206,7 +292,8 @@ namespace RacingGame.Editor
                 out AIProfile easyProfile,
                 out AIProfile normalProfile,
                 out AIProfile hardProfile,
-                out BikeSkinData[] skinAssets);
+                out BikeSkinData[] skinAssets,
+                out TrackDefinition[] mapAssets);
 
             Scene scene = EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single);
 
@@ -246,7 +333,14 @@ namespace RacingGame.Editor
 
             GameObject trackObj = new GameObject("WaypointTrack");
             WaypointTrack track = trackObj.AddComponent<WaypointTrack>();
-            track.BuildDefaultCircuit();
+            if (mapAssets != null && mapAssets.Length > 0)
+            {
+                track.ApplyTrackDefinition(mapAssets[0]);
+            }
+            else
+            {
+                track.BuildDefaultCircuit();
+            }
 
             GameObject carObj = new GameObject("PlayerCar");
             Car playerCar = carObj.AddComponent<Car>();
@@ -271,6 +365,7 @@ namespace RacingGame.Editor
             GameObject rendererObj = new GameObject("RoadRashRenderer2D");
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
+            AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
 
             GameObject gmObj = new GameObject("GameManager");
@@ -286,10 +381,12 @@ namespace RacingGame.Editor
             PauseMenuUI pauseMenuUi = gmObj.AddComponent<PauseMenuUI>();
             RaceAudioController audioCtrl = gmObj.AddComponent<RaceAudioController>();
             SkinManager skinManager = gmObj.AddComponent<SkinManager>();
+            MapManager mapManager = gmObj.AddComponent<MapManager>();
             EnvironmentDecorator envDecorator = gmObj.AddComponent<EnvironmentDecorator>();
             TrackObstacleSystem obstacleSystem = gmObj.AddComponent<TrackObstacleSystem>();
             PoliceChaseController policeCtrl = gmObj.AddComponent<PoliceChaseController>();
             AssignSkinAssetsSerialized(skinManager, skinAssets);
+            AssignMapAssetsSerialized(mapManager, mapAssets);
 
             SerializedObject gmSo = new SerializedObject(gm);
             gmSo.FindProperty("track").objectReferenceValue = track;
@@ -303,6 +400,7 @@ namespace RacingGame.Editor
             gmSo.FindProperty("pauseMenuUi").objectReferenceValue = pauseMenuUi;
             gmSo.FindProperty("audioController").objectReferenceValue = audioCtrl;
             gmSo.FindProperty("skinManager").objectReferenceValue = skinManager;
+            gmSo.FindProperty("mapManager").objectReferenceValue = mapManager;
             gmSo.FindProperty("environmentDecorator").objectReferenceValue = envDecorator;
             gmSo.FindProperty("obstacleSystem").objectReferenceValue = obstacleSystem;
             gmSo.FindProperty("policeController").objectReferenceValue = policeCtrl;
@@ -329,6 +427,27 @@ namespace RacingGame.Editor
                 arrProp.GetArrayElementAtIndex(i).objectReferenceValue = skinAssets[i];
             }
             skinSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void AssignDefaultThemeSerialized(RoadRashRenderer2D renderer, MapTheme defaultTheme)
+        {
+            if (renderer == null || defaultTheme == null) return;
+            SerializedObject rendererSo = new SerializedObject(renderer);
+            rendererSo.FindProperty("defaultTheme").objectReferenceValue = defaultTheme;
+            rendererSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void AssignMapAssetsSerialized(MapManager mapManager, TrackDefinition[] mapAssets)
+        {
+            if (mapManager == null || mapAssets == null) return;
+            SerializedObject mapSo = new SerializedObject(mapManager);
+            SerializedProperty arrProp = mapSo.FindProperty("mapAssets");
+            arrProp.arraySize = mapAssets.Length;
+            for (int i = 0; i < mapAssets.Length; i++)
+            {
+                arrProp.GetArrayElementAtIndex(i).objectReferenceValue = mapAssets[i];
+            }
+            mapSo.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void RegisterScenesInBuildSettings()
