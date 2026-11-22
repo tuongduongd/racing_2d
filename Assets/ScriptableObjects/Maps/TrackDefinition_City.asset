@@ -46,8 +46,8 @@ MonoBehaviour:
   - {x: -105, y: 0}
   - {x: -50, y: 0}
   laneCount: 4
-  laneWidth: 4.6
-  shoulderExtraWidth: 4.5
+  laneWidth: 6
+  shoulderExtraWidth: 6.5
   elevationAmplitude: 1.6
   elevationFrequency: 2
   elevationSecondaryAmp: 0.8

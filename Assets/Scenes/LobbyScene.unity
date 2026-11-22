@@ -401,10 +401,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.MapManager
   mapAssets:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 11400000, guid: 1ed8ddfd124d09e49982a5eca744b1d9, type: 2}
+  - {fileID: 11400000, guid: 817195c5fb21e6c4fbe341939ecd8ce8, type: 2}
+  - {fileID: 11400000, guid: d455e9a4f9c49c6428940004bb8121db, type: 2}
+  - {fileID: 11400000, guid: 1de5876382683d24e94ee423aeb68bca, type: 2}
   forceUnlockAllMaps: 0
 --- !u!114 &326863317
 MonoBehaviour:
