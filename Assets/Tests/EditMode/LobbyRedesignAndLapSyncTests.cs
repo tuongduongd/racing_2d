@@ -421,5 +421,29 @@ namespace RacingGame.Tests
                 Object.DestroyImmediate(trackGo);
             }
         }
+
+        [Test]
+        public void Stage5Polish_VietnameseTmpFontCoversAllDiacritics_AndWelcomeTemplateDeadCodeIsRemoved()
+        {
+            TMP_FontAsset vnFont = LobbyUiBuilder.GetTmpFont();
+            Assert.IsNotNull(vnFont, "LobbyUiBuilder.GetTmpFont() must always return a valid TMP_FontAsset.");
+
+            string charset = LobbyUiBuilder.GetVietnameseCharacterSet();
+            Assert.GreaterOrEqual(
+                charset.Length,
+                500,
+                "Vietnamese charset must cover Basic Latin, Latin-1 Supplement, Latin Extended-A/B, and Latin Extended Additional.");
+
+            Assert.IsTrue(
+                LobbyUiBuilder.HasFullVietnameseGlyphSupport(vnFont),
+                "Shared TMP_FontAsset must support full Vietnamese diacritics without missing characters.");
+
+            Assert.IsFalse(
+                System.IO.Directory.Exists("Assets/Welcome"),
+                "Unused Unity template folder Assets/Welcome must be removed.");
+            Assert.IsFalse(
+                System.IO.File.Exists("Assets/Welcome/Welcome2DScript.cs"),
+                "Template dead code Welcome2DScript.cs must be removed.");
+        }
     }
 }

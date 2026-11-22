@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,41 +49,146 @@ namespace RacingGame
         public static readonly Color DangerRed = new Color(0.851f, 0.220f, 0.161f, 1.00f);
         public static readonly Color SuccessGreen = new Color(0.000f, 0.824f, 0.522f, 1.00f);
 
+        public const string CustomVietnameseFontFolder = "Assets/Art/Fonts";
+        public const string CustomVietnameseFontPath = "Assets/Art/Fonts/VietnameseFont.ttf";
+        public const string FallbackLiberationFontPath = "Assets/TextMesh Pro/Fonts/LiberationSans.ttf";
+
         private static Sprite _cyberPanelSprite;
         private static Sprite _cyberButtonSprite;
         private static Sprite _softDarkScrimSprite;
         private static TMP_FontAsset _cachedTmpFont;
+        private static string _cachedVietnameseCharset;
+
+        public static string GetVietnameseCharacterSet()
+        {
+            if (!string.IsNullOrEmpty(_cachedVietnameseCharset))
+            {
+                return _cachedVietnameseCharset;
+            }
+
+            var sb = new StringBuilder(1024);
+            AppendUnicodeRange(sb, 0x0020, 0x007E); // Basic Latin
+            AppendUnicodeRange(sb, 0x00A0, 0x00FF); // Latin-1 Supplement
+            AppendUnicodeRange(sb, 0x0100, 0x017F); // Latin Extended-A (Ă/ă, Đ/đ, Ĩ/ĩ, Ũ/ũ)
+            AppendUnicodeRange(sb, 0x0180, 0x024F); // Latin Extended-B (Ơ/ơ, Ư/ư)
+            AppendUnicodeRange(sb, 0x1E00, 0x1EFF); // Latin Extended Additional (precomposed Vietnamese)
+            sb.Append("←↑→↓•⚠✓✕▶↻⌂⚙⌨⇄★☆●₫—");
+
+            _cachedVietnameseCharset = sb.ToString();
+            return _cachedVietnameseCharset;
+        }
+
+        private static void AppendUnicodeRange(StringBuilder sb, int startCodePoint, int endCodePoint)
+        {
+            for (int cp = startCodePoint; cp <= endCodePoint; cp++)
+            {
+                sb.Append((char)cp);
+            }
+        }
+
+        public static void EnsureVietnameseCharacters(TMP_FontAsset fontAsset)
+        {
+            if (fontAsset == null) return;
+            if (fontAsset.atlasPopulationMode != AtlasPopulationMode.Static)
+            {
+                fontAsset.TryAddCharacters(GetVietnameseCharacterSet(), out _);
+            }
+        }
+
+        public static bool HasFullVietnameseGlyphSupport(TMP_FontAsset fontAsset = null)
+        {
+            TMP_FontAsset font = fontAsset != null ? fontAsset : GetTmpFont();
+            if (font == null) return false;
+
+            EnsureVietnameseCharacters(font);
+            const string vietnameseSample =
+                "ĐẠI CHIẾN SHIPPER — TẠM DỪNG TRẬN ĐUA — NGƯỢC CHIỀU — ĐỘ BÁM ĐƯỜNG — " +
+                "ẮẰẲẴẶ ắằẳẵặ ẤẦẨẪẬ ấầẩẫậ ẾỀỂỄỆ ếềểễệ ỐỒỔỖỘ ốồổỗộ ỚỜỞỠỢ ớờởỡợ ỨỪỬỮỰ ứừửữự ỲỶỸỴ ỳỷỹỵ đ ă â ê ô ơ ư";
+            return font.HasCharacters(vietnameseSample, out uint[] missing, false, true) &&
+                   (missing == null || missing.Length == 0);
+        }
 
         public static TMP_FontAsset GetTmpFont(TMP_FontAsset customOverride = null)
         {
-            if (customOverride != null) return customOverride;
+            if (customOverride != null)
+            {
+                EnsureVietnameseCharacters(customOverride);
+                return customOverride;
+            }
             if (_cachedTmpFont != null) return _cachedTmpFont;
 
+#if UNITY_EDITOR
             try
             {
-                string[] preferredFamilies = { "Segoe UI", "Arial", "Tahoma" };
-                for (int i = 0; i < preferredFamilies.Length && _cachedTmpFont == null; i++)
+                Font customFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(CustomVietnameseFontPath);
+                if (customFont == null && UnityEditor.AssetDatabase.IsValidFolder(CustomVietnameseFontFolder))
                 {
-                    _cachedTmpFont = TMP_FontAsset.CreateFontAsset(preferredFamilies[i], "Regular", 48);
+                    string[] guids = UnityEditor.AssetDatabase.FindAssets("t:Font", new[] { CustomVietnameseFontFolder });
+                    if (guids != null && guids.Length > 0)
+                    {
+                        string firstPath = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+                        customFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(firstPath);
+                    }
                 }
 
-                if (_cachedTmpFont != null)
+                if (customFont != null)
                 {
-                    _cachedTmpFont.name = "Runtime_CyberLobby_TMPFont";
+                    _cachedTmpFont = TMP_FontAsset.CreateFontAsset(customFont);
                 }
             }
             catch
             {
                 _cachedTmpFont = null;
             }
+#endif
 
             if (_cachedTmpFont == null)
+            {
+                try
+                {
+                    string[] preferredFamilies = { "Segoe UI", "Arial", "Tahoma" };
+                    for (int i = 0; i < preferredFamilies.Length && _cachedTmpFont == null; i++)
+                    {
+                        _cachedTmpFont = TMP_FontAsset.CreateFontAsset(preferredFamilies[i], "Regular", 48);
+                    }
+                }
+                catch
+                {
+                    _cachedTmpFont = null;
+                }
+            }
+
+#if UNITY_EDITOR
+            if (_cachedTmpFont == null)
+            {
+                try
+                {
+                    Font liberationFont = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>(FallbackLiberationFontPath);
+                    if (liberationFont != null)
+                    {
+                        _cachedTmpFont = TMP_FontAsset.CreateFontAsset(liberationFont);
+                    }
+                }
+                catch
+                {
+                    _cachedTmpFont = null;
+                }
+            }
+#endif
+
+            if (_cachedTmpFont != null)
+            {
+                _cachedTmpFont.name = "Runtime_CyberVN_TMPFont";
+                EnsureVietnameseCharacters(_cachedTmpFont);
+            }
+            else
             {
                 try
                 {
                     if (TMP_Settings.instance != null)
                     {
                         _cachedTmpFont = TMP_Settings.defaultFontAsset;
+                        EnsureVietnameseCharacters(_cachedTmpFont);
                     }
                 }
                 catch

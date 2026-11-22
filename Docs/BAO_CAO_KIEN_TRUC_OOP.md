@@ -54,8 +54,8 @@ flowchart LR
 
 | Mã | Tên yêu cầu | Mô tả chi tiết | Thành phần cài đặt chính |
 | :--- | :--- | :--- | :--- |
-| **FR-01** | Sảnh chờ khởi động (Lobby) | Hiển thị banner, thống kê tiền/kỷ lục, chọn 4 skin thương hiệu (`Xanh SM`, `Shopee Food`, `Grab`, `Ahamove`), carousel chọn map có xem trước trực tiếp, chọn độ khó và số vòng, nút `PLAY`, `GARAGE`, `X` thoát game. Hỗ trợ chạy từ `LobbyScene` sang `SampleScene` hoặc trực tiếp trong `SampleScene`. | `GameMenuUI`, `SkinManager`, `MapManager` |
-| **FR-02** | Hệ thống Skin thương hiệu | Quản lý 4 `BikeSkinData`, cho phép gắn `Material`, `Texture2D`, `Sprite` tùy chỉnh hoặc dùng bộ sprite procedural theo màu thương hiệu; lưu lựa chọn vào `PlayerPrefs`. | `SkinManager`, `BikeSkinData`, `RoadRashBikeSprites` |
+| **FR-01** | Sảnh chờ khởi động (Lobby) | Hiển thị backdrop Sài Gòn đêm, thống kê tiền/kỷ lục, modal chọn 4 skin thương hiệu (`Xanh SM`, `Shopee Food`, `Grab`, `Ahamove`), carousel chọn 4 map kèm banner ảnh và nút mở khóa, chọn độ khó và số vòng (đồng bộ `PlayerPrefs` giữa `LobbyScene` và `SampleScene`), bật/tắt CRT Scanline, nút `PLAY`, `GARAGE`, `X` thoát game. | `GameMenuUI`, `LobbyUiBuilder`, `SkinManager`, `MapManager` |
+| **FR-02** | Hệ thống Skin thương hiệu & Palette Swap | Quản lý 4 `BikeSkinData` nhiều pose (Upright, LeanLeft1/2, LeanRight1/2, KickLeft, HitStagger), dùng `BikePaletteSwapper` ánh xạ màu HSV có cache (`Dictionary`) từ bộ sprite gốc sang 4 thương hiệu + Cảnh sát (0 alloc/frame), fallback procedural an toàn khi thiếu sprite. | `SkinManager`, `BikeSkinData`, `BikePaletteSwapper`, `RoadRashBikeSprites` |
 | **FR-03** | Hệ thống Map đa dạng (2–6 làn) | Quản lý danh sách `TrackDefinition` & `MapTheme` (Phố Sáng Ban Mai, Đại Lộ Ven Biển, Cao Tốc Đêm Neon, Thành Phố Đêm Neon); hỗ trợ mở khóa bằng tiền thưởng, lưu kỷ lục từng map và cấu trúc đặc biệt (`Overpass`, `Tunnel`, `Crosswalk`). | `MapManager`, `TrackDefinition`, `MapTheme`, `WaypointTrack` |
 | **FR-04** | Mô phỏng vật lý xe 2D | Mô phỏng lực kéo động cơ, phanh, lực cản khí động, lực ma sát lăn, độ bám ngang theo lốp, lái phụ thuộc tốc độ, phạt tốc độ ngoài đường (`IsOnTrack == false`) và rào chắn biên ngoài (`MaxOffRoadWidth`). | `VehiclePhysics`, `VehicleStats`, `VehicleStatsAsset`, `Car` |
 | **FR-05** | Điều khiển người chơi & Chiến đấu | Đọc phím `W/A/S/D` hoặc phím mũi tên (ga, phanh, lái mượt) và `Space` (đá trái/phải tự động hướng về đối thủ gần nhất trong tầm, gây choáng và đẩy ngang kèm cooldown). | `InputHandler`, `PlayerDriver`, `GameManager` |
@@ -63,9 +63,9 @@ flowchart LR
 | **FR-07** | Cảnh sát truy đuổi | Xe Cảnh sát (`PoliceCar_Unit01`) bám theo xe người chơi, tự tăng tốc bắt kịp khi tụt lại, ép làn ngang khi áp sát, tung đòn đá cản và bật đèn còi xanh-đỏ cảnh báo trên HUD khi vào tầm. | `PoliceChaseController`, `PoliceRacerDriver` |
 | **FR-08** | Chướng ngại vật & Cảnh quan | Sinh chướng ngại vật ngẫu nhiên trên làn (`TrafficCone`, `OilBarrel`, `RoadBarrier`, `OilSlick`, `ParkedBus`), xử lý va chạm giảm tốc/đẩy ngang và hồi phục sau cooldown; sinh prop hai bên đường theo vùng của `MapTheme`. | `TrackObstacleSystem`, `EnvironmentDecorator`, `RoadRashPropSprites` |
 | **FR-09** | Đếm vòng, Chống đi tắt & Xếp hạng | Kiểm tra cắt cổng `Checkpoint` theo đúng thứ tự và đúng chiều xuôi, phát hiện đi ngược chiều (`IsWrongWay`), tính thời gian từng vòng / kỷ lục và xếp hạng thời gian thực. | `LapCheckpointManager`, `Checkpoint`, `RacerProgress`, `RacerRankingComparer` |
-| **FR-10** | Tạm dừng (Pause Menu) | Nhấn `Esc` hoặc `P` trong `Countdown` hoặc `Racing` để đóng băng thời gian (`Time.timeScale = 0`), mở menu Pause với 4 nút: Tiếp tục (`Resume`), Chơi lại (`Restart`), Về Sảnh chờ (`Lobby`), Thoát game (`Quit`). | `PauseMenuUI`, `GameManager`, `GameState` |
-| **FR-11** | Garage nâng cấp & Lưu tiến trình | Cho phép nâng cấp 4 hạng mục (`Engine`, `Brakes`, `Grip`, `WeightReduction`) tối đa 5 cấp với giá tăng theo cấp số nhân (`1.5^level`); tự động lưu và nạp toàn bộ tiền, cấp nâng cấp, thành tích, map đã mở vào file JSON. | `CarUpgradeSystem`, `PlayerSaveData`, `UpgradeType` |
-| **FR-12** | Đồ họa Pseudo-3D, VFX & Âm thanh | Dựng mặt đường phối cảnh theo lát cắt (`sliceCount = 104`), đồng bộ scale xe/prop/chướng ngại vật, hiệu ứng URP (`Tonemapping`, `Bloom`, `Vignette`, `ChromaticAberration`), hạt bụi/tia lửa/gió, HUD đồng hồ kim + minimap và âm thanh tổng hợp procedural (`M` tắt/bật). | `RoadRashRenderer2D`, `RaceVfxController`, `RaceHUD`, `RaceAudioController` |
+| **FR-10** | Tạm dừng (Pause) & Hướng dẫn | Nhấn `Esc` hoặc `P` trong `Countdown` hoặc `Racing` để đóng băng thời gian (`Time.timeScale = 0`), mở Pause Overlay (`sortingOrder = 30`, uGUI + TMP) gồm telemetry, nút Resume/Restart/Lobby/Quit, bật/tắt CRT Scanline và modal Hướng dẫn phím đồng bộ 100% với phím thật. | `PauseMenuUI`, `GameManager`, `GameState`, `CrtScanlineController` |
+| **FR-11** | Garage nâng cấp & Lưu tiến trình | Giao diện Workshop Tuning (`GarageUiBuilder`) hiển thị 4 thanh chỉ số (`MAX SPD`, `POWER`, `BRAKE`, `GRIP`), nâng cấp 4 hạng mục (`Engine`, `Brakes`, `Grip`, `WeightReduction`) tối đa 5 cấp kèm 5 LED pip; View kiểm tra qua `CanAfford`/`IsMaxLevel` và lưu JSON tự động. | `GarageUiBuilder`, `CarUpgradeSystem`, `PlayerSaveData`, `UpgradeType` |
+| **FR-12** | Đồ họa Pseudo-3D, VFX, CRT & HUD | Dựng mặt đường phối cảnh theo lát cắt (`sliceCount = 104`), đồng bộ sprite 2D nhiều pose (`Assets/Art/`), hiệu ứng URP Bloom cân chỉnh cho đêm neon (`DefaultVolumeProfile.asset`), CRT Scanline shader bật/tắt (`CrtScanlineOverlay.shader`), HUD 4 góc Cyber Arcade (`RaceHUD`), và 11 SFX procedural (`M` tắt/bật). | `RoadRashRenderer2D`, `RaceVfxController`, `CrtScanlineController`, `RaceHUD`, `RaceAudioController` |
 
 ### 2.3 Danh sách Yêu cầu Phi chức năng (Non-Functional Requirements)
 
@@ -560,11 +560,29 @@ flowchart TD
 
 ## 8. Chương Cài đặt (Implementation)
 
-### 8.1 Tổ chức Assembly và Module
-Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) để bảo đảm tách biệt runtime, editor và kiểm thử:
-1. **`RacingGame`** (`Assets/Scripts/RacingGame.asmdef`): Toàn bộ logic gameplay, vật lý, AI, bản đồ, skin, giao diện, đồ họa, âm thanh và lưu trữ dữ liệu; tham chiếu `Unity.InputSystem`, `Unity.RenderPipelines.Core.Runtime`, `Unity.RenderPipelines.Universal.Runtime`, `UnityEngine.UI`.
-2. **`RacingGame.Editor`** (`Assets/Scripts/Editor/RacingGame.Editor.asmdef`): Công cụ `RoadRashSceneSetup` dùng `AssetDatabase` và `EditorSceneManager` để tạo `ScriptableObject` và dựng `LobbyScene`, `SampleScene`.
-3. **`RacingGame.Tests`** (`Assets/Tests/EditMode/RacingGame.Tests.asmdef`): Chứa 14 bộ test EditMode tham chiếu `RacingGame`, `UnityEngine.TestRunner`, `UnityEditor.TestRunner` và `nunit.framework.dll`.
+### 8.1 Tổ chức Assembly, Thư mục Art và Module
+Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) gồm **40 script runtime** và **3 script Editor**, cùng thư mục tài nguyên đồ họa chuẩn hóa dưới `Assets/Art/`:
+1. **`RacingGame`** (`Assets/Scripts/RacingGame.asmdef`): Toàn bộ logic gameplay, vật lý, AI, bản đồ, skin/palette swap, giao diện uGUI + TextMeshPro, đồ họa, VFX/CRT, âm thanh và lưu trữ dữ liệu; tham chiếu `Unity.InputSystem`, `Unity.RenderPipelines.Core.Runtime`, `Unity.RenderPipelines.Universal.Runtime`, `UnityEngine.UI`, `Unity.TextMeshPro`.
+2. **`RacingGame.Editor`** (`Assets/Scripts/Editor/RacingGame.Editor.asmdef`): Gồm `RoadRashSceneSetup`, `ArtAssetImportPostprocessor` (tự cấu hình Sprite/PPU/Pivot/Compression cho `Assets/Art/`) và `Stage2ArtWiringEditor` (tự gắn sprite nhiều pose, prop override, banner map, preview skin vào các `.asset`).
+3. **`RacingGame.Tests`** (`Assets/Tests/EditMode/RacingGame.Tests.asmdef`): Chứa **18 bộ test EditMode** tham chiếu `RacingGame`, `UnityEngine.TestRunner`, `UnityEditor.TestRunner`, `Unity.TextMeshPro` và `nunit.framework.dll`.
+
+```text
+Assets/
+├── Art/
+│   ├── Maps/                       # Banner_Map01_CityMorning .. Banner_Map04_CityNightDistrict (1376x768)
+│   ├── Previews/                   # Preview_XanhSM, Preview_ShopeeFood, Preview_Grab, Preview_Ahamove (1376x768)
+│   ├── Sprites/
+│   │   ├── Bikes/                  # 6 pose rear-view XanhSM RGBA (Upright, LeanLeft/Right Light/Deep, KickLeft)
+│   │   └── Props/                  # 10 sprite prop & vật cản RGBA (RoadBarrier, Cone, Barrel, ParkedBus, Palm, Tree, Lamp, NeonSign, HighwaySign)
+│   └── UI/                         # Bg_Lobby_SaigonNight.png
+├── Shaders/
+│   └── CrtScanlineOverlay.shader   # Shader CRT scanline + vignette tương thích URP
+└── Scripts/
+    ├── Editor/                     # ArtAssetImportPostprocessor.cs, RoadRashSceneSetup.cs, Stage2ArtWiringEditor.cs
+    ├── Rendering/                  # RoadRashRenderer2D.cs, RaceVfxController.cs, CrtScanlineController.cs, ...
+    ├── Skins/                      # BikePaletteSwapper.cs, BikeSkinData.cs, SkinManager.cs
+    └── UI/                         # GameMenuUI.cs, LobbyUiBuilder.cs, GarageUiBuilder.cs, RaceHUD.cs, PauseMenuUI.cs, RoadRashUiSprites.cs
+```
 
 ### 8.2 Chi tiết cài đặt các phân hệ chính
 - **Vật lý xe & Chỉ số chuẩn (`VehiclePhysics`, `VehicleStats`, `VehicleStatsAsset`, `Car`):**
@@ -579,10 +597,12 @@ Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) để b�
 - **Chướng ngại vật & Cảnh quan (`TrackObstacleSystem`, `EnvironmentDecorator`):**
   - `TrackObstacleSystem` sinh ngẫu nhiên (hoặc theo seed) 5 loại vật cản (`TrafficCone`, `OilBarrel`, `RoadBarrier`, `OilSlick`, `ParkedBus`), đảm bảo `ParkedBus` chỉ đỗ ở làn ngoài cùng và không chắn trong `Tunnel` hoặc trên `Overpass`; va chạm đẩy ngang xe, giảm tốc và đưa vật cản vào thời gian hồi sinh (`respawnCooldownSeconds = 4.5f`).
   - `EnvironmentDecorator` đọc động danh sách `MapZonePropConfig[]` và hệ số mật độ `propDensityMultiplier` từ `MapTheme` để rải prop hai bên đường.
-- **Skin, Sảnh chờ, Pause & HUD (`SkinManager`, `BikeSkinData`, `GameMenuUI`, `PauseMenuUI`, `RaceHUD`):**
-  - `SkinManager` quản lý 4 thương hiệu (`XanhSM`, `ShopeeFood`, `Grab`, `Ahamove`) và lưu vào `PlayerPrefs`.
-  - `GameMenuUI` xây dựng giao diện uGUI Sảnh chờ & Garage hoàn toàn bằng code, hỗ trợ cả `LobbyScene` độc lập (`isStandaloneLobbyScene = true`, chuyển sang `SampleScene` qua `SkinManager.AutoStartRaceOnGameplayLoad`) và `SampleScene`.
-  - `PauseMenuUI` dựng overlay `PauseMenuCanvas` (`sortingOrder = 30`) tự động hiện/ẩn theo `GameManager.IsPaused` trong `Racing` và `Countdown`.
+- **Skin, Palette Swap, VFX/CRT & Giao diện Cyber Arcade (`SkinManager`, `BikeSkinData`, `BikePaletteSwapper`, `RaceVfxController`, `CrtScanlineController`, `LobbyUiBuilder`, `GarageUiBuilder`, `GameMenuUI`, `RaceHUD`, `PauseMenuUI`):**
+  - `BikeSkinData` mở rộng hỗ trợ bộ sprite 7 pose (`Upright`, `LeanLeft1/2`, `LeanRight1/2`, `KickLeft`, `HitStagger`) đồng thời giữ nguyên trường cũ (`customTexture`, `customMaterial`, `customSprite`); `BikePaletteSwapper` ánh xạ màu HSV từ bộ `Xanh SM` sang 4 thương hiệu + Cảnh sát và cache duy nhất 1 lần trong `Dictionary` (0 cấp phát rác trong `Update`/`FixedUpdate`, tự fallback procedural khi sprite nguồn null hoặc non-readable).
+  - `RaceVfxController` giữ nguyên cơ chế hạt va chạm `EmitImpactSparks(...)` và tinh chỉnh URP Bloom trên `DefaultVolumeProfile.asset`; `CrtScanlineController` (độc lập, lưu trạng thái qua `PlayerPrefs`) điều khiển shader `Assets/Shaders/CrtScanlineOverlay.shader` qua API công khai `IsEnabled` / `ToggleCrt()` / `SetEnabled(bool)` và tự giải phóng Material trong `OnDestroy()`.
+  - `LobbyUiBuilder` và `GarageUiBuilder` tách riêng phần dựng layout uGUI + TextMeshPro theo nguyên tắc SRP (`View != Logic`), áp dụng ảnh nền/preview/banner từ `Assets/Art/` và nạp font TMP tiếng Việt đầy đủ tổ hợp dấu qua `LobbyUiBuilder.GetTmpFont(...)`.
+  - `GameMenuUI` hỗ trợ chọn 4 Skin, carousel 4 Map, Garage 4 thẻ × 5 pip kiểm tra thuần View qua `CanAfford`/`IsMaxLevel`, và đồng bộ số vòng (`1V/2V/3V/5V`) + độ khó qua `PlayerPrefs` giữa `LobbyScene` và `SampleScene`.
+  - `RaceHUD` bố trí 4 góc thông thoáng (`Leaderboard + QuickButtons`, `RankShield + FlashBanner`, `Minimap`, `Tachometer + LCD km/h + 12-LED RPM`, `Lap + Stopwatch`), giữ trung tâm ẩn khi không kích hoạt Countdown/Wrong-way/Finished, và hủy đăng ký Observer đầy đủ trong `OnDisable()` / `OnDestroy()`. `PauseMenuUI` dựng `PauseMenuCanvas` (`sortingOrder = 30`) với đủ 4 nút `TC-44`, nút CRT Scanline và Controls Modal đồng bộ 100% phím thật (`W/↑`, `S/↓`, `A/D`, `SPACE`, `M`, `R`, `ESC/P`).
 - **Lưu trữ tiến trình JSON (`CarUpgradeSystem`, `PlayerSaveData`):**
   Đường dẫn mặc định: `Application.persistentDataPath/racing2d_save.json`
   ```json
@@ -627,9 +647,13 @@ Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) để b�
 | 12 | `GameplayFeelAndOffRoadRecoveryTests.cs` | Cảm giác lái `VehicleStats.Default`, phục hồi off-road, rào chắn biên ngoài, độ rộng làn các map asset | 4 |
 | 13 | `LaneLayoutTests.cs` | Bố cục đối xứng 2/4/6 làn trên `WaypointTrack`, `GameManager` grid/AI, `TrackObstacleSystem` và vạch kẻ đường `RoadRashRenderer2D` | 6 |
 | 14 | `MapAIBenchmark3LapTests.cs` | Benchmark AI chạy 3 vòng liên tiếp (`seed=2026`, `STUCK=0`, đúng thứ tự checkpoint) trên Map Valley & City | 2 |
-| **Tổng** | **14 files** | **Toàn bộ EditMode Test Suite** | **70** |
+| 15 | `ArtAssetsIntegrityTests.cs` | Toàn vẹn 6 sprite xe rear-view, 10 prop/vật cản trong suốt, 4 preview, 4 banner map và backdrop Lobby | 3 |
+| 16 | `BikePaletteSwapAndStage2GraphicsTests.cs` | Cache `BikePaletteSwapper` cho 5 bảng màu, fallback an toàn khi null/non-readable và gán dữ liệu Stage 2 | 3 |
+| 17 | `VfxAndCrtScanlineTests.cs` | Lưu/nạp `CrtScanlineController` qua `PlayerPrefs` (không cần Camera/Canvas) & kiểm chuẩn URP Bloom | 2 |
+| 18 | `LobbyRedesignAndLapSyncTests.cs` | Đồng bộ vòng/độ khó Lobby, Lobby uGUI+TMP, Garage thuần View, HUD 4 góc + hủy Observer, Bộ 3 Modal 4D & Font tiếng Việt + dọn dead code | 6 |
+| **Tổng** | **18 files** | **Toàn bộ EditMode Test Suite** | **84** |
 
-- **Kết quả chạy thực tế (`EditModeResults.xml`, Unity `6000.6.9f1` batchmode):** Tổng `70` test cases — **Passed: 70**, **Failed: 0**, **Skipped: 0**, **Inconclusive: 0**, thời gian chạy `7.726s` (chi tiết từng test case xem tại [TEST_CASES.md](TEST_CASES.md), kết quả benchmark 3 vòng xem tại [EXPERIMENT.md](EXPERIMENT.md), log lỗi/cảnh báo xem tại [BUG_LOG.md](BUG_LOG.md)).
+- **Kết quả chạy thực tế (Unity `6000.6.9f1` batchmode):** Tổng `84` test cases — **Passed: 84**, **Failed: 0**, **Skipped: 0**, **Inconclusive: 0**, thời gian chạy `4.270s` (`4.269528s`, Result = Passed) — chi tiết từng test case xem tại [TEST_CASES.md](TEST_CASES.md), kết quả benchmark 3 vòng xem tại [EXPERIMENT.md](EXPERIMENT.md), log lỗi/cảnh báo xem tại [BUG_LOG.md](BUG_LOG.md).
 
 ---
 
@@ -637,8 +661,8 @@ Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) để b�
 
 ### 10.1 Kết quả đạt được
 - Hoàn thiện kiến trúc hướng đối tượng (OOP) rõ ràng cho game đua xe *Road Rash 2D*, áp dụng triệt để 4 tính chất (Trừu tượng hóa, Kế thừa, Đa hình, Đóng gói) cùng State Pattern (`RaceStateBase`), Strategy/Polymorphism (`Driver`, `IComparer<RacerProgress>`) và Data-Driven `ScriptableObject` (`AIProfile`, `VehicleStatsAsset`, `TrackDefinition`, `MapTheme`, `BikeSkinData`).
-- Xây dựng đầy đủ vòng đời chơi hoàn chỉnh từ Sảnh chờ (`LobbyScene` / `MainMenu`) -> Chọn Skin & Map -> Nâng cấp Garage -> Đếm ngược -> Đua xe (vật lý 2D, AI đa độ khó, Cảnh sát truy đuổi, Chướng ngại vật, Đòn đá) -> Tạm dừng (`PauseMenuUI`) -> Kết quả & Lưu tiến trình JSON.
-- Đảm bảo chất lượng bằng bộ **70 EditMode tests** bao phủ cả vật lý, AI determinism, benchmark 3 vòng trên nhiều bản đồ, bố cục 2–6 làn, đồ họa procedural, hệ thống Map/Skin/Pause và an toàn lưu trữ.
+- Xây dựng đầy đủ vòng đời chơi và bộ giao diện uGUI + TextMeshPro Cyber Arcade hoàn chỉnh từ Sảnh chờ (`LobbyScene` / `MainMenu`) -> Chọn Skin & Map -> Nâng cấp Garage -> Đếm ngược -> Đua xe (vật lý 2D, AI đa độ khó, Cảnh sát truy đuổi, Chướng ngại vật, Đòn đá, multi-pose palette swap, URP Bloom + CRT Scanline) -> Tạm dừng / Hướng dẫn phím (`PauseMenuUI`) -> Kết quả (`RaceHUD`) & Lưu tiến trình JSON; dọn sạch mã mẫu thừa `Assets/Welcome/`.
+- Đảm bảo chất lượng bằng bộ **84 EditMode tests** bao phủ cả vật lý, AI determinism, benchmark 3 vòng trên nhiều bản đồ, bố cục 2–6 làn, tài nguyên art 2D, palette swap cache, URP Bloom/CRT, giao diện TMP tiếng Việt, hủy đăng ký Observer (`OnDisable`/`OnDestroy`) và an toàn lưu trữ.
 
 ### 10.2 Hạn chế hiện tại
 - Bộ kiểm thử hiện tại tập trung ở **EditMode** (chưa có PlayMode UI automation tests mô phỏng thao tác chuột/bàn phím thực tế qua nhiều frame giữa `LobbyScene` và `SampleScene`).

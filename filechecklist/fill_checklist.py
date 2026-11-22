@@ -25,12 +25,12 @@ HEADER_UPDATES = {
     "A4": (
         "Mã nhóm: Nhóm 01 SV   Tên đề tài: Road Rash 2D: Đại Chiến Shipper (newbie)   "
         "Phân nhánh: Nhánh 1 - Đua xe Real-time (Vật lý 2D & AI)   "
-        "SV (MSSV – Họ tên): [SV tự điền]   Git: tungduongd (6 commits)"
+        "SV (MSSV – Họ tên): [SV tự điền]   Git: tungduongd (20 commits)"
     ),
     "A5": (
-        "TỰ KÊ KHAI KHỐI LƯỢNG (SV điền): Thể loại/PCU: Đua xe Pseudo-3D (4 Map SO + Police Chase + Kick + Garage + 4 Skin) | "
-        "UC: 9 UC | Entity/UML: 34+/26 lớp | Thuật toán/AI: 4 | GoF: 3 mẫu (1 nhóm Behavioral) | "
-        "Tests: 70 EditMode PASS (Playtest: 0 ca, Bug Log: 2 sửa + 3 cảnh báo) | Git: 6 commits (3 ngày, +42 thay đổi)"
+        "TỰ KÊ KHAI KHỐI LƯỢNG (SV điền): Thể loại/PCU: Đua xe Pseudo-3D (4 Map SO + Police Chase + Kick + Garage + 4 Skin + 2D Art/Shader CRT) | "
+        "UC: 9 UC | Entity/UML: 40 runtime + 3 editor / 26+ lớp | Thuật toán/AI: 4 | GoF: 3 mẫu (State, Strategy, Observer) | "
+        "Tests: 84 EditMode PASS (18 files, 4.270s) | Git: 20 commits (Nâng cấp Stage 1-5)"
     ),
 }
 
@@ -54,27 +54,27 @@ SELF_ASSESSMENT = [
     (
         11, "1.4", "D", "",
         "Docs/README.md; .gitignore | Git log | "
-        ".gitignore chuẩn Unity/VS; 6 commits/3 ngày (thiếu README gốc, Build sạch, Video, >=12 commits)",
+        ".gitignore chuẩn Unity/VS (0 Library/Temp/obj); 20 commits (thiếu README gốc, Build sạch, Video)",
     ),
     (
         12, "2.1", "B", "X",
-        "Mục 6, 8.2 BC | GameMenuUI.cs; RaceHUD.cs; PauseMenuUI.cs; RaceVfxController.cs; RaceAudioController.cs | "
-        "Đủ luồng UI, Reset sạch, VFX + 11 SFX phím M (thiếu BGM nhạc nền)",
+        "Mục 6, 8.2 BC | LobbyUiBuilder.cs; GarageUiBuilder.cs; GameMenuUI.cs; RaceHUD.cs; PauseMenuUI.cs; CrtScanlineController.cs; RaceVfxController.cs; RaceAudioController.cs | "
+        "uGUI+TMP Cyber Arcade đủ luồng (Font VN, CRT Scanline, URP Bloom, 25 asset Assets/Art/, 11 SFX phím M; thiếu BGM)",
     ),
     (
         13, "2.2", "C", "",
-        "Mục 8.2, 9 BC | Car.cs; AIRacerDriver.cs; CarUpgradeSystem.cs:359,386; TC-09,29,61 | "
-        "0 catch {} rỗng, kẹp JSON lỗi, STUCK=0 (chưa có cây CustomException)",
+        "Mục 8.2, 9 BC | Car.cs; AIRacerDriver.cs; CarUpgradeSystem.cs; BikePaletteSwapper.cs; RaceHUD.cs; TC-09,29,61,75,82 | "
+        "0 catch {} rỗng, fallback null/non-readable an toàn, kẹp JSON lỗi, STUCK=0 (chưa có cây CustomException)",
     ),
     (
         14, "2.3", "B", "X",
-        "Mục 2.3 NFR-01 BC | GameManager.cs; RoadRashRenderer2D.cs (_opponentPool, _propPool); CarUpgradeSystem.cs | "
-        "0 hard-code path, FixedUpdate 50Hz, Object Pool sprite",
+        "Mục 2.3 NFR-01 BC | GameManager.cs; RoadRashRenderer2D.cs (_opponentPool, _propPool); BikePaletteSwapper.cs; CrtScanlineController.cs | "
+        "FixedUpdate 50Hz, Object Pool sprite, Palette Swap cache Dictionary (0 alloc Update), tự dọn Material OnDestroy",
     ),
     (
         15, "2.4", "B", "X",
-        "Mục 8.1 BC | Assets/Scripts/ (14 thư mục, 3 .asmdef) | "
-        "36 runtime .cs chuẩn naming, 0 lỗi biên dịch (còn Welcome2DScript.cs thừa)",
+        "Mục 8.1 BC | Assets/Scripts/ (14 thư mục, 3 .asmdef, 40 runtime + 3 editor .cs) | "
+        "Đã xóa Assets/Welcome/ (Welcome2DScript.cs), tách SRP LobbyUiBuilder/GarageUiBuilder, 0 lỗi biên dịch, 0 warning",
     ),
     (
         16, "3.1", "A", "X",
@@ -123,18 +123,18 @@ SELF_ASSESSMENT = [
     ),
     (
         25, "5.1", "B", "X",
-        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (14 files) | "
-        "70/70 EditMode Tests PASS (7.726s), có StubDriver, phủ biên BVA & JSON lỗi",
+        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (18 files) | "
+        "84/84 EditMode Tests PASS (4.270s), có StubDriver, phủ biên BVA, JSON lỗi, Art/Palette/CRT/TMP UI",
     ),
     (
         26, "5.2", "C", "",
-        "Mục 9 BC; BUG_LOG.md | TC-25,29,32,42,61,69,70 | "
-        "Có >=4 Integration Tests PASS; thiếu Playtest >=8 ca, Bug Log 6 cột >=4 lỗi & test hủy Observer",
+        "Mục 9 BC; BUG_LOG.md | TC-25,29,32,42,61,69,70,82 | "
+        "Có >=4 Integration Tests + test hủy Observer (TC-82 OnDisable/OnDestroy) PASS; thiếu Playtest >=8 ca & Bug Log mở rộng",
     ),
     (
         27, "5.3", "A", "X",
-        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (14 files, 70 tests) | "
-        "70/70 Automated Tests PASS 100%, Assertion thực chất diệt đột biến tốt",
+        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (18 files, 84 tests) | "
+        "84/84 Automated Tests PASS 100%, Assertion thực chất kiểm chứng physics/AI/UI/View!=Logic/font VN",
     ),
 ]
 
