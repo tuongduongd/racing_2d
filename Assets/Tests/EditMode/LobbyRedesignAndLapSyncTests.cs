@@ -145,5 +145,53 @@ namespace RacingGame.Tests
                 Object.DestroyImmediate(host);
             }
         }
+
+        [Test]
+        public void GarageWorkshopRedesign_BuildsFourCardsWithFivePips_AndPurchasesViaPureViewChecks()
+        {
+            string tempSavePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"racing2d_garage_ui_{System.Guid.NewGuid():N}.json");
+            var host = new GameObject("GarageUiHost");
+            GameMenuUI menuUi = host.AddComponent<GameMenuUI>();
+
+            try
+            {
+                var saveSys = new CarUpgradeSystem(tempSavePath);
+                Assert.AreEqual(200, saveSys.Money);
+
+                menuUi.BindStandaloneSaveSystem(saveSys);
+                menuUi.InitializeStandaloneLobby();
+
+                Assert.AreEqual(4, menuUi.UpgradeCardCount);
+                Assert.IsFalse(menuUi.IsGarageOpen);
+
+                menuUi.OpenGarageFromLobby();
+                Assert.IsTrue(menuUi.IsGarageOpen);
+
+                // First Engine purchase costs 150 <= 200 -> succeeds and leaves 50
+                Assert.IsTrue(menuUi.TryBuyUpgradeFromGarage(UpgradeType.Engine));
+                Assert.AreEqual(1, saveSys.GetLevel(UpgradeType.Engine));
+                Assert.AreEqual(50, saveSys.Money);
+
+                // Second Engine purchase costs 225 > 50 -> rejected cleanly via CanAfford
+                Assert.IsFalse(menuUi.TryBuyUpgradeFromGarage(UpgradeType.Engine));
+                Assert.AreEqual(1, saveSys.GetLevel(UpgradeType.Engine));
+                Assert.AreEqual(50, saveSys.Money);
+
+                menuUi.CloseGarageToLobby();
+                Assert.IsFalse(menuUi.IsGarageOpen);
+            }
+            finally
+            {
+                if (menuUi != null && menuUi.MenuCanvas != null)
+                {
+                    Object.DestroyImmediate(menuUi.MenuCanvas.gameObject);
+                }
+                Object.DestroyImmediate(host);
+                if (System.IO.File.Exists(tempSavePath))
+                {
+                    System.IO.File.Delete(tempSavePath);
+                }
+            }
+        }
     }
 }

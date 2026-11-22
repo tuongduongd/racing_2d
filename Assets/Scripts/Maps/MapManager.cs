@@ -164,6 +164,14 @@ namespace RacingGame
             return Mathf.Max(1, def.DifficultyStars) * 250;
         }
 
+        public bool CanAffordMapUnlock(string mapId)
+        {
+            EnsureInitialized();
+            if (IsMapUnlocked(mapId)) return true;
+            if (_saveSystem == null) return false;
+            return _saveSystem.Money >= GetMapUnlockCost(mapId);
+        }
+
         public bool UnlockMap(string mapId, bool saveImmediately = true)
         {
             EnsureInitialized();

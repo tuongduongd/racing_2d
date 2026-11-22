@@ -90,30 +90,13 @@ namespace RacingGame
         private TMP_Text _skinModalBrandTagline;
         private TMP_Text _skinModalWalletText;
 
-        // Garage elements (Stage 4B preserves existing Garage functionality)
-        private Text _garageMoneyText;
-        private Text _garageStatsText;
-        private Text _garageFeedbackText;
+        // Garage Workshop Tuning elements
+        private GaragePanelWidgets _garageWidgets;
         private float _shopFeedbackUntil;
-        private Image _speedBarFill;
-        private Image _powerBarFill;
-        private Image _brakeBarFill;
-        private Image _gripBarFill;
         private float _dispSpeedBar;
         private float _dispPowerBar;
         private float _dispBrakeBar;
         private float _dispGripBar;
-        private readonly List<UpgradeCardWidgets> _upgradeCards = new List<UpgradeCardWidgets>();
-
-        private class UpgradeCardWidgets
-        {
-            public UpgradeType Type;
-            public Text TitleText;
-            public Text EffectText;
-            public Text ButtonLabel;
-            public Image ButtonImg;
-            public readonly List<Image> LevelPips = new List<Image>();
-        }
 
         private static readonly UpgradeType[] AllUpgradeTypes =
         {
@@ -148,6 +131,8 @@ namespace RacingGame
         public int SelectedLaps => _gameManager != null ? _gameManager.TotalLaps : _selectedLaps;
         public DifficultyLevel SelectedDifficulty => _gameManager != null ? _gameManager.Difficulty : _selectedDifficulty;
         public bool IsSkinSelectorOpen => _skinSelectorPanel != null && _skinSelectorPanel.activeSelf;
+        public int UpgradeCardCount => _garageWidgets != null ? _garageWidgets.UpgradeCards.Count : 0;
+        public bool IsGarageOpen => _garagePanel != null && _garagePanel.activeSelf;
 
         public bool IsBrowsedMapLocked
         {
@@ -365,7 +350,68 @@ namespace RacingGame
             {
                 _skinSelectorPanel.SetActive(false);
                 RefreshSkinCards();
+                if (IsGarageOpen)
+                {
+                    RefreshGarage(false);
+                }
             }
+        }
+
+        public void OpenGarageFromLobby()
+        {
+            EnsureBuilt();
+            _confirmResetPending = false;
+            if (_gameManager != null)
+            {
+                _gameManager.OpenGarage();
+                return;
+            }
+
+            if (_menuPanel != null) _menuPanel.SetActive(false);
+            if (_outerQuitButtonX != null) _outerQuitButtonX.gameObject.SetActive(false);
+            if (_garagePanel != null) _garagePanel.SetActive(true);
+            RefreshGarage(true);
+        }
+
+        public void CloseGarageToLobby()
+        {
+            if (_gameManager != null)
+            {
+                _gameManager.OpenMenu();
+                return;
+            }
+
+            if (_garagePanel != null) _garagePanel.SetActive(false);
+            if (_menuPanel != null) _menuPanel.SetActive(true);
+            if (_outerQuitButtonX != null) _outerQuitButtonX.gameObject.SetActive(true);
+            RefreshMenu();
+        }
+
+        public bool TryBuyUpgradeFromGarage(UpgradeType type)
+        {
+            CarUpgradeSystem upg = ResolveUpgradeSystem();
+            if (upg == null) return false;
+
+            if (upg.IsMaxLevel(type))
+            {
+                SetShopFeedback("Đã đạt cấp tối đa!", LobbyUiBuilder.SafetyAmber);
+                return false;
+            }
+
+            int cost = upg.GetUpgradeCost(type);
+            bool bought = _gameManager != null ? _gameManager.TryBuyUpgrade(type) : upg.BuyUpgrade(type);
+            if (bought)
+            {
+                SetShopFeedback(
+                    $"Đã nâng cấp {upg.GetUpgradeDisplayName(type)} lên Lv {upg.GetLevel(type)}!",
+                    LobbyUiBuilder.SuccessGreen);
+                RefreshGarage(false);
+                RefreshMenu();
+                return true;
+            }
+
+            SetShopFeedback($"Không đủ xu! Cần {cost:N0} XU.", LobbyUiBuilder.DangerRed);
+            return false;
         }
 
         public void SelectLapsFromLobby(int laps)
@@ -619,20 +665,41 @@ namespace RacingGame
                 return;
             }
 
+            if (_garagePanel != null && _garagePanel.activeSelf &&
+                Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                CloseGarageToLobby();
+                return;
+            }
+
             if (_lobbyFeedbackText != null && _lobbyFeedbackText.gameObject.activeSelf &&
                 Time.unscaledTime > _lobbyFeedbackUntil)
             {
                 _lobbyFeedbackText.gameObject.SetActive(false);
             }
 
+            if (_garageWidgets != null && _garageWidgets.FeedbackPanelBg != null &&
+                _garageWidgets.FeedbackPanelBg.gameObject.activeSelf && Time.unscaledTime > _shopFeedbackUntil)
+            {
+                _garageWidgets.FeedbackPanelBg.gameObject.SetActive(false);
+            }
+
             if (_gameManager == null)
             {
-                if (_menuPanel != null && !_menuPanel.activeSelf) _menuPanel.SetActive(true);
-                if (_outerQuitButtonX != null && !_outerQuitButtonX.gameObject.activeSelf)
+                bool showStandaloneGarage = IsGarageOpen;
+                if (_menuPanel != null && _menuPanel.activeSelf == showStandaloneGarage)
                 {
-                    _outerQuitButtonX.gameObject.SetActive(true);
+                    _menuPanel.SetActive(!showStandaloneGarage);
                 }
-                if (!string.IsNullOrEmpty(_mapFeedbackMsg) && Time.unscaledTime > _mapFeedbackUntil)
+                if (_outerQuitButtonX != null && _outerQuitButtonX.gameObject.activeSelf == showStandaloneGarage)
+                {
+                    _outerQuitButtonX.gameObject.SetActive(!showStandaloneGarage);
+                }
+                if (showStandaloneGarage)
+                {
+                    AnimateGarageBars(Time.unscaledDeltaTime);
+                }
+                else if (!string.IsNullOrEmpty(_mapFeedbackMsg) && Time.unscaledTime > _mapFeedbackUntil)
                 {
                     _mapFeedbackMsg = null;
                     RefreshMapCarousel();
@@ -686,10 +753,6 @@ namespace RacingGame
             else if (showGarage)
             {
                 AnimateGarageBars(Time.unscaledDeltaTime);
-                if (_garageFeedbackText != null && _garageFeedbackText.gameObject.activeSelf && Time.unscaledTime > _shopFeedbackUntil)
-                {
-                    _garageFeedbackText.gameObject.SetActive(false);
-                }
             }
         }
 
@@ -826,8 +889,7 @@ namespace RacingGame
                 if (!isUnlocked)
                 {
                     int cost = mm.GetMapUnlockCost(displayMap.MapId);
-                    CarUpgradeSystem upg = ResolveUpgradeSystem();
-                    bool canAfford = upg != null && upg.Money >= cost;
+                    bool canAfford = mm.CanAffordMapUnlock(displayMap.MapId);
                     _mapActionBtnLabel.text = $"MỞ KHÓA (${cost})";
                     _mapActionBtnImg.color = canAfford ? LobbyUiBuilder.SuccessGreen : LobbyUiBuilder.DangerRed;
                     _mapActionBtnLabel.color = canAfford ? LobbyUiBuilder.OnCyan : Color.white;
@@ -1045,59 +1107,131 @@ namespace RacingGame
 
         private void RefreshGarage(bool snapBars)
         {
-            CarUpgradeSystem upg = _gameManager != null ? _gameManager.UpgradeSystem : null;
+            if (_garageWidgets == null) return;
+
+            CarUpgradeSystem upg = ResolveUpgradeSystem();
             if (upg == null) return;
 
-            _garageMoneyText.text = $"Tiền hiện có: ${upg.Money}";
-
-            VehiclePhysics phys = _gameManager.PlayerCar != null ? _gameManager.PlayerCar.Physics : null;
-            if (phys != null)
+            if (_garageWidgets.MoneyText != null)
             {
-                int maxKmh = Mathf.RoundToInt(phys.MaxSpeed * 3.6f);
-                _garageStatsText.text =
-                    $"Max {maxKmh} km/h  |  Power {phys.EnginePower:F0}  |  Phanh {phys.BrakePower:F0}  |  Bám {phys.Grip:F1}  |  {phys.Mass:F0} kg";
+                _garageWidgets.MoneyText.text = $"{upg.Money:N0} XU";
+            }
 
-                if (snapBars)
+            BikeSkinData activeSkin = _skinManager != null ? _skinManager.SelectedSkin : null;
+            if (activeSkin != null)
+            {
+                if (_garageWidgets.BikeBrandTitleText != null)
                 {
-                    _dispSpeedBar = Mathf.InverseLerp(180f, 340f, maxKmh);
-                    _dispPowerBar = Mathf.InverseLerp(5000f, 11500f, phys.EnginePower);
-                    _dispBrakeBar = Mathf.InverseLerp(7500f, 15500f, phys.BrakePower);
-                    _dispGripBar = Mathf.InverseLerp(7f, 16f, phys.Grip);
-                    ApplyBarFills();
+                    _garageWidgets.BikeBrandTitleText.text = activeSkin.DisplayName.ToUpperInvariant();
+                    _garageWidgets.BikeBrandTitleText.color = Color.Lerp(activeSkin.PrimaryColor, Color.white, 0.35f);
+                }
+                if (_garageWidgets.BikeTaglineText != null)
+                {
+                    _garageWidgets.BikeTaglineText.text = activeSkin.Tagline;
+                }
+                if (_garageWidgets.BikeAccentBar != null)
+                {
+                    _garageWidgets.BikeAccentBar.color = activeSkin.PrimaryColor;
+                }
+                if (_garageWidgets.BikePreviewImage != null)
+                {
+                    _garageWidgets.BikePreviewImage.sprite = ResolveSkinPreviewSprite(activeSkin);
                 }
             }
 
-            for (int i = 0; i < _upgradeCards.Count; i++)
+            ReadGarageTelemetry(upg, out float maxSpeed, out float enginePower, out float brakePower, out float grip, out float mass);
+            int maxKmh = Mathf.RoundToInt(maxSpeed * 3.6f);
+
+            if (_garageWidgets.SpeedValueText != null) _garageWidgets.SpeedValueText.text = $"{maxKmh} KM/H";
+            if (_garageWidgets.PowerValueText != null) _garageWidgets.PowerValueText.text = $"{enginePower:F0} W";
+            if (_garageWidgets.BrakeValueText != null) _garageWidgets.BrakeValueText.text = $"{brakePower:F0} N";
+            if (_garageWidgets.GripValueText != null) _garageWidgets.GripValueText.text = $"{grip:F1}";
+            if (_garageWidgets.StatsSummaryText != null)
             {
-                UpgradeCardWidgets card = _upgradeCards[i];
+                _garageWidgets.StatsSummaryText.text =
+                    $"MAX {maxKmh} KM/H  •  POWER {enginePower:F0}  •  PHANH {brakePower:F0}  •  BÁM {grip:F1}  •  {mass:F0} KG";
+            }
+
+            if (snapBars)
+            {
+                _dispSpeedBar = Mathf.InverseLerp(180f, 340f, maxKmh);
+                _dispPowerBar = Mathf.InverseLerp(5000f, 11500f, enginePower);
+                _dispBrakeBar = Mathf.InverseLerp(7500f, 15500f, brakePower);
+                _dispGripBar = Mathf.InverseLerp(7f, 16f, grip);
+                ApplyBarFills();
+            }
+
+            for (int i = 0; i < _garageWidgets.UpgradeCards.Count; i++)
+            {
+                UpgradeCardWidgets card = _garageWidgets.UpgradeCards[i];
                 int level = upg.GetLevel(card.Type);
                 bool isMax = upg.IsMaxLevel(card.Type);
+                bool canAfford = upg.CanAfford(card.Type);
                 int cost = upg.GetUpgradeCost(card.Type);
 
-                card.TitleText.text = $"{upg.GetUpgradeDisplayName(card.Type)}   Lv {level}/{CarUpgradeSystem.MaxUpgradeLevel}";
+                card.TitleText.text = upg.GetUpgradeDisplayName(card.Type).ToUpperInvariant();
+                card.LevelBadgeText.text = isMax ? "MAX" : $"LV {level}/{CarUpgradeSystem.MaxUpgradeLevel}";
+                card.LevelBadgeBg.color = isMax ? LobbyUiBuilder.SuccessGreen : LobbyUiBuilder.SurfaceHigh;
+                card.LevelBadgeText.color = isMax ? LobbyUiBuilder.OnCyan : LobbyUiBuilder.SafetyAmber;
                 card.EffectText.text = upg.GetUpgradeEffectText(card.Type);
-                card.ButtonLabel.text = isMax ? "ĐẠT TỐI ĐA" : $"Nâng cấp (${cost})";
+                card.CostText.text = isMax ? "TỐI ĐA" : $"{cost:N0} XU";
+                card.CostText.color = isMax
+                    ? LobbyUiBuilder.SuccessGreen
+                    : (canAfford ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.DangerRed);
+                card.ButtonLabel.text = isMax ? "✓ ĐẠT TỐI ĐA" : $"NÂNG CẤP [LV {level + 1}]";
                 card.ButtonImg.color = isMax
-                    ? RoadRashVisualTheme.MetalDark
-                    : (upg.Money >= cost ? new Color(0.24f, 0.58f, 0.28f) : new Color(0.45f, 0.26f, 0.24f));
+                    ? LobbyUiBuilder.SurfaceHigh
+                    : (canAfford ? LobbyUiBuilder.ElectricCyan : new Color(0.45f, 0.16f, 0.16f, 1f));
+                card.ButtonLabel.color = isMax
+                    ? LobbyUiBuilder.TextMuted
+                    : (canAfford ? LobbyUiBuilder.OnCyan : Color.white);
 
                 for (int p = 0; p < card.LevelPips.Count; p++)
                 {
-                    card.LevelPips[p].color = p < level ? RoadRashVisualTheme.HudYellow : new Color(0.18f, 0.20f, 0.24f);
+                    card.LevelPips[p].color = p < level ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.SurfaceLowest;
                 }
             }
         }
 
+        private void ReadGarageTelemetry(
+            CarUpgradeSystem upg,
+            out float maxSpeed,
+            out float enginePower,
+            out float brakePower,
+            out float grip,
+            out float mass)
+        {
+            VehiclePhysics phys = _gameManager != null && _gameManager.PlayerCar != null
+                ? _gameManager.PlayerCar.Physics
+                : null;
+            if (phys != null)
+            {
+                maxSpeed = phys.MaxSpeed;
+                enginePower = phys.EnginePower;
+                brakePower = phys.BrakePower;
+                grip = phys.Grip;
+                mass = phys.Mass;
+                return;
+            }
+
+            VehicleStats computed = upg != null ? upg.ComputeUpgradedStats() : VehicleStats.Default;
+            maxSpeed = computed.maxSpeed;
+            enginePower = computed.enginePower;
+            brakePower = computed.brakePower;
+            grip = computed.grip;
+            mass = computed.mass;
+        }
+
         private void AnimateGarageBars(float dt)
         {
-            VehiclePhysics phys = _gameManager.PlayerCar != null ? _gameManager.PlayerCar.Physics : null;
-            if (phys == null) return;
+            CarUpgradeSystem upg = ResolveUpgradeSystem();
+            ReadGarageTelemetry(upg, out float maxSpeed, out float enginePower, out float brakePower, out float grip, out _);
 
-            int maxKmh = Mathf.RoundToInt(phys.MaxSpeed * 3.6f);
+            int maxKmh = Mathf.RoundToInt(maxSpeed * 3.6f);
             float tSpeed = Mathf.InverseLerp(180f, 340f, maxKmh);
-            float tPower = Mathf.InverseLerp(5000f, 11500f, phys.EnginePower);
-            float tBrake = Mathf.InverseLerp(7500f, 15500f, phys.BrakePower);
-            float tGrip = Mathf.InverseLerp(7f, 16f, phys.Grip);
+            float tPower = Mathf.InverseLerp(5000f, 11500f, enginePower);
+            float tBrake = Mathf.InverseLerp(7500f, 15500f, brakePower);
+            float tGrip = Mathf.InverseLerp(7f, 16f, grip);
 
             float lerp = 1f - Mathf.Exp(-10f * dt);
             _dispSpeedBar = Mathf.Lerp(_dispSpeedBar, tSpeed, lerp);
@@ -1109,18 +1243,19 @@ namespace RacingGame
 
         private void ApplyBarFills()
         {
-            if (_speedBarFill != null) _speedBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispSpeedBar), 1f);
-            if (_powerBarFill != null) _powerBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispPowerBar), 1f);
-            if (_brakeBarFill != null) _brakeBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispBrakeBar), 1f);
-            if (_gripBarFill != null) _gripBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispGripBar), 1f);
+            if (_garageWidgets == null) return;
+            if (_garageWidgets.SpeedBarFill != null) _garageWidgets.SpeedBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispSpeedBar), 1f);
+            if (_garageWidgets.PowerBarFill != null) _garageWidgets.PowerBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispPowerBar), 1f);
+            if (_garageWidgets.BrakeBarFill != null) _garageWidgets.BrakeBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispBrakeBar), 1f);
+            if (_garageWidgets.GripBarFill != null) _garageWidgets.GripBarFill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(_dispGripBar), 1f);
         }
 
         private void SetShopFeedback(string msg, Color color)
         {
-            if (_garageFeedbackText == null) return;
-            _garageFeedbackText.text = msg;
-            _garageFeedbackText.color = color;
-            _garageFeedbackText.gameObject.SetActive(true);
+            if (_garageWidgets == null || _garageWidgets.FeedbackText == null || _garageWidgets.FeedbackPanelBg == null) return;
+            _garageWidgets.FeedbackText.text = msg;
+            _garageWidgets.FeedbackText.color = color;
+            _garageWidgets.FeedbackPanelBg.gameObject.SetActive(true);
             _shopFeedbackUntil = Time.unscaledTime + 2.2f;
         }
 
@@ -1286,18 +1421,7 @@ namespace RacingGame
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.SafetyAmber, 13f,
                 "Động cơ • Phanh • Bám • Trọng lượng", customTmpFont);
             LobbyUiBuilder.PlaceTopLeft(garageBtn.GetComponent<RectTransform>(), 32f + (actionBtnW + actionBtnGap), actionBtnY, actionBtnW, 62f);
-            garageBtn.onClick.AddListener(() =>
-            {
-                _confirmResetPending = false;
-                if (_gameManager != null)
-                {
-                    _gameManager.OpenGarage();
-                }
-                else
-                {
-                    SetLobbyFeedback("Hãy bấm CHƠI NGAY để mở Garage trong trận đua!", LobbyUiBuilder.SafetyAmber);
-                }
-            });
+            garageBtn.onClick.AddListener(OpenGarageFromLobby);
 
             Button resetBtn = LobbyUiBuilder.CreateCyberButton(
                 _menuPanel.transform, "ResetBtn", "XÓA DỮ LIỆU",
@@ -1703,148 +1827,15 @@ namespace RacingGame
 
         private void BuildGaragePanel()
         {
-            _garagePanel = CreateCenteredPanel(_canvas.transform, "GaragePanel", 720f, 540f);
-
-            Text title = RoadRashUiSprites.CreateStyledText(
-                _garagePanel.transform, "GarageTitle", "CỬA HÀNG NÂNG CẤP XE (GARAGE)", 26, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleCenter);
-            LobbyUiBuilder.PlaceTop(title.rectTransform, -14f, 680f, 38f);
-
-            _garageMoneyText = RoadRashUiSprites.CreateStyledText(
-                _garagePanel.transform, "GarageMoney", "Tiền hiện có: $0", 18, RoadRashVisualTheme.AccentGreen, TextAnchor.MiddleCenter);
-            LobbyUiBuilder.PlaceTop(_garageMoneyText.rectTransform, -54f, 680f, 26f);
-
-            _garageStatsText = RoadRashUiSprites.CreateStyledText(
-                _garagePanel.transform, "GarageStats", "", 13, new Color(0.88f, 0.91f, 0.96f), TextAnchor.MiddleCenter);
-            LobbyUiBuilder.PlaceTop(_garageStatsText.rectTransform, -82f, 680f, 22f);
-
-            _speedBarFill = CreateStatBar("MAX SPD", 40f, -112f, new Color(0.95f, 0.72f, 0.18f));
-            _powerBarFill = CreateStatBar("POWER", 205f, -112f, new Color(0.92f, 0.35f, 0.24f));
-            _brakeBarFill = CreateStatBar("BRAKE", 370f, -112f, new Color(0.28f, 0.76f, 0.94f));
-            _gripBarFill = CreateStatBar("GRIP", 535f, -112f, RoadRashVisualTheme.AccentGreen);
-
-            for (int i = 0; i < AllUpgradeTypes.Length; i++)
-            {
-                UpgradeType type = AllUpgradeTypes[i];
-                float cardY = -148f - i * 74f;
-
-                GameObject cardObj = new GameObject($"Card_{type}");
-                cardObj.transform.SetParent(_garagePanel.transform, false);
-                Image cardBg = cardObj.AddComponent<Image>();
-                cardBg.sprite = RoadRashUiSprites.GetPanelSprite();
-                cardBg.type = Image.Type.Sliced;
-                cardBg.color = new Color(0.14f, 0.17f, 0.22f, 0.95f);
-                LobbyUiBuilder.PlaceTop(cardBg.rectTransform, cardY, 664f, 66f);
-
-                Text cardTitle = RoadRashUiSprites.CreateStyledText(cardObj.transform, "CardTitle", "", 16, Color.white);
-                LobbyUiBuilder.PlaceTopLeft(cardTitle.rectTransform, 16f, -6f, 280f, 24f);
-
-                Text cardEffect = RoadRashUiSprites.CreateStyledText(cardObj.transform, "CardEffect", "", 13, new Color(0.80f, 0.86f, 0.94f));
-                LobbyUiBuilder.PlaceTopLeft(cardEffect.rectTransform, 16f, -34f, 430f, 22f);
-
-                UpgradeCardWidgets widgets = new UpgradeCardWidgets
-                {
-                    Type = type,
-                    TitleText = cardTitle,
-                    EffectText = cardEffect
-                };
-
-                for (int p = 0; p < CarUpgradeSystem.MaxUpgradeLevel; p++)
-                {
-                    GameObject pip = new GameObject($"Pip_{p}");
-                    pip.transform.SetParent(cardObj.transform, false);
-                    Image pipImg = pip.AddComponent<Image>();
-                    pipImg.raycastTarget = false;
-                    LobbyUiBuilder.PlaceTopLeft(pipImg.rectTransform, 310f + p * 26f, -11f, 20f, 14f);
-                    widgets.LevelPips.Add(pipImg);
-                }
-
-                Button buyBtn = RoadRashUiSprites.CreateBevelButton(cardObj.transform, "BuyBtn", "Nâng cấp", new Color(0.24f, 0.58f, 0.28f), 14);
-                LobbyUiBuilder.PlaceTopLeft(buyBtn.GetComponent<RectTransform>(), 488f, -13f, 160f, 40f);
-                widgets.ButtonImg = buyBtn.GetComponent<Image>();
-                widgets.ButtonLabel = buyBtn.GetComponentInChildren<Text>();
-                buyBtn.onClick.AddListener(() => OnBuyUpgradeClicked(type));
-
-                _upgradeCards.Add(widgets);
-            }
-
-            _garageFeedbackText = RoadRashUiSprites.CreateStyledText(
-                _garagePanel.transform, "Feedback", "", 15, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleCenter);
-            LobbyUiBuilder.PlaceTop(_garageFeedbackText.rectTransform, -450f, 660f, 26f);
-            _garageFeedbackText.gameObject.SetActive(false);
-
-            Button backBtn = RoadRashUiSprites.CreateBevelButton(_garagePanel.transform, "BackBtn", "QUAY LẠI SẢNH CHỜ", RoadRashVisualTheme.MetalMid, 16);
-            LobbyUiBuilder.PlaceTopLeft(backBtn.GetComponent<RectTransform>(), 72f, -482f, 260f, 40f);
-            backBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
-
-            Button raceBtn = RoadRashUiSprites.CreateBevelButton(_garagePanel.transform, "RaceNowBtn", "PLAY (ĐUA NGAY)", new Color(0.22f, 0.58f, 0.28f), 16);
-            LobbyUiBuilder.PlaceTopLeft(raceBtn.GetComponent<RectTransform>(), 388f, -482f, 260f, 40f);
-            raceBtn.onClick.AddListener(TriggerPlay);
-
-            _garagePanel.SetActive(false);
-        }
-
-        private void OnBuyUpgradeClicked(UpgradeType type)
-        {
-            if (_gameManager == null || _gameManager.UpgradeSystem == null) return;
-            CarUpgradeSystem upg = _gameManager.UpgradeSystem;
-            if (upg.IsMaxLevel(type))
-            {
-                SetShopFeedback("Đã đạt cấp tối đa!", RoadRashVisualTheme.HudYellow);
-                return;
-            }
-
-            int cost = upg.GetUpgradeCost(type);
-            if (_gameManager.TryBuyUpgrade(type))
-            {
-                SetShopFeedback($"Đã nâng cấp {upg.GetUpgradeDisplayName(type)} lên Lv {upg.GetLevel(type)}!", RoadRashVisualTheme.AccentGreen);
-                RefreshGarage(false);
-            }
-            else
-            {
-                SetShopFeedback($"Không đủ tiền! Cần ${cost}.", RoadRashVisualTheme.DangerRed);
-            }
-        }
-
-        private Image CreateStatBar(string label, float x, float y, Color fillColor)
-        {
-            Text lbl = RoadRashUiSprites.CreateStyledText(_garagePanel.transform, $"Lbl_{label}", label, 11, new Color(0.82f, 0.86f, 0.92f));
-            LobbyUiBuilder.PlaceTopLeft(lbl.rectTransform, x, y, 70f, 18f);
-
-            GameObject track = new GameObject($"Bar_{label}");
-            track.transform.SetParent(_garagePanel.transform, false);
-            Image trackImg = track.AddComponent<Image>();
-            trackImg.color = new Color(0.14f, 0.16f, 0.20f, 1f);
-            trackImg.raycastTarget = false;
-            LobbyUiBuilder.PlaceTopLeft(trackImg.rectTransform, x + 64f, y - 3f, 82f, 12f);
-
-            GameObject fill = new GameObject("Fill");
-            fill.transform.SetParent(track.transform, false);
-            Image fillImg = fill.AddComponent<Image>();
-            fillImg.color = fillColor;
-            fillImg.raycastTarget = false;
-            RectTransform frt = fillImg.rectTransform;
-            frt.anchorMin = Vector2.zero;
-            frt.anchorMax = new Vector2(0.5f, 1f);
-            frt.offsetMin = new Vector2(1f, 1f);
-            frt.offsetMax = new Vector2(-1f, -1f);
-            return fillImg;
-        }
-
-        private static GameObject CreateCenteredPanel(Transform parent, string name, float w, float h)
-        {
-            GameObject obj = new GameObject(name);
-            obj.transform.SetParent(parent, false);
-            Image img = obj.AddComponent<Image>();
-            img.sprite = RoadRashUiSprites.GetPanelSprite();
-            img.type = Image.Type.Sliced;
-            img.color = RoadRashVisualTheme.PanelBackdrop;
-
-            RectTransform rt = img.rectTransform;
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(w, h);
-            return obj;
+            _garageWidgets = GarageUiBuilder.BuildGaragePanel(
+                _canvas.transform,
+                AllUpgradeTypes,
+                CloseGarageToLobby,
+                TriggerPlay,
+                OpenSkinSelector,
+                type => TryBuyUpgradeFromGarage(type),
+                customTmpFont);
+            _garagePanel = _garageWidgets.RootPanel;
         }
 
         private static void DestroyUnityObject(Object obj)
