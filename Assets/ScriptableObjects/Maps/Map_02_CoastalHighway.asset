@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "\u0110\u1EA1i L\u1ED9 Ven Bi\u1EC3n"
   description: "\u0110\u1EA1i l\u1ED9 r\u1ED9ng 6 l\xE0n t\u1ED1c \u0111\u1ED9 cao ven bi\u1EC3n, cua d\xE0i m\u01B0\u1EE3t v\xE0 nhi\u1EC1u xe tranh l\xE0n."
   difficultyStars: 3
-  previewBannerSprite: {fileID: 0}
+  previewBannerSprite: {fileID: 21300000, guid: 3d243b3fa6f03224c9815fcbe6e39ec0, type: 3}
   unlockedByDefault: 1
   waypoints:
   - {x: 0, y: 0}
@@ -53,3 +53,4 @@ MonoBehaviour:
   rewardMultiplier: 1.3
   recommendedLaps: 3
   theme: {fileID: 11400000, guid: 855fb6b6e6385f8409bb0511ef0bc461, type: 2}
+  featureZones: []

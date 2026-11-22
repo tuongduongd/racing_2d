@@ -217,6 +217,7 @@ MonoBehaviour:
   playerCar: {fileID: 255995033}
   vfxController: {fileID: 0}
   defaultTheme: {fileID: 11400000, guid: 8d6c2b395f6694248a7c2377564d75d3, type: 2}
+  referenceMultiPoseSkin: {fileID: 11400000, guid: f276be12787d1564bb8020781a6f6992, type: 2}
   sliceCount: 104
   sliceStep: 1.9
   firstSliceZ: 1

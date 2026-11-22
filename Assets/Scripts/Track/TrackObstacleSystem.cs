@@ -173,12 +173,7 @@ namespace RacingGame
 
                 GetKindParameters(kind, out float radius, out float speedMult, out float knockImpulse);
 
-                Sprite customSpr = null;
-                if (customObstacleSprites != null && customObstacleSprites.Length > 0)
-                {
-                    int idx = (int)kind % customObstacleSprites.Length;
-                    customSpr = customObstacleSprites[idx];
-                }
+                Sprite customSpr = ResolveCustomObstacleSprite(kind);
 
                 _obstacles.Add(new TrackObstacle
                 {
@@ -211,10 +206,32 @@ namespace RacingGame
                 HitRadius = hitRadius > 0f ? hitRadius : defaultRad,
                 SpeedMultiplierOnHit = speedMult,
                 LateralKnockImpulse = knockImpulse,
-                RespawnTimer = 0f
+                RespawnTimer = 0f,
+                CustomSprite = ResolveCustomObstacleSprite(kind)
             };
             _obstacles.Add(obs);
             return obs;
+        }
+
+        public void SetCustomObstacleSprites(Sprite[] sprites)
+        {
+            customObstacleSprites = sprites;
+        }
+
+        private Sprite ResolveCustomObstacleSprite(ObstacleKind kind)
+        {
+            if (customObstacleSprites == null || customObstacleSprites.Length == 0)
+            {
+                return null;
+            }
+
+            int index = (int)kind;
+            if (index >= 0 && index < customObstacleSprites.Length)
+            {
+                return customObstacleSprites[index];
+            }
+
+            return customObstacleSprites[((index % customObstacleSprites.Length) + customObstacleSprites.Length) % customObstacleSprites.Length];
         }
 
         public void StepObstacles(WaypointTrack track, IReadOnlyList<Car> cars, float dt)

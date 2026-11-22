@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "Ph\u1ED1 S\xE1ng Ban Mai"
   description: "\u0110\u01B0\u1EDDng ph\u1ED1 4 l\xE0n c\xE2n b\u1EB1ng, t\u1EA7m nh\xECn s\xE1ng r\xF5, ph\xF9 h\u1EE3p luy\u1EC7n t\u1EADp."
   difficultyStars: 2
-  previewBannerSprite: {fileID: 0}
+  previewBannerSprite: {fileID: 21300000, guid: 1f697d627f7de8546a29cff8a1823a56, type: 3}
   unlockedByDefault: 1
   waypoints:
   - {x: 0, y: 0}
@@ -57,3 +57,4 @@ MonoBehaviour:
   rewardMultiplier: 1
   recommendedLaps: 3
   theme: {fileID: 11400000, guid: 478490362e4e2f74182b3af0f52e2bb4, type: 2}
+  featureZones: []

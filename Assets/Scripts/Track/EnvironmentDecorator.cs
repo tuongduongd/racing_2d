@@ -95,7 +95,9 @@ namespace RacingGame
                     RoadsidePropKind leftKind = isCrosswalkApproach
                         ? ((slot % 2) == 0 ? RoadsidePropKind.TrafficLight : RoadsidePropKind.NeonSign)
                         : ChoosePropForSide(zoneCfg, zone, true, slot, sample.curvature, rng);
-                    Sprite customLeft = PickThemeCustomSprite(zoneCfg, true, rng) ?? PickCustomSprite(slot, rng);
+                    Sprite customLeft = (theme != null ? theme.PickOverrideSpriteForKind(leftKind, rng) : null)
+                        ?? PickThemeCustomSprite(zoneCfg, true, rng)
+                        ?? PickCustomSprite(slot, rng);
                     _decorations.Add(new RoadsideDecoration
                     {
                         TrackDistance = s,
@@ -112,7 +114,9 @@ namespace RacingGame
                         RoadsidePropKind rightKind = isCrosswalkApproach
                             ? RoadsidePropKind.TrafficLight
                             : ChoosePropForSide(zoneCfg, zone, false, slot, sample.curvature, rng);
-                        Sprite customRight = PickThemeCustomSprite(zoneCfg, false, rng) ?? PickCustomSprite(slot + 17, rng);
+                        Sprite customRight = (theme != null ? theme.PickOverrideSpriteForKind(rightKind, rng) : null)
+                            ?? PickThemeCustomSprite(zoneCfg, false, rng)
+                            ?? PickCustomSprite(slot + 17, rng);
                         _decorations.Add(new RoadsideDecoration
                         {
                             TrackDistance = s,

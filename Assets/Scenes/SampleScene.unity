@@ -154,6 +154,7 @@ MonoBehaviour:
   playerCar: {fileID: 2099585159}
   vfxController: {fileID: 0}
   defaultTheme: {fileID: 11400000, guid: 8d6c2b395f6694248a7c2377564d75d3, type: 2}
+  referenceMultiPoseSkin: {fileID: 0}
   sliceCount: 104
   sliceStep: 1.9
   firstSliceZ: 1
@@ -584,7 +585,12 @@ MonoBehaviour:
   defaultLateralImpulse: 8.5
   useFixedSeed: 0
   fixedSeed: 2026
-  customObstacleSprites: []
+  customObstacleSprites:
+  - {fileID: 21300000, guid: 5189cd51d9bc3114ea26b1c0c1700fab, type: 3}
+  - {fileID: 21300000, guid: 0ea7500c1a133674ab9402053e25250f, type: 3}
+  - {fileID: 21300000, guid: ec0d8e75f6d83ed4db7193e4de0d1f37, type: 3}
+  - {fileID: 0}
+  - {fileID: 21300000, guid: 89ab9ded74f521d469386e82466019e0, type: 3}
 --- !u!114 &680330530
 MonoBehaviour:
   m_ObjectHideFlags: 0

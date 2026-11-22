@@ -34,6 +34,13 @@ namespace RacingGame
         public Sprite[] customRightSprites;
     }
 
+    [Serializable]
+    public struct PropSpriteOverride
+    {
+        public RoadsidePropKind kind;
+        public Sprite sprite;
+    }
+
     /// <summary>
     /// Chủ đề hình ảnh và cảnh vật của một Map đua xe:
     /// gồm bảng màu bầu trời/địa hình/mặt đường, kiểu đường chân trời và danh sách prop theo vùng.
@@ -84,6 +91,9 @@ namespace RacingGame
         [SerializeField] private float slotIntervalMeters = 9f;
         [SerializeField] private MapZonePropConfig[] zones = Array.Empty<MapZonePropConfig>();
 
+        [Header("Sprite Override Theo Đúng Loại Prop")]
+        [SerializeField] private PropSpriteOverride[] propSpriteOverrides = Array.Empty<PropSpriteOverride>();
+
         public string ThemeId => themeId;
         public string ThemeName => themeName;
         public Color SkyTop => skyTop;
@@ -113,6 +123,47 @@ namespace RacingGame
         public float FogDensity => Mathf.Clamp(fogDensity, 0.25f, 1.0f);
         public float SlotIntervalMeters => Mathf.Max(4f, slotIntervalMeters);
         public MapZonePropConfig[] Zones => zones;
+        public PropSpriteOverride[] PropSpriteOverrides => propSpriteOverrides;
+
+        public Sprite PickOverrideSpriteForKind(RoadsidePropKind kind, System.Random rng)
+        {
+            if (propSpriteOverrides == null || propSpriteOverrides.Length == 0)
+            {
+                return null;
+            }
+
+            int matchCount = 0;
+            for (int i = 0; i < propSpriteOverrides.Length; i++)
+            {
+                if (propSpriteOverrides[i].kind == kind && propSpriteOverrides[i].sprite != null)
+                {
+                    matchCount++;
+                }
+            }
+
+            if (matchCount == 0) return null;
+
+            int pickIndex = matchCount == 1 || rng == null ? 0 : rng.Next(0, matchCount);
+            int seen = 0;
+            for (int i = 0; i < propSpriteOverrides.Length; i++)
+            {
+                if (propSpriteOverrides[i].kind == kind && propSpriteOverrides[i].sprite != null)
+                {
+                    if (seen == pickIndex)
+                    {
+                        return propSpriteOverrides[i].sprite;
+                    }
+                    seen++;
+                }
+            }
+
+            return null;
+        }
+
+        public void SetPropSpriteOverrides(PropSpriteOverride[] overrides)
+        {
+            propSpriteOverrides = overrides ?? Array.Empty<PropSpriteOverride>();
+        }
 
         /// <summary>
         /// Tạo bản chuẩn thung lũng ban đầu tương đương 100% bảng màu RoadRashVisualTheme.

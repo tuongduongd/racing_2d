@@ -26,6 +26,7 @@ namespace RacingGame
         public Sprite KickLeft;
         public Sprite KickRight;
         public Sprite HitStagger;
+        public bool FlipKickRight;
     }
 
     /// <summary>

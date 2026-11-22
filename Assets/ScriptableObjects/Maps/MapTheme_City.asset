@@ -65,3 +65,20 @@ MonoBehaviour:
     rightProps: 13000000060000001200000010000000i
     customLeftSprites: []
     customRightSprites: []
+  propSpriteOverrides:
+  - kind: 6
+    sprite: {fileID: 21300000, guid: 966bec963b1081644a3852e99f1a57ef, type: 3}
+  - kind: 4
+    sprite: {fileID: 21300000, guid: 5c28be191944f7f40aef2bf59cfd566f, type: 3}
+  - kind: 8
+    sprite: {fileID: 21300000, guid: 1b5c33dacc97eba4085314802dbc5f88, type: 3}
+  - kind: 19
+    sprite: {fileID: 21300000, guid: 6d1e422000f367f49835dffabb6fba4e, type: 3}
+  - kind: 16
+    sprite: {fileID: 21300000, guid: d8b0e316cdbb57d4eacabd61d4ef582f, type: 3}
+  - kind: 16
+    sprite: {fileID: 21300000, guid: 817a9aee85d7aa94a8a60ea0ddc8d820, type: 3}
+  - kind: 7
+    sprite: {fileID: 21300000, guid: d8b0e316cdbb57d4eacabd61d4ef582f, type: 3}
+  - kind: 7
+    sprite: {fileID: 21300000, guid: 817a9aee85d7aa94a8a60ea0ddc8d820, type: 3}

@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "Th\xE0nh Ph\u1ED1 \u0110\xEAm Neon"
   description: "\u0110\xF4 th\u1ECB ban \u0111\xEAm 4-6 l\xE0n v\u1EDBi ng\xE3 t\u01B0 g\xF3c g\u1EAFt 90\xB0, c\u1EA7u v\u01B0\u1EE3t cao, \u0111o\u1EA1n h\u1EA7m t\u1ED1i, bi\u1EC3n neon v\xE0 xe bu\xFDt \u0111\u1ED7."
   difficultyStars: 4
-  previewBannerSprite: {fileID: 0}
+  previewBannerSprite: {fileID: 21300000, guid: fe81caf033bfadc4d94fd499790a7fd4, type: 3}
   unlockedByDefault: 1
   waypoints:
   - {x: 0, y: 0}

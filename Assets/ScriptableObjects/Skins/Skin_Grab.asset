@@ -21,4 +21,11 @@ MonoBehaviour:
   customMaterial: {fileID: 0}
   customTexture: {fileID: 0}
   customSprite: {fileID: 0}
-  customLogoSprite: {fileID: 0}
+  customLogoSprite: {fileID: 21300000, guid: e5d10fc6f227e8b469762586db91f020, type: 3}
+  uprightSprite: {fileID: 21300000, guid: 03c10264eaf235043a12bfde084b2b5a, type: 3}
+  leanLeft1Sprite: {fileID: 21300000, guid: 83dd04015c844d24784c4a59a44c6023, type: 3}
+  leanLeft2Sprite: {fileID: 21300000, guid: af8d004d394187a4d992320a0ac632b5, type: 3}
+  leanRight1Sprite: {fileID: 21300000, guid: 86eb05ceb54e9734b89cc96d70c6eaad, type: 3}
+  leanRight2Sprite: {fileID: 21300000, guid: 8db7a0fbe28952b4688c7c297087e087, type: 3}
+  kickLeftSprite: {fileID: 21300000, guid: 48a8035a1a5c1d448ab0283c1baa84fc, type: 3}
+  hitStaggerSprite: {fileID: 21300000, guid: 8db7a0fbe28952b4688c7c297087e087, type: 3}

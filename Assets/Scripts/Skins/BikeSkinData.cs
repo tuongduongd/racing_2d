@@ -43,6 +43,15 @@ namespace RacingGame
         [Tooltip("Sprite icon/logo thương hiệu hiển thị trên thẻ chọn skin ở sảnh chờ.")]
         [SerializeField] private Sprite customLogoSprite;
 
+        [Header("Bộ Sprite Nhiều Pose (Góc Nhìn Sau Lưng - Multi-Pose)")]
+        [SerializeField] private Sprite uprightSprite;
+        [SerializeField] private Sprite leanLeft1Sprite;
+        [SerializeField] private Sprite leanLeft2Sprite;
+        [SerializeField] private Sprite leanRight1Sprite;
+        [SerializeField] private Sprite leanRight2Sprite;
+        [SerializeField] private Sprite kickLeftSprite;
+        [SerializeField] private Sprite hitStaggerSprite;
+
         private Sprite _runtimeTextureSprite;
         private Texture2D _cachedTextureSource;
 
@@ -56,6 +65,14 @@ namespace RacingGame
         public Texture2D CustomTexture => customTexture;
         public Sprite CustomSprite => customSprite;
         public Sprite CustomLogoSprite => customLogoSprite;
+        public Sprite UprightSprite => uprightSprite;
+        public Sprite LeanLeft1Sprite => leanLeft1Sprite;
+        public Sprite LeanLeft2Sprite => leanLeft2Sprite;
+        public Sprite LeanRight1Sprite => leanRight1Sprite;
+        public Sprite LeanRight2Sprite => leanRight2Sprite;
+        public Sprite KickLeftSprite => kickLeftSprite;
+        public Sprite HitStaggerSprite => hitStaggerSprite;
+        public bool HasMultiPoseSprites => uprightSprite != null;
 
         public void ConfigureValues(
             DriverBrandSkin id,
@@ -91,6 +108,26 @@ namespace RacingGame
             _cachedTextureSource = null;
             _runtimeTextureSprite = null;
         }
+
+        public void SetMultiPoseSprites(
+            Sprite upright,
+            Sprite leanLeft1,
+            Sprite leanLeft2,
+            Sprite leanRight1,
+            Sprite leanRight2,
+            Sprite kickLeft,
+            Sprite hitStagger = null)
+        {
+            uprightSprite = upright;
+            leanLeft1Sprite = leanLeft1;
+            leanLeft2Sprite = leanLeft2;
+            leanRight1Sprite = leanRight1;
+            leanRight2Sprite = leanRight2;
+            kickLeftSprite = kickLeft;
+            hitStaggerSprite = hitStagger;
+        }
+
+        public BikeSpriteSet GetMultiPoseSpriteSet() => BikePaletteSwapper.GetOrCreateSet(this);
 
         /// <summary>
         /// Trả về Sprite tùy chỉnh nếu người dùng đã gắn Custom Sprite hoặc Custom Texture2D;

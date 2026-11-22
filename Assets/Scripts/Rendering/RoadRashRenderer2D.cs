@@ -16,6 +16,7 @@ namespace RacingGame
         [SerializeField] private Car playerCar;
         [SerializeField] private RaceVfxController vfxController;
         [SerializeField] private MapTheme defaultTheme;
+        [SerializeField] private BikeSkinData referenceMultiPoseSkin;
 
         [Header("Pseudo-3D Projection")]
         [SerializeField] private int sliceCount = 104;
@@ -1202,24 +1203,50 @@ namespace RacingGame
             }
 
             Sprite overrideSprite = activeSkin != null ? activeSkin.GetOverrideSprite() : null;
+            bool isMultiPoseArt = false;
             if (overrideSprite != null)
             {
                 _bikeRenderer.sprite = overrideSprite;
+                _bikeRenderer.flipX = false;
             }
             else
             {
-                BikeSpriteSet set = activeSkin != null
-                    ? RoadRashBikeSprites.GetOrCreateSet(activeSkin)
-                    : RoadRashBikeSprites.GetOrCreateSet(playerCar.BikeColor);
+                BikeSpriteSet set;
+                if (activeSkin != null && activeSkin.HasMultiPoseSprites)
+                {
+                    set = BikePaletteSwapper.GetOrCreateSet(activeSkin);
+                }
+                else
+                {
+                    BikeSkinData refSkin = ResolveReferenceMultiPoseSkin();
+                    if (refSkin != null)
+                    {
+                        BikePaletteKind palette = activeSkin != null
+                            ? BikePaletteSwapper.ToPaletteKind(activeSkin.SkinId)
+                            : BikePaletteKind.XanhSM;
+                        set = BikePaletteSwapper.GetOrCreateSet(palette, refSkin);
+                    }
+                    else
+                    {
+                        set = activeSkin != null
+                            ? RoadRashBikeSprites.GetOrCreateSet(activeSkin)
+                            : RoadRashBikeSprites.GetOrCreateSet(playerCar.BikeColor);
+                    }
+                }
+
                 BikePose pose = ResolveBikePose(playerCar);
+                isMultiPoseArt = set != null && set.FlipKickRight;
                 _bikeRenderer.sprite = RoadRashBikeSprites.SelectPoseSprite(set, pose, animFrame);
+                _bikeRenderer.flipX = isMultiPoseArt && pose == BikePose.KickRight;
             }
             _bikeRenderer.color = Color.white;
             _bikeRenderer.sortingOrder = playerOrder;
 
             Vector3 bikePos = new Vector3(0f, pGroundY + vibe, -0.2f);
             _bikeRenderer.transform.position = bikePos;
-            float rollDeg = playerCar.IsKicking ? -playerCar.KickDirection * 6f : -playerCar.LeanAngle * 14f;
+            float rollDeg = isMultiPoseArt
+                ? (playerCar.IsKicking ? -playerCar.KickDirection * 4f : -playerCar.LeanAngle * 5f)
+                : (playerCar.IsKicking ? -playerCar.KickDirection * 6f : -playerCar.LeanAngle * 14f);
             _bikeRenderer.transform.rotation = Quaternion.Euler(0f, 0f, rollDeg);
             _bikeRenderer.transform.localScale = Vector3.one * pScale;
 
@@ -1276,9 +1303,31 @@ namespace RacingGame
                         Color horizonCol = EffectiveTheme != null ? EffectiveTheme.SkyHorizon : RoadRashVisualTheme.SkyHorizon;
                         Color fogTint = Color.Lerp(Color.white, horizonCol, fog);
 
-                        BikeSpriteSet set = RoadRashBikeSprites.GetOrCreateSet(other.BikeColor);
+                        bool isPolice = _gameManager != null && _gameManager.PoliceController != null &&
+                                        other == _gameManager.PoliceController.PoliceCar;
+
+                        BikeSpriteSet set;
+                        BikeSkinData refSkin = (other.ActiveSkin != null && other.ActiveSkin.HasMultiPoseSprites)
+                            ? other.ActiveSkin
+                            : ResolveReferenceMultiPoseSkin();
+                        if (refSkin != null)
+                        {
+                            BikePaletteKind palette = isPolice
+                                ? BikePaletteKind.Police
+                                : (other.ActiveSkin != null
+                                    ? BikePaletteSwapper.ToPaletteKind(other.ActiveSkin.SkinId)
+                                    : (BikePaletteKind)((i + 1) % 4));
+                            set = BikePaletteSwapper.GetOrCreateSet(palette, refSkin);
+                        }
+                        else
+                        {
+                            set = RoadRashBikeSprites.GetOrCreateSet(other.BikeColor);
+                        }
+
                         BikePose pose = ResolveBikePose(other);
+                        bool isMultiPoseArt = set != null && set.FlipKickRight;
                         slot.bike.sprite = RoadRashBikeSprites.SelectPoseSprite(set, pose, animFrame + i);
+                        slot.bike.flipX = isMultiPoseArt && pose == BikePose.KickRight;
                         slot.bike.color = other.IsStaggered && (Mathf.FloorToInt(Time.time * 24f) % 2 == 0)
                             ? new Color(1f, 0.85f, 0.75f, 1f)
                             : fogTint;
@@ -1286,7 +1335,9 @@ namespace RacingGame
                         Vector3 pos = new Vector3(screenX, slice.screenY, -0.15f);
                         slot.lastScreenPos = pos;
                         slot.bike.transform.position = pos;
-                        float roll = other.IsStaggered ? Mathf.Sin(Time.time * 36f) * 16f : -other.LeanAngle * 14f;
+                        float roll = other.IsStaggered
+                            ? Mathf.Sin(Time.time * 36f) * 16f
+                            : -other.LeanAngle * (isMultiPoseArt ? 5f : 14f);
                         slot.bike.transform.rotation = Quaternion.Euler(0f, 0f, roll);
                         slot.bike.transform.localScale = Vector3.one * spriteScale;
                         slot.bike.sortingOrder = order;
@@ -1300,8 +1351,6 @@ namespace RacingGame
 
                         if (slot.sirenBeacon != null)
                         {
-                            bool isPolice = _gameManager != null && _gameManager.PoliceController != null &&
-                                            other == _gameManager.PoliceController.PoliceCar;
                             slot.sirenBeacon.gameObject.SetActive(isPolice);
                             if (isPolice)
                             {
@@ -1324,6 +1373,30 @@ namespace RacingGame
                 _opponentPool[i].bike.gameObject.SetActive(false);
                 _opponentPool[i].shadow.gameObject.SetActive(false);
             }
+        }
+
+        private BikeSkinData ResolveReferenceMultiPoseSkin()
+        {
+            if (referenceMultiPoseSkin != null && referenceMultiPoseSkin.HasMultiPoseSprites)
+            {
+                return referenceMultiPoseSkin;
+            }
+
+            if (playerCar != null && playerCar.ActiveSkin != null && playerCar.ActiveSkin.HasMultiPoseSprites)
+            {
+                return playerCar.ActiveSkin;
+            }
+
+            if (_gameManager != null && _gameManager.SkinManager != null)
+            {
+                BikeSkinData xanhSm = _gameManager.SkinManager.GetSkin(DriverBrandSkin.XanhSM);
+                if (xanhSm != null && xanhSm.HasMultiPoseSprites)
+                {
+                    return xanhSm;
+                }
+            }
+
+            return null;
         }
 
         private static BikePose ResolveBikePose(Car car)

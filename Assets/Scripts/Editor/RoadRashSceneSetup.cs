@@ -128,6 +128,8 @@ namespace RacingGame.Editor
                 LoadOrCreateMapAsset(MapCityDistrictPath, () => TrackDefinition.CreateCityDistrictPreset(cityDistrictTheme))
             };
 
+            Stage2ArtWiringEditor.WireDataAssetsOnly();
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
@@ -260,6 +262,7 @@ namespace RacingGame.Editor
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
             AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
+            Stage2ArtWiringEditor.WireSceneObjects(roadRenderer, null, skinAssets != null && skinAssets.Length > 0 ? skinAssets[0] : null);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
 
             GameObject lobbyObj = new GameObject("LobbyController");
@@ -366,6 +369,7 @@ namespace RacingGame.Editor
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
             AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
+            Stage2ArtWiringEditor.WireSceneObjects(roadRenderer, null, skinAssets != null && skinAssets.Length > 0 ? skinAssets[0] : null);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
 
             GameObject gmObj = new GameObject("GameManager");
@@ -387,6 +391,10 @@ namespace RacingGame.Editor
             PoliceChaseController policeCtrl = gmObj.AddComponent<PoliceChaseController>();
             AssignSkinAssetsSerialized(skinManager, skinAssets);
             AssignMapAssetsSerialized(mapManager, mapAssets);
+            Stage2ArtWiringEditor.WireSceneObjects(
+                roadRenderer,
+                obstacleSystem,
+                skinAssets != null && skinAssets.Length > 0 ? skinAssets[0] : null);
 
             SerializedObject gmSo = new SerializedObject(gm);
             gmSo.FindProperty("track").objectReferenceValue = track;
