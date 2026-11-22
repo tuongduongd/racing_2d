@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ROAD RASH: CHIẾN THẦN GIAO HÀNG - Offline Arcade</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Chivo:ital,wght@0,400;0,700;0,800;1,400&amp;family=Space+Mono:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-error": "#690005",
+            "inverse-primary": "#006970",
+            "on-tertiary-fixed": "#3e0500",
+            "on-primary": "#00363a",
+            "surface": "#0a0e14",
+            "tertiary-container": "#ffcec4",
+            "outline": "#849495",
+            "primary-fixed": "#7df4ff",
+            "inverse-surface": "#dfe2eb",
+            "tertiary": "#fff3f1",
+            "secondary-fixed": "#ffdea9",
+            "secondary": "#ffaa00",
+            "secondary-fixed-dim": "#ffba27",
+            "on-secondary": "#422c00",
+            "surface-container-high": "#222731",
+            "background": "#0a0e14",
+            "surface-dim": "#0a0e14",
+            "on-background": "#dfe2eb",
+            "on-surface": "#dfe2eb",
+            "on-secondary-fixed-variant": "#5e4100",
+            "on-tertiary-container": "#b62506",
+            "tertiary-fixed-dim": "#ffb4a4",
+            "primary-fixed-dim": "#00dbe9",
+            "on-surface-variant": "#b9cacb",
+            "on-tertiary": "#640d00",
+            "surface-container": "#151921",
+            "error": "#ff5449",
+            "surface-container-lowest": "#06090e",
+            "on-primary-fixed-variant": "#004f54",
+            "on-error-container": "#ffdad6",
+            "surface-container-low": "#10141b",
+            "secondary-container": "#fbb400",
+            "error-container": "#93000a",
+            "primary": "#dbfcff",
+            "on-secondary-fixed": "#271900",
+            "surface-variant": "#2b303a",
+            "outline-variant": "#2d3748",
+            "surface-container-highest": "#2c323f",
+            "on-tertiary-fixed-variant": "#8d1600",
+            "primary-container": "#00f0ff",
+            "on-primary-container": "#00363a",
+            "on-primary-fixed": "#002022",
+            "tertiary-fixed": "#ffdad3",
+            "surface-tint": "#00dbe9",
+            "surface-bright": "#323846",
+            "inverse-on-surface": "#2d3137",
+            "on-secondary-container": "#4a3200"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            margin: "1rem",
+            "space-sm": "0.5rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "space-xl": "2rem",
+            "space-xs": "0.25rem",
+            "space-md": "1rem",
+            gutter: "1rem",
+            "gutter-desktop": "1.5rem"
+          },
+          fontFamily: {
+            "headline-lg-mobile": ["Anton"],
+            "title-md": ["Chivo"],
+            "label-md": ["Space Mono"],
+            "label-sm": ["Space Mono"],
+            "headline-lg": ["Anton"],
+            "body-md": ["Chivo"],
+            "body-lg": ["Chivo"],
+            "title-lg": ["Chivo"],
+            "display-hero": ["Anton"],
+            "headline-md": ["Anton"],
+            "display-hero-mobile": ["Anton"],
+            "label-lg": ["Space Mono"]
+          },
+          fontSize: {
+            "headline-lg-mobile": ["28px", { lineHeight: "32px", letterSpacing: "0.02em", fontWeight: "400" }],
+            "title-md": ["16px", { lineHeight: "22px", letterSpacing: "0.01em", fontWeight: "700" }],
+            "label-md": ["11px", { lineHeight: "14px", letterSpacing: "0.06em", fontWeight: "700" }],
+            "label-sm": ["9px", { lineHeight: "12px", letterSpacing: "0.05em", fontWeight: "700" }],
+            "headline-lg": ["36px", { lineHeight: "40px", letterSpacing: "0.03em", fontWeight: "400" }],
+            "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+            "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+            "title-lg": ["20px", { lineHeight: "26px", letterSpacing: "0.01em", fontWeight: "800" }],
+            "display-hero": ["58px", { lineHeight: "60px", letterSpacing: "0.04em", fontWeight: "400" }],
+            "headline-md": ["24px", { lineHeight: "28px", letterSpacing: "0.02em", fontWeight: "400" }],
+            "display-hero-mobile": ["36px", { lineHeight: "40px", letterSpacing: "0.03em", fontWeight: "400" }],
+            "label-lg": ["13px", { lineHeight: "16px", letterSpacing: "0.08em", fontWeight: "700" }]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-surface font-body-md text-body-md text-on-surface min-h-screen flex flex-col justify-between selection:bg-primary-container selection:text-on-primary-container relative overflow-x-hidden">
+<!-- CRT Scanline Filter Overlay -->
+<div class="pointer-events-none fixed inset-0 z-40 opacity-30 mix-blend-overlay transition-opacity duration-300" id="scanline-overlay" style="background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5) 1px, transparent 1px, transparent 3px);"></div>
+<!-- Background Cyberpunk Atmospheric Layer -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center opacity-25 filter blur-[1px] scale-105" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB8Nma9EvpYSnwsW4qc1le6ljdg1PvBc_AG7u8OQMvGlTDcdOPxlvj6O7dYGLJbTJrL8TZMrrrOQA79dxYPSn57vCFiXw6p4x1VXk7dRjAiMoh4BWgrmW50j_eHmIsru_2zEY1oyVt1tfhYKxrD-yIernHKoLZwPd5qsQhL1JNqMMnS9n-RXgrF4tH74VCIkoZOXWxnc1-5wZbnRVOT5DY4mk1FlKl9694F-Q2j9EA5');"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/90 to-surface/80"></div>
+<div class="absolute -top-32 -left-32 w-96 h-96 bg-primary-container/10 rounded-full blur-[130px]"></div>
+<div class="absolute -bottom-32 -right-32 w-96 h-96 bg-secondary/10 rounded-full blur-[140px]"></div>
+</div>
+<!-- ==================== 1. TOP BAR (CLEAN OFFLINE HEADER) ==================== -->
+<header class="relative z-30 w-full bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/60 shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
+<div class="h-16 w-full px-space-md lg:px-margin-desktop flex items-center justify-between gap-space-md">
+<!-- Left: Game Logo emblem / tag -->
+<div class="flex items-center gap-space-sm">
+<div class="bg-secondary-container px-space-xs py-space-xs rounded flex items-center justify-center shadow-[0_0_12px_rgba(251,180,0,0.4)]">
+<span class="material-symbols-outlined text-on-secondary-container text-[22px]" style="font-variation-settings: 'FILL' 1;">sports_motorsports</span>
+</div>
+<div>
+<span class="font-headline-md text-headline-md tracking-wider text-primary-container block leading-none">ROAD RASH</span>
+<span class="font-label-sm text-label-sm tracking-widest text-secondary block uppercase">ARCADE MOTORBIKE 2D</span>
+</div>
+</div>
+<!-- Right Elements: Wallet, Audio Toggle, CRT Toggle, Red Quit Button -->
+<div class="flex items-center gap-space-sm sm:gap-space-md">
+<!-- Player Wallet -->
+<div class="flex items-center gap-space-xs bg-surface-container-high px-space-md py-1.5 rounded border border-secondary/20 shadow-inner">
+<span class="material-symbols-outlined text-secondary text-[18px]">monetization_on</span>
+<span class="font-label-md text-label-md text-secondary font-bold tracking-wider">25,400 XU</span>
+</div>
+<!-- Audio Mute Toggle Button -->
+<button class="flex items-center gap-space-xs bg-surface-container-high hover:bg-surface-bright px-space-sm sm:px-space-md py-1.5 rounded text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer border border-outline-variant/50" id="toggle-audio-btn" type="button">
+<span class="material-symbols-outlined text-[18px]" id="audio-icon">volume_up</span>
+<span class="font-label-sm text-label-sm uppercase hidden sm:inline" id="audio-label">BẬT ÂM</span>
+</button>
+<!-- CRT FX Toggle Button -->
+<button class="flex items-center gap-space-xs bg-surface-container-high hover:bg-surface-bright px-space-sm sm:px-space-md py-1.5 rounded text-primary hover:text-primary-fixed-dim transition-colors cursor-pointer border border-outline-variant/50" id="toggle-crt-btn" type="button">
+<span class="material-symbols-outlined text-[18px]" id="crt-icon">tv</span>
+<span class="font-label-sm text-label-sm uppercase hidden sm:inline" id="crt-label">CRT FX: BẬT</span>
+</button>
+<!-- Red Quit Button -->
+<button class="flex items-center gap-space-xs bg-error-container hover:bg-error text-on-error px-space-md py-1.5 rounded transition-all cursor-pointer shadow-[0_0_12px_rgba(255,84,73,0.35)] hover:shadow-[0_0_18px_rgba(255,84,73,0.6)]" id="btn-quit" type="button">
+<span class="material-symbols-outlined text-[18px]">power_settings_new</span>
+<span class="font-label-sm text-label-sm uppercase font-bold tracking-wider">[ESC] THOÁT</span>
+</button>
+</div>
+</div>
+</header>
+<!-- ==================== MAIN 16:9 DUAL COLUMN CANVAS ==================== -->
+<main class="relative z-20 flex-1 w-full px-space-md lg:px-margin-desktop py-space-md max-w-7xl mx-auto flex flex-col justify-center">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-stretch">
+<!-- ==================== 2. LEFT COLUMN (Main Navigation & Race Configuration) ==================== -->
+<div class="lg:col-span-6 flex flex-col justify-between space-y-space-md">
+<!-- Hero Titles -->
+<div>
+<div class="flex items-center gap-space-sm mb-1">
+<span class="bg-secondary/20 text-secondary border border-secondary/40 font-label-sm text-label-sm px-2 py-0.5 rounded uppercase tracking-widest font-bold">
+              OFFLINE ARCADE EDITION // V1.0
+            </span>
+</div>
+<h1 class="font-display-hero text-display-hero-mobile sm:text-display-hero text-primary-container tracking-wider uppercase drop-shadow-[0_0_24px_rgba(0,240,255,0.7)] leading-none mt-1">
+            ROAD RASH
+          </h1>
+<div class="font-headline-lg text-headline-lg-mobile sm:text-headline-lg text-secondary uppercase tracking-tight drop-shadow-[0_2px_12px_rgba(255,170,0,0.5)] -mt-1">
+            CHIẾN THẦN GIAO HÀNG
+          </div>
+</div>
+<!-- Primary CTA: PLAY NOW -->
+<button class="group relative overflow-hidden bg-primary-container hover:bg-primary text-on-primary-container p-space-md rounded-lg shadow-[0_0_30px_rgba(0,240,255,0.75)] hover:shadow-[0_0_40px_rgba(0,240,255,0.95)] transition-all duration-200 transform hover:-translate-y-0.5 cursor-pointer text-left" id="btn-play" type="button">
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/35 to-transparent -translate-x-full group-hover:translate-x-full duration-700 transition-transform"></div>
+<div class="flex items-center justify-between relative z-10">
+<div class="flex items-center gap-space-md">
+<div class="w-12 h-12 rounded bg-surface-container-lowest text-primary-container flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[32px] group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">flag_circle</span>
+</div>
+<div>
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-md text-headline-md tracking-wider uppercase font-black">CHƠI NGAY (PLAY)</span>
+<span class="bg-surface-container-lowest text-primary-container font-label-sm text-label-sm px-1.5 py-0.5 rounded font-bold">XUẤT PHÁT</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-primary-container/85 block">ĐUA ĐƯỜNG PHỐ &amp; ĐẬP PHÁ ARCADE 2D</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-[36px] group-hover:translate-x-2 transition-transform">fast_forward</span>
+</div>
+</button>
+<!-- Secondary Vertical Buttons -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-sm">
+<!-- Button: Chọn Skin -->
+<button class="group bg-surface-container-high hover:bg-surface-bright p-space-sm rounded border border-outline-variant/40 hover:border-primary-container/50 transition-all text-left flex flex-col justify-between" id="btn-skins-quick" type="button">
+<div class="flex items-center justify-between text-secondary mb-1">
+<span class="material-symbols-outlined text-[22px]">moped</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-secondary group-hover:translate-x-0.5 transition-all">chevron_right</span>
+</div>
+<div>
+<div class="font-title-md text-title-md text-on-surface uppercase group-hover:text-secondary transition-colors text-sm">CHỌN SKIN (4 HÃNG)</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block truncate">Xanh SM, Shopee, Grab...</span>
+</div>
+</button>
+<!-- Button: Garage Nâng Cấp -->
+<button class="group bg-surface-container-high hover:bg-surface-bright p-space-sm rounded border border-outline-variant/40 hover:border-primary-container/50 transition-all text-left flex flex-col justify-between" id="btn-garage-quick" type="button">
+<div class="flex items-center justify-between text-primary mb-1">
+<span class="material-symbols-outlined text-[22px]">build</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-primary group-hover:translate-x-0.5 transition-all">chevron_right</span>
+</div>
+<div>
+<div class="font-title-md text-title-md text-on-surface uppercase group-hover:text-primary transition-colors text-sm">GARAGE NÂNG CẤP</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block truncate">Tốc độ, Động cơ, Nitro</span>
+</div>
+</button>
+<!-- Button: Hướng Dẫn -->
+<button class="group bg-surface-container-high hover:bg-surface-bright p-space-sm rounded border border-outline-variant/40 hover:border-secondary/50 transition-all text-left flex flex-col justify-between" id="btn-guide-quick" type="button">
+<div class="flex items-center justify-between text-secondary mb-1">
+<span class="material-symbols-outlined text-[22px]">sports_esports</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant group-hover:text-secondary group-hover:translate-x-0.5 transition-all">chevron_right</span>
+</div>
+<div>
+<div class="font-title-md text-title-md text-on-surface uppercase group-hover:text-secondary transition-colors text-sm">HƯỚNG DẪN</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block truncate">Phím lái A/D, Nitro, J/K</span>
+</div>
+</button>
+</div>
+<!-- Race Settings Card (Cấu Hình Trận Đấu) -->
+<div class="bg-surface-container/95 border border-outline-variant/60 rounded-xl p-space-md shadow-xl">
+<div class="flex items-center justify-between pb-2 mb-space-sm border-b border-outline-variant/40">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary-container text-[18px]">tune</span>
+<span class="font-label-md text-label-md uppercase tracking-wider text-primary font-bold">CẤU HÌNH TRẬN ĐẤU (RACE SETTINGS)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">ARCADE LOCAL</span>
+</div>
+<div class="space-y-space-sm">
+<!-- Difficulty Selector -->
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase block mb-1">ĐỘ KHÓ AI ĐỐI THỦ:</span>
+<div class="grid grid-cols-3 gap-2" id="difficulty-group">
+<button class="diff-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40" data-val="easy" type="button">DỄ</button>
+<button class="diff-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-secondary-container text-on-secondary-container font-black shadow-[0_0_12px_rgba(251,180,0,0.4)] border border-secondary transition-all" data-val="medium" type="button">VỪA</button>
+<button class="diff-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40" data-val="hard" type="button">KHÓ</button>
+</div>
+</div>
+<!-- Lap Count Selector -->
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase block mb-1">SỐ VÒNG ĐUA:</span>
+<div class="grid grid-cols-4 gap-2" id="lap-group">
+<button class="lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40" data-laps="1" type="button">1 VÒNG</button>
+<button class="lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40" data-laps="2" type="button">2 VÒNG</button>
+<button class="lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-primary-container text-on-primary-container font-black shadow-[0_0_12px_rgba(0,240,255,0.4)] border border-primary-container transition-all" data-laps="3" type="button">3 VÒNG</button>
+<button class="lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40" data-laps="5" type="button">5 VÒNG</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== 3. RIGHT COLUMN (Equipped Vehicle & Track Selection) ==================== -->
+<div class="lg:col-span-6 flex flex-col justify-between space-y-space-md">
+<!-- Active Bike Card -->
+<div class="bg-surface-container/95 border border-outline-variant/60 rounded-xl p-space-md shadow-2xl relative overflow-hidden">
+<!-- Card Header & Badge -->
+<div class="flex items-center justify-between pb-space-xs mb-space-sm border-b border-outline-variant/40">
+<div class="flex items-center gap-space-xs">
+<span class="inline-block w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-label-md text-label-md text-primary uppercase font-bold tracking-wider">XẾ CHIẾN ĐANG TRANG BỊ</span>
+</div>
+<button class="bg-surface-container-high hover:bg-primary-container hover:text-on-primary-container text-on-surface-variant px-space-sm py-1 rounded font-label-sm text-label-sm uppercase transition-colors cursor-pointer flex items-center gap-1 border border-outline-variant/40" id="btn-swap-skin-right" type="button">
+<span>ĐỔI SKIN KHÁC</span>
+<span class="material-symbols-outlined text-[14px]">cached</span>
+</button>
+</div>
+<!-- Bike Details Subheader -->
+<div class="mb-space-sm flex justify-between items-end">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary-container uppercase tracking-wide leading-tight" id="equipped-skin-title">
+                XANH SM - THUẦN ĐIỆN XANH CYAN
+              </h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant block uppercase">VinFast Feliz S độ thùng hàng &amp; giảm xóc đôi</span>
+</div>
+<span class="bg-primary/10 border border-primary/30 text-primary-container font-label-sm text-label-sm px-2 py-0.5 rounded font-bold uppercase shrink-0">
+              S-CLASS
+            </span>
+</div>
+<!-- Bike Preview Image Container with Cyberpunk Grid -->
+<div class="relative w-full h-40 bg-surface-container-lowest rounded-lg overflow-hidden flex items-center justify-center p-2 border border-outline-variant/40 group">
+<!-- Cyberpunk grid background effect -->
+<div class="absolute inset-0 opacity-20" style="background-image: linear-gradient(rgba(0, 240, 255, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.4) 1px, transparent 1px); background-size: 20px 20px;"></div>
+<!-- Radial glow behind bike -->
+<div class="absolute w-44 h-44 bg-primary-container/20 rounded-full blur-[45px] pointer-events-none"></div>
+<img alt="Xanh SM Electric Delivery Scooter" class="w-full h-full object-contain relative z-10 transform group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)]" id="equipped-bike-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWFfoixJiZymibO1rYOyE8Jnhmuv3bP-bUgF-PN8fu8dXhIK3b8DD-jI8wMh-iVUE_gDNTIZZ5Al3FxsE5VX4RKwC6wNwMt7owIWVyKb_Y-LAd17CjCLB-ed-DzY3g3DIdUIIDAPOAyALHP6PMxK1zUzFSPWuGUzKgmvDY2BSzIbLHL-4w4l6e5LPVhmnMOrhQQbgXuHQnBId8qL0EWpqjOewmLgGeDLi957zMZF7X"/>
+<div class="absolute bottom-2 left-2 z-20 flex items-center gap-1 bg-surface-container-lowest/80 px-2 py-0.5 rounded border border-outline-variant/30">
+<span class="material-symbols-outlined text-secondary text-[14px]">electric_bolt</span>
+<span class="font-label-sm text-label-sm text-secondary uppercase font-bold">4000W HYPER MOTOR</span>
+</div>
+</div>
+<!-- 4 Stat Bars with Clean Progress Meters -->
+<div class="mt-space-sm grid grid-cols-2 gap-x-space-md gap-y-space-xs">
+<!-- 1. Tốc độ -->
+<div class="space-y-0.5">
+<div class="flex justify-between font-label-sm text-label-sm">
+<span class="text-on-surface-variant uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-primary">speed</span> TỐC ĐỘ (SPEED)
+                </span>
+<span class="text-primary font-bold">88%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full shadow-[0_0_6px_rgba(0,240,255,0.7)]" style="width: 88%"></div>
+</div>
+</div>
+<!-- 2. Gia tốc -->
+<div class="space-y-0.5">
+<div class="flex justify-between font-label-sm text-label-sm">
+<span class="text-on-surface-variant uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">bolt</span> GIA TỐC (ACCEL)
+                </span>
+<span class="text-secondary font-bold">95%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-secondary-container rounded-full shadow-[0_0_6px_rgba(251,180,0,0.7)]" style="width: 95%"></div>
+</div>
+</div>
+<!-- 3. Phanh -->
+<div class="space-y-0.5">
+<div class="flex justify-between font-label-sm text-label-sm">
+<span class="text-on-surface-variant uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-primary-fixed">disc_full</span> PHANH (BRAKING)
+                </span>
+<span class="text-primary-fixed font-bold">80%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-primary-fixed rounded-full shadow-[0_0_6px_rgba(125,244,255,0.7)]" style="width: 80%"></div>
+</div>
+</div>
+<!-- 4. Độ bám -->
+<div class="space-y-0.5">
+<div class="flex justify-between font-label-sm text-label-sm">
+<span class="text-on-surface-variant uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-tertiary-fixed-dim">tire_repair</span> ĐỘ BÁM (GRIP)
+                </span>
+<span class="text-tertiary-fixed-dim font-bold">85%</span>
+</div>
+<div class="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-fixed-dim rounded-full shadow-[0_0_6px_rgba(255,180,164,0.6)]" style="width: 85%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Map Selector Carousel (Chọn Màn Đua) -->
+<div class="bg-surface-container/95 border border-outline-variant/60 rounded-xl p-space-md shadow-2xl">
+<div class="flex items-center justify-between pb-space-xs mb-space-sm border-b border-outline-variant/40">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[18px]">map</span>
+<span class="font-label-md text-label-md uppercase tracking-wider text-secondary font-bold">BẢN ĐỒ THI ĐẤU (TRACK SELECT)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">SÀI GÒN - CHỢ LỚN</span>
+</div>
+<!-- Active Track Display with Carousel Controls -->
+<div class="relative bg-surface-container-lowest rounded-lg p-space-md border border-outline-variant/40 flex items-center justify-between gap-space-md overflow-hidden">
+<!-- Left Arrow -->
+<button class="w-8 h-8 rounded bg-surface-container hover:bg-surface-bright text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-outline-variant/50" id="track-prev-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_back_ios_new</span>
+</button>
+<!-- Current Track Info -->
+<div class="text-center flex-1">
+<div class="flex items-center justify-center gap-space-xs mb-1">
+<span class="bg-primary-container text-on-primary-container font-label-sm text-label-sm px-2 py-0.5 rounded font-bold uppercase" id="track-badge">
+                  ĐÃ MỞ KHÓA
+                </span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary tracking-wide uppercase" id="track-title">
+                PHỐ SÁNG BAN MAI
+              </h3>
+<p class="font-label-sm text-label-sm text-secondary uppercase tracking-widest mt-0.5" id="track-desc">
+                4 LÀN XE // ĐỘ KHÓ 2★ // 3.8 KM
+              </p>
+</div>
+<!-- Right Arrow -->
+<button class="w-8 h-8 rounded bg-surface-container hover:bg-surface-bright text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-outline-variant/50" id="track-next-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_forward_ios</span>
+</button>
+</div>
+<!-- Quick Map Selection Tabs Below (4 Maps) -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-space-sm" id="map-tabs-container">
+<!-- Map 1: Active -->
+<button class="map-tab active text-left p-space-xs rounded bg-surface-container-high border-2 border-primary-container transition-all cursor-pointer" data-map="0" type="button">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-primary font-bold">MAP 01</span>
+<span class="material-symbols-outlined text-primary text-[14px]">check_circle</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface text-xs truncate mt-0.5">Phố Sáng Ban Mai</div>
+<span class="font-label-sm text-label-sm text-primary-container block text-[8px] uppercase">ĐÃ CHỌN</span>
+</button>
+<!-- Map 2: Unlocked -->
+<button class="map-tab text-left p-space-xs rounded bg-surface-container-high border border-outline-variant/40 hover:border-outline transition-all cursor-pointer" data-map="1" type="button">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">MAP 02</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[14px]">lock_open</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface text-xs truncate mt-0.5">Đại Lộ Ven Biển</div>
+<span class="font-label-sm text-label-sm text-secondary block text-[8px] uppercase">SẴN SÀNG</span>
+</button>
+<!-- Map 3: Locked 15k -->
+<button class="map-tab text-left p-space-xs rounded bg-surface-container-high/60 border border-outline-variant/30 opacity-75 hover:opacity-100 transition-all cursor-pointer" data-map="2" type="button">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">MAP 03</span>
+<span class="material-symbols-outlined text-error text-[14px]">lock</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface-variant text-xs truncate mt-0.5">Cao Tốc Đêm Neon</div>
+<span class="font-label-sm text-label-sm text-secondary block text-[8px] uppercase">15,000 XU</span>
+</button>
+<!-- Map 4: Locked 30k -->
+<button class="map-tab text-left p-space-xs rounded bg-surface-container-high/60 border border-outline-variant/30 opacity-75 hover:opacity-100 transition-all cursor-pointer" data-map="3" type="button">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">MAP 04</span>
+<span class="material-symbols-outlined text-error text-[14px]">lock</span>
+</div>
+<div class="font-title-md text-title-md text-on-surface-variant text-xs truncate mt-0.5">Thành Phố Đêm Neon</div>
+<span class="font-label-sm text-label-sm text-secondary block text-[8px] uppercase">30,000 XU</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- ==================== 4. FOOTER (COMPACT CHEAT SHEET / CONTROLS) ==================== -->
+<footer class="relative z-30 w-full bg-surface-container-lowest/95 backdrop-blur-md border-t border-outline-variant/60">
+<div class="h-12 w-full px-space-md lg:px-margin-desktop flex items-center justify-between gap-space-md text-on-surface-variant">
+<!-- Left: Tagline / Mode -->
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-bold">THAO TÁC BÀN PHÍM:</span>
+</div>
+<!-- Center & Right: Keyboard Control Reminders -->
+<div class="flex flex-wrap items-center gap-2 sm:gap-4 font-label-sm text-label-sm text-on-surface-variant overflow-x-auto">
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-primary font-bold border border-outline-variant/40">A / D</kbd> LÁI XE
+        </span>
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-secondary font-bold border border-outline-variant/40">SPACE</kbd> BƠM NITRO
+        </span>
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-on-surface font-bold border border-outline-variant/40">J</kbd> QUẤT GẬY / XÍCH
+        </span>
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-on-surface font-bold border border-outline-variant/40">K</kbd> ĐẠP XE ĐỐI THỦ
+        </span>
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-secondary font-bold border border-outline-variant/40">H</kbd> BÓP CÒI
+        </span>
+<span class="flex items-center gap-1">
+<kbd class="bg-surface-container px-1.5 py-0.5 rounded text-error font-bold border border-error/40">ESC</kbd> TẠM DỪNG / PAUSE
+        </span>
+</div>
+</div>
+</footer>
+<!-- ==================== POPUP: SKIN SELECTOR MODAL ==================== -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-surface-container-lowest/90 backdrop-blur-md hidden opacity-0 transition-opacity duration-200" id="modal-skins">
+<div class="w-full max-w-4xl bg-surface-container rounded-xl shadow-2xl border border-outline-variant/60 overflow-hidden flex flex-col max-h-[90vh]">
+<div class="flex items-center justify-between bg-surface-container-high px-space-lg py-space-md border-b border-outline-variant/40">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary-container text-[24px]">palette</span>
+<div>
+<h3 class="font-headline-md text-headline-md text-primary uppercase">CHỌN SKIN CHIẾN XẾ (4 HÃNG)</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">CHỌN TRANG PHỤC SHIPPER GIAO HÀNG ĐẠI CHIẾN</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded bg-surface-container hover:bg-error hover:text-on-error flex items-center justify-center transition-colors cursor-pointer text-on-surface-variant" id="close-skins-modal" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="p-space-lg overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Skin 1: Xanh SM -->
+<div class="skin-choice active cursor-pointer bg-surface-container-high rounded-lg p-space-md border-2 border-primary-container flex flex-col justify-between transition-all" data-skin-name="XANH SM - THUẦN ĐIỆN XANH CYAN" data-skin-src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWFfoixJiZymibO1rYOyE8Jnhmuv3bP-bUgF-PN8fu8dXhIK3b8DD-jI8wMh-iVUE_gDNTIZZ5Al3FxsE5VX4RKwC6wNwMt7owIWVyKb_Y-LAd17CjCLB-ed-DzY3g3DIdUIIDAPOAyALHP6PMxK1zUzFSPWuGUzKgmvDY2BSzIbLHL-4w4l6e5LPVhmnMOrhQQbgXuHQnBId8qL0EWpqjOewmLgGeDLi957zMZF7X">
+<div class="h-28 bg-surface-container-lowest rounded flex items-center justify-center p-2 mb-2">
+<img alt="Xanh SM" class="max-h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWFfoixJiZymibO1rYOyE8Jnhmuv3bP-bUgF-PN8fu8dXhIK3b8DD-jI8wMh-iVUE_gDNTIZZ5Al3FxsE5VX4RKwC6wNwMt7owIWVyKb_Y-LAd17CjCLB-ed-DzY3g3DIdUIIDAPOAyALHP6PMxK1zUzFSPWuGUzKgmvDY2BSzIbLHL-4w4l6e5LPVhmnMOrhQQbgXuHQnBId8qL0EWpqjOewmLgGeDLi957zMZF7X"/>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase">XANH SM</span>
+<h4 class="font-title-md text-title-md text-on-surface uppercase">THUẦN ĐIỆN CYAN</h4>
+<span class="font-label-sm text-label-sm text-primary-container mt-2">ĐÃ TRANG BỊ</span>
+</div>
+<!-- Skin 2: Shopee Food -->
+<div class="skin-choice cursor-pointer bg-surface-container-high rounded-lg p-space-md border border-outline-variant/40 hover:border-secondary flex flex-col justify-between transition-all" data-skin-name="SHOPEE FOOD - BÃO LỬA HỎA TỐC" data-skin-src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYEwgtHqQBui1RMYQ1dSYcbBqlL0mis0-CVVlpdXh5Z27U80thQYiiTfxdexWEGt_JO2bcsIJ79r_M6v6omd40CLyt9e8gz7NXUPSU5Z7yCPjFiC0h5wg562edtzq7-6XOF8RToqMHWgyhNkdW9uZJ0-rsM8TOedea_LFWYgawnJHwtRV-ZC55FceU8u5D6h40RrSOLnziRJYjab3vcWIlZ7-KbXctqaNrF-fTBh2j">
+<div class="h-28 bg-surface-container-lowest rounded flex items-center justify-center p-2 mb-2">
+<img alt="Shopee Food" class="max-h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYEwgtHqQBui1RMYQ1dSYcbBqlL0mis0-CVVlpdXh5Z27U80thQYiiTfxdexWEGt_JO2bcsIJ79r_M6v6omd40CLyt9e8gz7NXUPSU5Z7yCPjFiC0h5wg562edtzq7-6XOF8RToqMHWgyhNkdW9uZJ0-rsM8TOedea_LFWYgawnJHwtRV-ZC55FceU8u5D6h40RrSOLnziRJYjab3vcWIlZ7-KbXctqaNrF-fTBh2j"/>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold uppercase">SHOPEE FOOD</span>
+<h4 class="font-title-md text-title-md text-on-surface uppercase">BÃO LỬA CAM</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-2">CLICK ĐỂ CHỌN</span>
+</div>
+<!-- Skin 3: Grab -->
+<div class="skin-choice cursor-pointer bg-surface-container-high rounded-lg p-space-md border border-outline-variant/40 hover:border-primary-container flex flex-col justify-between transition-all" data-skin-name="GRABBIKE - KỊ SĨ RỪNG XANH" data-skin-src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWgSbhgMqQcCtGBLOiLLY-gnkI5X80g7TLS3TvXE87zb26h5BnlF3Yr6U8-FOIiSUJWW7ZE3J76oelVViUmLFAVEMwVDAnqKbpG8mFO7gqJwmnqDdXPCjV7HnvpmptvVzvsv41HEmyNEUvKaHkvXnLGrFu2S22pB0PR1x3yCcPHcroRA1QdzvZFVzNor-NHkkfNv1iu65k2dOAjuUR1xoAUpoNST6QufZSZn4peAqD">
+<div class="h-28 bg-surface-container-lowest rounded flex items-center justify-center p-2 mb-2">
+<img alt="Grab" class="max-h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWgSbhgMqQcCtGBLOiLLY-gnkI5X80g7TLS3TvXE87zb26h5BnlF3Yr6U8-FOIiSUJWW7ZE3J76oelVViUmLFAVEMwVDAnqKbpG8mFO7gqJwmnqDdXPCjV7HnvpmptvVzvsv41HEmyNEUvKaHkvXnLGrFu2S22pB0PR1x3yCcPHcroRA1QdzvZFVzNor-NHkkfNv1iu65k2dOAjuUR1xoAUpoNST6QufZSZn4peAqD"/>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold uppercase">GRAB BIKE</span>
+<h4 class="font-title-md text-title-md text-on-surface uppercase">KỊ SĨ EMERALD</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-2">CLICK ĐỂ CHỌN</span>
+</div>
+<!-- Skin 4: Ahamove -->
+<div class="skin-choice cursor-pointer bg-surface-container-high rounded-lg p-space-md border border-outline-variant/40 hover:border-secondary flex flex-col justify-between transition-all" data-skin-name="AHAMOVE - TAY LÁI THẦN TỐC" data-skin-src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-K3x16sgPP1B_SSbMbFqYZimLQYWOA00nhff-F81zcZmtdUiHkTRvYXfloNDYT-kcjIQ_ep_L_yXI3s8Wx2o6y2I8FQRUTM8fmihjtxspEqN3QTErKaAXpfJaueDxZcHlLFUVmfT1dRADCrGxBSiz8lA43f0SDJv6NZx8o7lmHdw2PmyF35N2Imgvqq5rwjza-dJnkLpGZ36hegvNWF0muubRcbUYTZ_EyMVAhEcT">
+<div class="h-28 bg-surface-container-lowest rounded flex items-center justify-center p-2 mb-2">
+<img alt="Ahamove" class="max-h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-K3x16sgPP1B_SSbMbFqYZimLQYWOA00nhff-F81zcZmtdUiHkTRvYXfloNDYT-kcjIQ_ep_L_yXI3s8Wx2o6y2I8FQRUTM8fmihjtxspEqN3QTErKaAXpfJaueDxZcHlLFUVmfT1dRADCrGxBSiz8lA43f0SDJv6NZx8o7lmHdw2PmyF35N2Imgvqq5rwjza-dJnkLpGZ36hegvNWF0muubRcbUYTZ_EyMVAhEcT"/>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold uppercase">AHAMOVE</span>
+<h4 class="font-title-md text-title-md text-on-surface uppercase">TAY LÁI TỐC ĐỘ</h4>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-2">CLICK ĐỂ CHỌN</span>
+</div>
+</div>
+<div class="bg-surface-container-high px-space-lg py-space-md border-t border-outline-variant/40 flex justify-end">
+<button class="bg-primary-container text-on-primary-container px-space-md py-1.5 rounded font-label-md text-label-md uppercase font-bold cursor-pointer" id="btn-close-skins-footer" type="button">
+          XÁC NHẬN CHỌN
+        </button>
+</div>
+</div>
+</div>
+<!-- ==================== POPUP: HOW TO PLAY MODAL ==================== -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-surface-container-lowest/90 backdrop-blur-md hidden opacity-0 transition-opacity duration-200" id="modal-guide">
+<div class="w-full max-w-2xl bg-surface-container rounded-xl shadow-2xl border border-outline-variant/60 overflow-hidden flex flex-col">
+<div class="flex items-center justify-between bg-surface-container-high px-space-lg py-space-md border-b border-outline-variant/40">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[24px]">sports_esports</span>
+<h3 class="font-headline-md text-headline-md text-secondary uppercase">HƯỚNG DẪN CHIẾN ĐẤU (HOW TO PLAY)</h3>
+</div>
+<button class="w-8 h-8 rounded bg-surface-container hover:bg-error hover:text-on-error flex items-center justify-center transition-colors cursor-pointer text-on-surface-variant" id="close-guide-modal" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="p-space-lg space-y-space-md">
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="bg-surface-container-lowest p-space-sm rounded border border-outline-variant/40">
+<span class="font-label-md text-label-md text-primary uppercase font-bold block mb-1">PHÍM [A / D] HOẶC [← / →]</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Điều khiển lượn lách xe qua làn đường hẹp, né ổ gà và rào chắn.</p>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded border border-outline-variant/40">
+<span class="font-label-md text-label-md text-secondary uppercase font-bold block mb-1">PHÍM [SPACEBAR]</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Kích hoạt bình Nitro tăng tốc cực hạn vượt ngã tư.</p>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded border border-outline-variant/40">
+<span class="font-label-md text-label-md text-primary uppercase font-bold block mb-1">PHÍM [J]</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Vung xích khóa hoặc gậy bóng chày hạ gục đối thủ cạnh xe.</p>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded border border-outline-variant/40">
+<span class="font-label-md text-label-md text-primary uppercase font-bold block mb-1">PHÍM [K]</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Tung cú đạp cực mạnh hất văng xe đối phương vào lề đường.</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-space-sm rounded border border-secondary/40 flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[24px]">volume_up</span>
+<div>
+<span class="font-label-md text-label-md text-secondary uppercase font-bold">PHÍM [H]: BÓP CÒI HƠI</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-xs">Làm choáng tạm thời các shipper đối thủ chạy phía trước!</p>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high px-space-lg py-space-md border-t border-outline-variant/40 flex justify-end">
+<button class="bg-secondary-container text-on-secondary-container px-space-md py-1.5 rounded font-label-md text-label-md uppercase font-bold cursor-pointer" id="close-guide-footer-btn" type="button">
+          ĐÃ RÕ! SẴN SÀNG ĐUA
+        </button>
+</div>
+</div>
+</div>
+<!-- JavaScript Interactivity -->
+<script>
+    (function initOfflineArcade() {
+      // Audio & CRT Toggles
+      let audioOn = true;
+      let crtOn = true;
+
+      const toggleAudioBtn = document.getElementById('toggle-audio-btn');
+      const audioIcon = document.getElementById('audio-icon');
+      const audioLabel = document.getElementById('audio-label');
+
+      const toggleCrtBtn = document.getElementById('toggle-crt-btn');
+      const crtIcon = document.getElementById('crt-icon');
+      const crtLabel = document.getElementById('crt-label');
+      const scanlineOverlay = document.getElementById('scanline-overlay');
+
+      toggleAudioBtn?.addEventListener('click', () => {
+        audioOn = !audioOn;
+        if (audioOn) {
+          audioIcon.textContent = 'volume_up';
+          audioLabel.textContent = 'BẬT ÂM';
+          toggleAudioBtn.classList.remove('text-on-surface-variant');
+          toggleAudioBtn.classList.add('text-secondary');
+        } else {
+          audioIcon.textContent = 'volume_off';
+          audioLabel.textContent = 'TẮT ÂM';
+          toggleAudioBtn.classList.remove('text-secondary');
+          toggleAudioBtn.classList.add('text-on-surface-variant');
+        }
+      });
+
+      toggleCrtBtn?.addEventListener('click', () => {
+        crtOn = !crtOn;
+        if (crtOn) {
+          scanlineOverlay.classList.remove('opacity-0');
+          scanlineOverlay.classList.add('opacity-30');
+          crtIcon.textContent = 'tv';
+          crtLabel.textContent = 'CRT FX: BẬT';
+          toggleCrtBtn.classList.add('text-primary');
+        } else {
+          scanlineOverlay.classList.remove('opacity-30');
+          scanlineOverlay.classList.add('opacity-0');
+          crtIcon.textContent = 'tv_off';
+          crtLabel.textContent = 'CRT FX: TẮT';
+          toggleCrtBtn.classList.remove('text-primary');
+        }
+      });
+
+      // Quit Button
+      document.getElementById('btn-quit')?.addEventListener('click', () => {
+        if (confirm('BẠN CÓ CHẮC MUỐN THOÁT GAME VỀ MÀN HÌNH CHÍNH?')) {
+          alert('Hẹn gặp lại chiến thần giao hàng!');
+        }
+      });
+
+      // Difficulty Selector
+      const diffButtons = document.querySelectorAll('.diff-btn');
+      diffButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          diffButtons.forEach(b => {
+            b.className = 'diff-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40';
+          });
+          btn.className = 'diff-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-secondary-container text-on-secondary-container font-black shadow-[0_0_12px_rgba(251,180,0,0.4)] border border-secondary transition-all';
+        });
+      });
+
+      // Lap Selector
+      const lapButtons = document.querySelectorAll('.lap-btn');
+      lapButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          lapButtons.forEach(b => {
+            b.className = 'lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-surface-container-high hover:bg-surface-bright text-on-surface-variant transition-all border border-outline-variant/40';
+          });
+          btn.className = 'lap-btn py-1.5 px-space-xs rounded font-label-md text-label-md uppercase tracking-wider bg-primary-container text-on-primary-container font-black shadow-[0_0_12px_rgba(0,240,255,0.4)] border border-primary-container transition-all';
+        });
+      });
+
+      // Track Carousel Data
+      const tracks = [
+        {
+          title: "PHỐ SÁNG BAN MAI",
+          desc: "4 LÀN XE // ĐỘ KHÓ 2★ // 3.8 KM",
+          badge: "ĐÃ MỞ KHÓA",
+          badgeClass: "bg-primary-container text-on-primary-container"
+        },
+        {
+          title: "ĐẠI LỘ VEN BIỂN",
+          desc: "6 LÀN TỐC ĐỘ CAO // ĐỘ KHÓ 3★ // 5.2 KM",
+          badge: "SẴN SÀNG",
+          badgeClass: "bg-secondary text-on-secondary"
+        },
+        {
+          title: "CAO TỐC ĐÊM NEON",
+          desc: "ĐƯỜNG TRÊN CAO // ĐỘ KHÓ 4★ // 6.5 KM",
+          badge: "KHÓA - 15,000 XU",
+          badgeClass: "bg-surface-container-high text-secondary border border-secondary"
+        },
+        {
+          title: "THÀNH PHỐ ĐÊM NEON",
+          desc: "HẺM CHỢ LỚN // ĐỘ KHÓ 5★ // 7.0 KM",
+          badge: "KHÓA - 30,000 XU",
+          badgeClass: "bg-surface-container-high text-error border border-error"
+        }
+      ];
+
+      let currentTrackIdx = 0;
+      const trackTitle = document.getElementById('track-title');
+      const trackDesc = document.getElementById('track-desc');
+      const trackBadge = document.getElementById('track-badge');
+      const trackPrevBtn = document.getElementById('track-prev-btn');
+      const trackNextBtn = document.getElementById('track-next-btn');
+      const mapTabs = document.querySelectorAll('.map-tab');
+
+      function updateTrack(idx) {
+        currentTrackIdx = (idx + tracks.length) % tracks.length;
+        const cur = tracks[currentTrackIdx];
+        trackTitle.textContent = cur.title;
+        trackDesc.textContent = cur.desc;
+        trackBadge.textContent = cur.badge;
+        trackBadge.className = `font-label-sm text-label-sm px-2 py-0.5 rounded font-bold uppercase ${cur.badgeClass}`;
+
+        mapTabs.forEach((tab, i) => {
+          if (i === currentTrackIdx) {
+            tab.classList.add('border-2', 'border-primary-container');
+            tab.classList.remove('border-outline-variant/40');
+          } else {
+            tab.classList.remove('border-2', 'border-primary-container');
+            tab.classList.add('border-outline-variant/40');
+          }
+        });
+      }
+
+      trackPrevBtn?.addEventListener('click', () => updateTrack(currentTrackIdx - 1));
+      trackNextBtn?.addEventListener('click', () => updateTrack(currentTrackIdx + 1));
+      mapTabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => updateTrack(i));
+      });
+
+      // Modals
+      const modalSkins = document.getElementById('modal-skins');
+      const modalGuide = document.getElementById('modal-guide');
+
+      const btnSkins = document.getElementById('btn-skins-quick');
+      const btnSwapSkinRight = document.getElementById('btn-swap-skin-right');
+      const closeSkins = document.getElementById('close-skins-modal');
+      const closeSkinsFooter = document.getElementById('btn-close-skins-footer');
+
+      const btnGuide = document.getElementById('btn-guide-quick');
+      const closeGuide = document.getElementById('close-guide-modal');
+      const closeGuideFooter = document.getElementById('close-guide-footer-btn');
+
+      const equippedTitle = document.getElementById('equipped-skin-title');
+      const equippedImg = document.getElementById('equipped-bike-img');
+
+      function openModal(m) {
+        m.classList.remove('hidden');
+        setTimeout(() => m.classList.remove('opacity-0'), 10);
+      }
+      function closeModal(m) {
+        m.classList.add('opacity-0');
+        setTimeout(() => m.classList.add('hidden'), 200);
+      }
+
+      btnSkins?.addEventListener('click', () => openModal(modalSkins));
+      btnSwapSkinRight?.addEventListener('click', () => openModal(modalSkins));
+      closeSkins?.addEventListener('click', () => closeModal(modalSkins));
+      closeSkinsFooter?.addEventListener('click', () => closeModal(modalSkins));
+
+      btnGuide?.addEventListener('click', () => openModal(modalGuide));
+      closeGuide?.addEventListener('click', () => closeModal(modalGuide));
+      closeGuideFooter?.addEventListener('click', () => closeModal(modalGuide));
+
+      // Skin Cards click
+      const skinChoices = document.querySelectorAll('.skin-choice');
+      skinChoices.forEach(card => {
+        card.addEventListener('click', () => {
+          skinChoices.forEach(c => {
+            c.classList.remove('border-primary-container', 'border-2');
+            c.classList.add('border-outline-variant/40');
+          });
+          card.classList.add('border-primary-container', 'border-2');
+          card.classList.remove('border-outline-variant/40');
+
+          const name = card.getAttribute('data-skin-name');
+          const src = card.getAttribute('data-skin-src');
+          if (name && equippedTitle) equippedTitle.textContent = name;
+          if (src && equippedImg) equippedImg.src = src;
+        });
+      });
+
+      // Play button action
+      document.getElementById('btn-play')?.addEventListener('click', () => {
+        alert('🚀 [KHỞI ĐỘNG ĐỘNG CƠ] XUẤT PHÁT MÀN: ' + tracks[currentTrackIdx].title + '!');
+      });
+
+      // Garage button placeholder
+      document.getElementById('btn-garage-quick')?.addEventListener('click', () => {
+        alert('🔧 GARAGE ĐỘ XE: Bạn có 25,400 XU. Hãy đua để kiếm thêm linh kiện pô độ!');
+      });
+
+      // Keyboard ESC shortcut
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (!modalSkins.classList.contains('hidden')) closeModal(modalSkins);
+          else if (!modalGuide.classList.contains('hidden')) closeModal(modalGuide);
+        }
+      });
+    })();
+  </script>
+</body></html>

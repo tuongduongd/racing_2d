@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_blank" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Chivo:ital,wght@0,400;0,700;0,800;1,400&amp;family=Space+Mono:ital,wght@0,400;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;width:100%;height:100%;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-dim": "#10141a", "on-tertiary-fixed-variant": "#8d1600", "secondary-container": "#fbb400", "secondary-fixed": "#ffdea9", "surface-container-lowest": "#0a0e14", "surface": "#10141a", "inverse-on-surface": "#2d3137", "on-tertiary-fixed": "#3e0500", "secondary": "#ffd795", "on-secondary-container": "#694900", "on-tertiary": "#640d00", "on-primary-fixed": "#002022", "on-secondary": "#422c00", "secondary-fixed-dim": "#ffba27", "on-secondary-fixed": "#271900", "surface-variant": "#31353c", "outline-variant": "#3b494b", "on-primary": "#00363a", "on-error": "#690005", "on-background": "#dfe2eb", "surface-container-highest": "#31353c", "primary-container": "#00f0ff", "tertiary-fixed": "#ffdad3", "tertiary-fixed-dim": "#ffb4a4", "surface-container": "#1c2026", "on-surface": "#dfe2eb", "primary-fixed-dim": "#00dbe9", "on-error-container": "#ffdad6", "primary-fixed": "#7df4ff", "tertiary-container": "#ffcec4", "surface-container-high": "#262a31", "background": "#10141a", "on-tertiary-container": "#b62506", "inverse-surface": "#dfe2eb", "inverse-primary": "#006970", "on-primary-fixed-variant": "#004f54", "error": "#ffb4ab", "tertiary": "#fff3f1", "primary": "#dbfcff", "outline": "#849495", "on-surface-variant": "#b9cacb", "surface-tint": "#00dbe9", "surface-bright": "#353940", "on-secondary-fixed-variant": "#5e4100", "on-primary-container": "#006970", "surface-container-low": "#181c22", "error-container": "#93000a" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-lg": "1.5rem", "space-sm": "0.5rem", "margin": "1rem", "space-md": "1rem", "gutter-desktop": "1.5rem", "gutter": "1rem", "space-xl": "2.5rem", "space-xs": "0.25rem", "margin-desktop": "2.5rem" }, "fontFamily": { "headline-lg": [ "Anton" ], "body-lg": [ "Chivo" ], "display-hero-mobile": [ "Anton" ], "label-lg": [ "Space Mono" ], "display-hero": [ "Anton" ], "label-sm": [ "Space Mono" ], "label-md": [ "Space Mono" ], "headline-md": [ "Anton" ], "title-md": [ "Chivo" ], "body-md": [ "Chivo" ], "headline-lg-mobile": [ "Anton" ], "title-lg": [ "Chivo" ] }, "fontSize": { "headline-lg": [ "36px", { "lineHeight": "40px", "letterSpacing": "0.03em", "fontWeight": "400" } ], "body-lg": [ "16px", { "lineHeight": "24px", "fontWeight": "400" } ], "display-hero-mobile": [ "40px", { "lineHeight": "44px", "letterSpacing": "0.03em", "fontWeight": "400" } ], "label-lg": [ "13px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700" } ], "display-hero": [ "64px", { "lineHeight": "68px", "letterSpacing": "0.04em", "fontWeight": "400" } ], "label-sm": [ "9px", { "lineHeight": "12px", "letterSpacing": "0.05em", "fontWeight": "700" } ], "label-md": [ "11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" } ], "headline-md": [ "24px", { "lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "400" } ], "title-md": [ "16px", { "lineHeight": "22px", "letterSpacing": "0.01em", "fontWeight": "700" } ], "body-md": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ], "headline-lg-mobile": [ "28px", { "lineHeight": "32px", "letterSpacing": "0.02em", "fontWeight": "400" } ], "title-lg": [ "20px", { "lineHeight": "26px", "letterSpacing": "0.01em", "fontWeight": "800" } ] } } } };</script></head><body class="bg-surface-container-lowest text-on-surface font-body-md text-body-md select-none"><main class="relative w-full min-h-screen bg-transparent"><div class="flex flex-col w-full relative select-none overflow-hidden font-body-md text-on-surface">
+<!-- FULLSCREEN GAME VIEWPORT WITH VIGNETTE SCENIC SCRIM -->
+<div class="relative w-full aspect-[16/9] min-h-[720px] max-h-screen bg-surface-container-lowest overflow-hidden flex flex-col justify-between p-4 lg:p-6" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDI6ztcw1Ra1WOjrFnmaR4SY_gHIh9vXGUQvugRKQRSBxbPj7swicAXoIvcvUht9m3riz8tdtCt1E-J31qYEj_T3QgGSsDWvPGPPiQRpKFH27y7euQYtG_Tzuh1ApJ0_b4Dy6GrlpJw0QfOhpPoZyzW-qdQgLUDBRQSnJOv2TfDn27BAEGENMm1VLYHr8BFf_N4PRsT8oK7k5Wb9LZGY6RIQUG5Fo8zdxgqLZBEUlE1'); background-size: cover; background-position: center;">
+<!-- TACTICAL CRT SCANLINES & AMBIENT VIGNETTE OVERLAYS -->
+<div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-surface-container-lowest/90 via-transparent to-surface-container-lowest/80 z-0"></div>
+<div class="pointer-events-none absolute inset-0 bg-radial from-transparent via-transparent to-surface-container-lowest/85 z-0"></div>
+<!-- TOP HORIZONTAL HUD CLUSTERS -->
+<div class="relative z-10 w-full flex items-start justify-between gap-4">
+<!-- TOP-LEFT: LIVE LEADERBOARD MATRIX & QUICK CONTROLS -->
+<div class="flex flex-col gap-2">
+<!-- Arcade Keycap Action Strip -->
+<div class="flex items-center gap-2">
+<button class="bg-surface-container-lowest/90 hover:bg-surface-container-high px-2.5 py-1 rounded flex items-center gap-1.5 shadow-md transition-all group">
+<span class="font-label-sm text-label-sm text-primary-container bg-surface-container px-1 py-0.5 rounded">ESC</span>
+<span class="material-symbols-outlined text-primary-container text-body-md group-hover:scale-110 transition-transform">pause</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">TẠM DỪNG</span>
+</button>
+<button class="bg-surface-container-lowest/90 hover:bg-surface-container-high px-2.5 py-1 rounded flex items-center gap-1.5 shadow-md transition-all group">
+<span class="font-label-sm text-label-sm text-primary-container bg-surface-container px-1 py-0.5 rounded">M</span>
+<span class="material-symbols-outlined text-secondary-container text-body-md group-hover:scale-110 transition-transform">volume_up</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">ÂM THANH</span>
+</button>
+<div class="hidden sm:flex items-center gap-1 bg-surface-container-lowest/80 px-2 py-1 rounded">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-ping"></span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">PING 14ms</span>
+</div>
+</div>
+<!-- Standings Box -->
+<div class="w-64 sm:w-72 bg-surface-container-lowest/85 backdrop-blur-md rounded-lg p-3 shadow-2xl flex flex-col gap-2">
+<!-- Standings Header -->
+<div class="flex items-center justify-between pb-1.5">
+<div class="flex items-center gap-1.5">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-container opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary-container"></span>
+</span>
+<span class="font-label-sm text-label-sm text-primary font-bold tracking-widest">BẢNG XẾP HẠNG // LIVE</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary-container bg-secondary-container/20 px-1.5 py-0.5 rounded font-bold">5 TAY ĐUA</span>
+</div>
+<!-- Racers List -->
+<div class="flex flex-col gap-1 font-label-md text-label-md">
+<!-- Pos 1: Player -->
+<div class="flex items-center justify-between bg-primary-container/20 px-2 py-1 rounded text-primary-fixed shadow-sm">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md leading-none text-primary-container">1</span>
+<div class="w-1.5 h-3 rounded-full bg-primary-container"></div>
+<div class="flex flex-col">
+<span class="font-title-md text-title-md leading-none text-primary font-bold">BẠN <span class="font-label-sm text-label-sm text-primary-fixed-dim font-normal">(XANH SM)</span></span>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm bg-primary-container text-surface-container-lowest px-1 py-0.5 rounded font-black tracking-tighter">LEADER</span>
+<span class="font-label-md text-label-md text-primary font-bold">00:00.00</span>
+</div>
+</div>
+<!-- Pos 2: Shopee -->
+<div class="flex items-center justify-between bg-surface-container/60 hover:bg-surface-container px-2 py-1 rounded transition-colors">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md leading-none text-on-surface-variant">2</span>
+<div class="w-1.5 h-3 rounded-full bg-on-tertiary-container"></div>
+<span class="font-title-md text-title-md leading-none text-on-surface">Viper <span class="font-label-sm text-label-sm text-on-surface-variant font-normal">(Shopee)</span></span>
+</div>
+<span class="font-label-md text-label-md text-tertiary-fixed font-bold">+0.84s</span>
+</div>
+<!-- Pos 3: Grab -->
+<div class="flex items-center justify-between bg-surface-container/60 hover:bg-surface-container px-2 py-1 rounded transition-colors">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md leading-none text-on-surface-variant">3</span>
+<div class="w-1.5 h-3 rounded-full bg-primary-fixed-dim"></div>
+<span class="font-title-md text-title-md leading-none text-on-surface">Blaze <span class="font-label-sm text-label-sm text-on-surface-variant font-normal">(Grab)</span></span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant font-bold">+1.42s</span>
+</div>
+<!-- Pos 4: Ahamove -->
+<div class="flex items-center justify-between bg-surface-container/40 px-2 py-1 rounded">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md leading-none text-on-surface-variant">4</span>
+<div class="w-1.5 h-3 rounded-full bg-secondary-container"></div>
+<span class="font-title-md text-title-md leading-none text-on-surface">Thép Đen <span class="font-label-sm text-label-sm text-on-surface-variant font-normal">(Ahamove)</span></span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant font-bold">+2.15s</span>
+</div>
+<!-- Pos 5: Traditional Xe Om -->
+<div class="flex items-center justify-between bg-surface-container/30 px-2 py-1 rounded">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md leading-none text-on-surface-variant">5</span>
+<div class="w-1.5 h-3 rounded-full bg-outline"></div>
+<span class="font-title-md text-title-md leading-none text-on-surface-variant">Ghost_99 <span class="font-label-sm text-label-sm text-outline font-normal">(Xe Ôm)</span></span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant font-bold">+3.08s</span>
+</div>
+</div>
+</div>
+</div>
+<!-- TOP-CENTER: RANK SHIELD & FLASHING DISPATCH / PURSUIT ALERTS -->
+<div class="flex flex-col items-center gap-1.5 pointer-events-none">
+<!-- Giant Arcade Rank Badge -->
+<div class="relative bg-surface-container-lowest/90 px-6 py-1.5 rounded-lg shadow-2xl flex items-center gap-3 backdrop-blur-md">
+<div class="flex flex-col text-right">
+<span class="font-label-sm text-label-sm tracking-widest text-primary-fixed-dim uppercase leading-none">THỨ HẠNG</span>
+<span class="font-label-sm text-label-sm tracking-tighter text-on-surface-variant leading-none">POSITION</span>
+</div>
+<div class="font-display-hero text-display-hero leading-none text-primary-container tracking-wider drop-shadow-md">
+            1<span class="font-headline-md text-headline-md text-on-surface-variant">/5</span>
+</div>
+<div class="flex flex-col text-left">
+<span class="font-label-sm text-label-sm bg-secondary-container text-surface-container-lowest px-1.5 py-0.5 rounded font-black tracking-wide">DẪN ĐẦU</span>
+<span class="font-label-sm text-label-sm text-secondary-fixed mt-0.5">TOP RIDER</span>
+</div>
+</div>
+<!-- Flashing Tactical Hazard Banner: Police Pursuit -->
+<div class="flex items-center gap-2 px-4 py-1.5 bg-error-container/95 text-on-error rounded-md shadow-2xl animate-pulse">
+<span class="material-symbols-outlined text-headline-md animate-bounce">local_police</span>
+<div class="flex flex-col leading-none">
+<span class="font-headline-md text-headline-md tracking-wider text-error">🚨 CẢNH SÁT ĐANG ĐUỔI!</span>
+<span class="font-label-sm text-label-sm tracking-widest text-tertiary-container uppercase">LEVEL 3 PURSUIT INTERCEPT</span>
+</div>
+<span class="material-symbols-outlined text-headline-md animate-bounce">warning</span>
+</div>
+<!-- Sub-Pill: Wrong-way warning / Street traffic caution -->
+<div class="flex items-center gap-1.5 px-3 py-0.5 bg-secondary-container/90 text-on-secondary-container rounded-full shadow-lg">
+<span class="material-symbols-outlined text-title-md">report</span>
+<span class="font-label-sm text-label-sm font-black tracking-widest uppercase">⚠️ ĐI NGƯỢC CHIỀU! // WRONG WAY</span>
+</div>
+</div>
+<!-- TOP-RIGHT: CHAMFERED RADAR MINIMAP FRAME -->
+<div class="flex flex-col items-end gap-1">
+<div class="relative w-48 sm:w-56 h-48 sm:h-56 bg-surface-container-lowest/85 rounded-xl p-3 shadow-2xl flex flex-col justify-between backdrop-blur-md overflow-hidden">
+<!-- Compass & District Header -->
+<div class="relative z-10 flex items-center justify-between w-full">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary-container text-body-md">explore</span>
+<span class="font-label-sm text-label-sm text-primary font-bold tracking-widest">RADAR // CHỢ LỚN</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary-container bg-surface-container-high px-1 rounded font-bold">N 342°</span>
+</div>
+<!-- Radar Screen SVG Overlay with Street Circuit Vector -->
+<div class="absolute inset-0 flex items-center justify-center p-3 pointer-events-none">
+<svg class="w-full h-full" fill="none" viewbox="0 0 200 200">
+<!-- Grid Radar Rings -->
+<circle class="text-surface-variant opacity-40" cx="100" cy="100" r="90" stroke="currentColor" stroke-dasharray="3 3" stroke-width="1"></circle>
+<circle class="text-surface-variant opacity-30" cx="100" cy="100" r="60" stroke="currentColor" stroke-width="1"></circle>
+<circle class="text-surface-variant opacity-25" cx="100" cy="100" r="30" stroke="currentColor" stroke-width="1"></circle>
+<!-- Crosshairs -->
+<line class="text-surface-variant opacity-25" stroke="currentColor" stroke-width="1" x1="100" x2="100" y1="10" y2="190"></line>
+<line class="text-surface-variant opacity-25" stroke="currentColor" stroke-width="1" x1="10" x2="190" y1="100" y2="100"></line>
+<!-- Saigon Alley Street Circuit Track Outline -->
+<path class="text-primary-container" d="M 50 160 L 35 110 L 45 65 L 75 35 L 135 30 L 170 70 L 160 135 L 125 170 L 85 160 Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+<!-- Police Patrol Blip (Chasing red dot) -->
+<circle class="fill-error animate-ping" cx="70" cy="162" r="4.5"></circle>
+<circle class="fill-error" cx="70" cy="162" r="3"></circle>
+<!-- Opponent 2 (Shopee orange dot) -->
+<circle class="fill-on-tertiary-container" cx="70" cy="38" r="3"></circle>
+<!-- Opponent 3 (Grab green dot) -->
+<circle class="fill-primary-fixed-dim" cx="130" cy="32" r="3"></circle>
+<!-- Opponent 4 (Ahamove amber dot) -->
+<circle class="fill-secondary-container" cx="165" cy="80" r="3"></circle>
+<!-- PLAYER POSITION (BẠN - Neon Cyan with pulse ring) -->
+<circle class="text-primary-container animate-pulse" cx="85" cy="160" fill="none" r="7" stroke="currentColor" stroke-width="1.5"></circle>
+<circle class="fill-primary-container" cx="85" cy="160" r="4"></circle>
+</svg>
+</div>
+<!-- Radar Sweep Scanline Animation -->
+<div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary-container/10 via-transparent to-transparent animate-pulse"></div>
+<!-- Radar Footer Metric -->
+<div class="relative z-10 flex items-center justify-between w-full pt-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">DIST TO FINISH</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">1,420M</span>
+</div>
+</div>
+</div>
+</div>
+<!-- CENTER CORRIDOR COMBAT FEEDBACK (FLOATING SUBTLE OVERLAY - PRESERVES CENTER VIEWPORT) -->
+<div class="relative z-10 w-full flex flex-col items-center justify-center pointer-events-none">
+<!-- Arcade Combat Strike Banner (Dynamic hit effect) -->
+<div class="bg-surface-container-lowest/85 backdrop-blur-md px-6 py-2 rounded-lg shadow-2xl flex items-center gap-3 transform -rotate-1 hover:rotate-0 transition-transform">
+<div class="w-8 h-8 rounded bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-surface-container-lowest text-title-lg font-black">sports_mma</span>
+</div>
+<div class="flex flex-col">
+<div class="font-headline-md text-headline-md tracking-wider text-secondary leading-none">
+            + ĐẠP TRÚNG ĐỐI THỦ!
+          </div>
+<div class="font-label-sm text-label-sm text-primary-fixed-dim font-bold tracking-widest mt-0.5">
+            +150 XU THƯỞNG // GÂY CHOÁNG VIPER 1.5S
+          </div>
+</div>
+<div class="bg-primary-container/20 px-2 py-1 rounded">
+<span class="font-label-md text-label-md text-primary-container font-black">CRIT x2</span>
+</div>
+</div>
+</div>
+<!-- BOTTOM HORIZONTAL HUD TELEMETRY CLUSTERS -->
+<div class="relative z-10 w-full flex items-end justify-between gap-4">
+<!-- BOTTOM-LEFT: COCKPIT SPEEDOMETER & WEAPONS MODULE -->
+<div class="w-72 sm:w-84 bg-surface-container-lowest/90 backdrop-blur-md rounded-xl p-3.5 sm:p-4 shadow-2xl flex flex-col gap-2.5">
+<!-- Telemetry Header: Surface Status & Gear Indicator -->
+<div class="flex items-center justify-between">
+<!-- Road Grip Status -->
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-1 bg-primary-container/20 px-2 py-0.5 rounded">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span class="font-label-sm text-label-sm text-primary font-bold">ON TRACK</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline opacity-60">OFF-ROAD</span>
+</div>
+<!-- Gear Indicator Capsule -->
+<div class="flex items-center gap-1.5 bg-surface-container-high px-2 py-0.5 rounded">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">SỐ</span>
+<span class="font-headline-md text-headline-md leading-none text-primary-container">4</span>
+<span class="font-label-sm text-label-sm text-primary-fixed-dim">(G4)</span>
+</div>
+</div>
+<!-- Speedometer & Segmented LED Arc Tachometer -->
+<div class="flex items-baseline justify-between pt-1">
+<div class="flex items-baseline gap-1">
+<span class="font-display-hero text-display-hero leading-none text-primary-container tracking-tighter drop-shadow-md">138</span>
+<span class="font-label-lg text-label-lg text-primary-fixed-dim font-bold">KM/H</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="font-label-sm text-label-sm text-on-surface-variant">VÒNG TUA MÁY</span>
+<span class="font-headline-md text-headline-md leading-none text-secondary">9,400 <span class="font-label-sm text-label-sm text-on-surface-variant">RPM</span></span>
+</div>
+</div>
+<!-- 12-Segment LED RPM Bar Strip -->
+<div class="grid grid-cols-12 gap-1 w-full h-2 rounded bg-surface-container-high p-0.5">
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-primary-container rounded-sm h-full"></div>
+<div class="bg-secondary-container rounded-sm h-full"></div>
+<div class="bg-secondary-container rounded-sm h-full"></div>
+<div class="bg-secondary-container rounded-sm h-full"></div>
+<div class="bg-on-tertiary-container rounded-sm h-full animate-pulse"></div>
+<div class="bg-surface-variant rounded-sm h-full opacity-40"></div>
+</div>
+<!-- Nitro Boost Gauge with Key Action -->
+<div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary-container text-body-md">bolt</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">NITRO BOOST</span>
+<span class="font-label-sm text-label-sm bg-surface-container-high text-primary-fixed px-1 rounded">[SPACE]</span>
+</div>
+<span class="font-label-md text-label-md text-primary-container font-black">85%</span>
+</div>
+<!-- Nitro Bar Segmented -->
+<div class="w-full bg-surface-container-highest h-2 rounded-full overflow-hidden flex">
+<div class="bg-gradient-to-r from-primary-fixed via-primary-container to-surface-tint h-full w-[85%] rounded-full shadow-lg"></div>
+</div>
+</div>
+<!-- Weapon Ready Indicator -->
+<div class="flex items-center justify-between bg-surface-container-high/80 px-2.5 py-1.5 rounded">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container text-title-md">link</span>
+<div class="flex flex-col leading-none">
+<span class="font-label-sm text-label-sm text-on-surface font-bold">VŨ KHÍ: XÍCH KHÓA</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">BẤM [J] HOẶC [CHUỘT TRÁI] ĐỂ QUẬT</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-secondary-container">
+<span class="font-label-sm text-label-sm font-bold bg-surface-container px-1 py-0.5 rounded">SẴN SÀNG</span>
+</div>
+</div>
+</div>
+<!-- BOTTOM-RIGHT: RACE PROGRESS, LAP TIMER & BOUNTY COUNTER -->
+<div class="w-64 sm:w-72 bg-surface-container-lowest/90 backdrop-blur-md rounded-xl p-3.5 sm:p-4 shadow-2xl flex flex-col items-end gap-2.5">
+<!-- Lap Count Pill -->
+<div class="flex items-center gap-2">
+<div class="flex flex-col text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold leading-none">TIẾN ĐỘ CHẶNG</span>
+<span class="font-label-sm text-label-sm text-secondary leading-none mt-0.5">CURRENT LAP</span>
+</div>
+<div class="flex items-center gap-1 bg-secondary-container/20 px-2.5 py-1 rounded">
+<span class="font-headline-md text-headline-md leading-none text-secondary-container">2</span>
+<span class="font-title-md text-title-md leading-none text-on-surface-variant">/ 3</span>
+</div>
+</div>
+<!-- Precision Monospaced Digital Lap Stopwatch -->
+<div class="flex flex-col items-end w-full bg-surface-container/60 p-2.5 rounded">
+<span class="font-label-sm text-label-sm text-primary-fixed-dim font-bold tracking-widest">THỜI GIAN VÒNG // LAP TIME</span>
+<div class="font-headline-lg text-headline-lg leading-none text-primary-container tracking-wider drop-shadow-md">
+            01:24.58
+          </div>
+<div class="flex items-center justify-between w-full pt-1.5">
+<span class="font-label-sm text-label-sm text-outline">KỶ LỤC CÁ NHÂN</span>
+<span class="font-label-sm text-label-sm text-on-surface font-bold">BEST: 01:19.40</span>
+</div>
+</div>
+<!-- Bounty / Picked-up Race Coins Counter -->
+<div class="flex items-center justify-between w-full bg-surface-container-high/80 px-3 py-1.5 rounded">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary-container text-body-md">monetization_on</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">TIỀN THƯỞNG SHIP</span>
+</div>
+<span class="font-title-md text-title-md text-secondary-container font-black tracking-wide">+850 XU</span>
+</div>
+<!-- Package Delivery Integrity Status Indicator -->
+<div class="flex items-center justify-between w-full">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary-container text-body-md">inventory_2</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">KIỆN HÀNG: CÒN NGUYÊN</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">100% HP</span>
+</div>
+</div>
+</div>
+</div>
+<!-- INTERACTIVE HUD CONTROLS CLIENT LOGIC -->
+<script>
+    // Micro-interaction simulation for dynamic racing metrics
+    (function initHudSimulation() {
+      const speedDisplay = document.querySelector('.text-display-hero');
+      if (!speedDisplay) return;
+
+      let speed = 138;
+      setInterval(() => {
+        // Organic fluctuation simulating throttle and street bumps
+        const delta = Math.floor(Math.random() * 7) - 3;
+        speed = Math.max(122, Math.min(152, speed + delta));
+        speedDisplay.innerText = speed;
+      }, 700);
+    })();
+  </script>
+</div></main></body></html>
