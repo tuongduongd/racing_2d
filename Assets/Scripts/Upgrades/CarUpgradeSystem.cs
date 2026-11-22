@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
 namespace RacingGame
 {
     /// <summary>
-    /// Serializable DTO persisted to JSON for player money, upgrade levels, and race records.
+    /// Serializable DTO persisted to JSON for player money, upgrade levels, race records, and unlocked maps.
     /// </summary>
     [Serializable]
     public class PlayerSaveData
@@ -18,6 +19,8 @@ namespace RacingGame
         public int racesPlayed;
         public int racesWon;
         public float bestRaceTime;
+        public List<string> unlockedMapIds = new List<string>();
+        public string selectedMapId = string.Empty;
     }
 
     /// <summary>
@@ -40,6 +43,8 @@ namespace RacingGame
         public float BestRaceTime => _data.bestRaceTime;
         public string SaveFilePath => _saveFilePath;
         public VehicleStats BaseStats => _baseStats;
+        public IReadOnlyList<string> UnlockedMapIds => _data.unlockedMapIds ?? (_data.unlockedMapIds = new List<string>());
+        public string SelectedMapId => _data.selectedMapId ?? string.Empty;
 
         public CarUpgradeSystem() : this(Path.Combine(Application.persistentDataPath, "racing2d_save.json"), VehicleStats.Default)
         {
@@ -145,7 +150,16 @@ namespace RacingGame
         /// </summary>
         public int AwardRaceResult(int finishPosition, float raceTime)
         {
-            int prize = CalculatePrizeMoney(finishPosition);
+            return AwardRaceResult(finishPosition, raceTime, 1.0f);
+        }
+
+        /// <summary>
+        /// Awards race prize money scaled by the map's reward multiplier, then persists to JSON.
+        /// </summary>
+        public int AwardRaceResult(int finishPosition, float raceTime, float rewardMultiplier)
+        {
+            float safeMult = Mathf.Clamp(rewardMultiplier, 1.0f, 3.0f);
+            int prize = Mathf.RoundToInt(CalculatePrizeMoney(finishPosition) * safeMult);
             _data.money += prize;
             _data.racesPlayed++;
             if (finishPosition == 1)
@@ -210,6 +224,103 @@ namespace RacingGame
                 UpgradeType.WeightReduction => "-14 kg Trọng lượng/cấp",
                 _ => string.Empty
             };
+        }
+
+        public bool IsMapUnlocked(string mapId)
+        {
+            if (string.IsNullOrWhiteSpace(mapId) || _data.unlockedMapIds == null) return false;
+            return _data.unlockedMapIds.Contains(mapId.Trim());
+        }
+
+        public bool UnlockMap(string mapId, bool saveImmediately = true)
+        {
+            if (string.IsNullOrWhiteSpace(mapId)) return false;
+
+            string cleanId = mapId.Trim();
+            _data.unlockedMapIds ??= new List<string>();
+            if (_data.unlockedMapIds.Contains(cleanId)) return false;
+
+            _data.unlockedMapIds.Add(cleanId);
+            if (saveImmediately)
+            {
+                Save();
+            }
+            return true;
+        }
+
+        public bool TryPurchaseMapUnlock(string mapId, int cost)
+        {
+            if (string.IsNullOrWhiteSpace(mapId) || IsMapUnlocked(mapId)) return false;
+
+            int safeCost = Mathf.Max(0, cost);
+            if (_data.money < safeCost) return false;
+
+            _data.money -= safeCost;
+            _data.unlockedMapIds ??= new List<string>();
+            _data.unlockedMapIds.Add(mapId.Trim());
+            Save();
+            return true;
+        }
+
+        public void SetSelectedMapId(string mapId, bool saveImmediately = true)
+        {
+            _data.selectedMapId = string.IsNullOrWhiteSpace(mapId) ? string.Empty : mapId.Trim();
+            if (saveImmediately)
+            {
+                Save();
+            }
+        }
+
+        public bool EnsureDefaultUnlockedMaps(IReadOnlyList<TrackDefinition> definitions, bool saveIfChanged = false)
+        {
+            if (definitions == null) return false;
+
+            _data.unlockedMapIds ??= new List<string>();
+            bool changed = false;
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackDefinition def = definitions[i];
+                if (def != null && def.UnlockedByDefault && !string.IsNullOrWhiteSpace(def.MapId))
+                {
+                    string cleanId = def.MapId.Trim();
+                    if (!_data.unlockedMapIds.Contains(cleanId))
+                    {
+                        _data.unlockedMapIds.Add(cleanId);
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed && saveIfChanged)
+            {
+                Save();
+            }
+            return changed;
+        }
+
+        public void ResetMapProgress(IReadOnlyList<TrackDefinition> definitions = null, bool saveImmediately = true)
+        {
+            _data.unlockedMapIds = new List<string>();
+            _data.selectedMapId = string.Empty;
+
+            if (definitions != null)
+            {
+                EnsureDefaultUnlockedMaps(definitions, saveIfChanged: false);
+                for (int i = 0; i < definitions.Count; i++)
+                {
+                    TrackDefinition def = definitions[i];
+                    if (def != null && !string.IsNullOrWhiteSpace(def.MapId) && IsMapUnlocked(def.MapId))
+                    {
+                        _data.selectedMapId = def.MapId.Trim();
+                        break;
+                    }
+                }
+            }
+
+            if (saveImmediately)
+            {
+                Save();
+            }
         }
 
         public void Save()
@@ -282,6 +393,30 @@ namespace RacingGame
             _data.racesPlayed = Mathf.Max(0, _data.racesPlayed);
             _data.racesWon = Mathf.Max(0, _data.racesWon);
             _data.bestRaceTime = Mathf.Max(0f, _data.bestRaceTime);
+
+            if (_data.unlockedMapIds == null)
+            {
+                _data.unlockedMapIds = new List<string>();
+            }
+            else
+            {
+                var cleaned = new List<string>(_data.unlockedMapIds.Count);
+                for (int i = 0; i < _data.unlockedMapIds.Count; i++)
+                {
+                    string id = _data.unlockedMapIds[i];
+                    if (string.IsNullOrWhiteSpace(id)) continue;
+                    string trimmed = id.Trim();
+                    if (!cleaned.Contains(trimmed))
+                    {
+                        cleaned.Add(trimmed);
+                    }
+                }
+                _data.unlockedMapIds = cleaned;
+            }
+
+            _data.selectedMapId = string.IsNullOrWhiteSpace(_data.selectedMapId)
+                ? string.Empty
+                : _data.selectedMapId.Trim();
         }
     }
 }

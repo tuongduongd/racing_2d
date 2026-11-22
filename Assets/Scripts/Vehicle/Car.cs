@@ -186,7 +186,19 @@ namespace RacingGame
                 }
                 else
                 {
-                    physics.SetSurfaceModifier(3.0f, 0.55f, 0.55f);
+                    // Mild speed cap off-road while keeping throttle punchy and steering grip responsive for quick recovery
+                    physics.SetSurfaceModifier(1.30f, 0.95f, 0.58f);
+
+                    // Assist turning back onto the track when throttling and steering inward from the shoulder
+                    if (throttle > 0.1f && Mathf.Abs(_lastInput.steering) > 0.1f && Mathf.Abs(_lateralOffset) > 0.1f)
+                    {
+                        float inwardSign = -Mathf.Sign(_lateralOffset);
+                        if (Mathf.Sign(_lastInput.steering) == inwardSign)
+                        {
+                            Vector2 segRight = new Vector2(proj.tangent.y, -proj.tangent.x);
+                            physics.ApplyVelocityImpulse(segRight * (inwardSign * 14f * dt));
+                        }
+                    }
                 }
             }
 
@@ -226,8 +238,8 @@ namespace RacingGame
                 float outwardSpeed = Vector2.Dot(physics.Velocity, right) * Mathf.Sign(proj.lateralOffset);
                 if (outwardSpeed > 0f)
                 {
-                    physics.ApplyVelocityImpulse(-right * (outwardSpeed * Mathf.Sign(proj.lateralOffset) * 1.2f));
-                    physics.ScaleVelocity(0.85f);
+                    physics.ApplyVelocityImpulse(-right * (outwardSpeed * Mathf.Sign(proj.lateralOffset) * 1.15f));
+                    physics.ScaleVelocity(0.985f);
                 }
             }
         }

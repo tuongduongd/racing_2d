@@ -111,13 +111,15 @@ namespace RacingGame
                 if (absDz <= interceptRangeMeters)
                 {
                     float blend = Mathf.Clamp01(1f - (absDz / interceptRangeMeters));
-                    // Áp sát cạnh xe người chơi (giữ khoảng cách 1.6m để ép làn)
+                    // Áp sát cạnh xe người chơi (co giãn khoảng hở theo độ rộng làn 2-6 làn)
                     float sideSign = car.LateralOffset >= _targetPlayer.LateralOffset ? 1f : -1f;
-                    float desiredSideOffset = _targetPlayer.LateralOffset + sideSign * 1.4f;
+                    float laneGap = Mathf.Clamp(track.LaneWidth * 0.35f, 1.1f, 1.8f);
+                    float desiredSideOffset = _targetPlayer.LateralOffset + sideSign * laneGap;
                     targetLateral = Mathf.Lerp(0f, desiredSideOffset, blend);
 
                     float dLat = Mathf.Abs(_targetPlayer.LateralOffset - car.LateralOffset);
-                    if (absDz <= strikeRangeLongitudinal && dLat <= strikeRangeLateral && car.CanKick)
+                    float scaledStrikeLat = Mathf.Clamp(strikeRangeLateral * (track.LaneWidth / 4f), 2.2f, 4.4f);
+                    if (absDz <= strikeRangeLongitudinal && dLat <= scaledStrikeLat && car.CanKick)
                     {
                         shouldKick = true;
                     }
@@ -131,7 +133,9 @@ namespace RacingGame
 
             Vector2 segDir = track.GetTrackDirection(targetWaypoint);
             Vector2 segRight = new Vector2(segDir.y, -segDir.x);
-            float maxOffset = track.TrackWidth * 0.38f;
+            float maxOffset = Mathf.Min(
+                track.MaxLaneCenterOffset + track.LaneWidth * 0.05f,
+                Mathf.Max(0.5f, track.TrackWidth * 0.5f - 0.1f));
             float clampedLat = Mathf.Clamp(targetLateral, -maxOffset, maxOffset);
             Vector2 aimPoint = baseTarget + segRight * clampedLat;
 

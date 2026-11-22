@@ -24,6 +24,7 @@ namespace RacingGame
         [SerializeField] private PauseMenuUI pauseMenuUi;
         [SerializeField] private RaceAudioController audioController;
         [SerializeField] private SkinManager skinManager;
+        [SerializeField] private MapManager mapManager;
         [SerializeField] private EnvironmentDecorator environmentDecorator;
         [SerializeField] private TrackObstacleSystem obstacleSystem;
         [SerializeField] private PoliceChaseController policeController;
@@ -76,6 +77,7 @@ namespace RacingGame
         public CarUpgradeSystem UpgradeSystem => _upgradeSystem;
         public RaceAudioController AudioController => audioController;
         public SkinManager SkinManager => skinManager;
+        public MapManager MapManager => mapManager;
         public EnvironmentDecorator EnvironmentDecorator => environmentDecorator;
         public TrackObstacleSystem ObstacleSystem => obstacleSystem;
         public PoliceChaseController PoliceController => policeController;
@@ -133,7 +135,7 @@ namespace RacingGame
 
             lapManager.Initialize(track, new List<Car>(_allCars), totalLaps);
             EnsurePoliceSetup();
-            environmentDecorator.RebuildEnvironment(track);
+            ApplyActiveMapSettings();
             obstacleSystem.SpawnObstacles(track);
 
             BindAudioEvents();
@@ -163,6 +165,7 @@ namespace RacingGame
 
         private void SetupReferences()
         {
+            EnsureStatesInitialized();
             track = FindOrCreate(track, "WaypointTrack");
             inputHandler = GetOrAdd(inputHandler);
             playerDriver = GetOrAdd(playerDriver);
@@ -173,9 +176,13 @@ namespace RacingGame
             audioController = GetOrAdd(audioController);
             skinManager = GetOrAdd(skinManager);
             skinManager.EnsureInitialized();
+            mapManager = GetOrAdd(mapManager);
+            mapManager.BindSaveSystem(_upgradeSystem);
+            mapManager.EnsureInitialized();
             environmentDecorator = GetOrAdd(environmentDecorator);
             obstacleSystem = GetOrAdd(obstacleSystem);
             policeController = GetOrAdd(policeController);
+            ApplyActiveMapSettings();
 
             playerDriver.SetDriverName("Player");
             playerDriver.SetInputHandler(inputHandler);
@@ -250,7 +257,7 @@ namespace RacingGame
                 aiCar.ConfigureIdentity(false, racer.color);
 
                 AIRacerDriver aiDriver = aiObj.AddComponent<AIRacerDriver>();
-                aiDriver.Configure(racer.name, activeProfile, racer.latOffset, racer.skillOffset);
+                aiDriver.Configure(racer.name, activeProfile, GetAiPreferredLateralOffset(i), racer.skillOffset);
 
                 _allCars.Add(aiCar);
                 _aiDrivers.Add(aiDriver);
@@ -314,14 +321,98 @@ namespace RacingGame
         public void StartRace()
         {
             ResumeGame();
+            ApplyActiveMapSettings();
             ApplyPlayerUpgrades();
             skinManager?.ApplyToCar(playerCar);
             ApplyDifficultyToAI();
             lapManager.SetTotalLaps(totalLaps);
+            raceHud?.RebuildMinimapTexture();
             _prizeAwardedForCurrentRace = false;
             _lastPrizeEarned = 0;
             _lastFinishPosition = 0;
             TransitionTo(GameFlowState.Countdown);
+        }
+
+        public bool SelectPlayerMap(string mapId)
+        {
+            EnsureStatesInitialized();
+            if (mapManager == null)
+            {
+                mapManager = GetOrAdd(mapManager);
+            }
+            if (mapManager.SaveSystem != _upgradeSystem)
+            {
+                mapManager.BindSaveSystem(_upgradeSystem);
+            }
+            bool changed = mapManager.SelectMap(mapId, track, environmentDecorator);
+            if (changed)
+            {
+                ApplyActiveMapSettings();
+                ApplyDifficultyToAI();
+                raceHud?.RebuildMinimapTexture();
+                if (audioController != null) audioController.PlayUpgradeResult(true);
+            }
+            return changed;
+        }
+
+        public TrackDefinition StepPlayerMap(int delta)
+        {
+            EnsureStatesInitialized();
+            if (mapManager == null)
+            {
+                mapManager = GetOrAdd(mapManager);
+            }
+            if (mapManager.SaveSystem != _upgradeSystem)
+            {
+                mapManager.BindSaveSystem(_upgradeSystem);
+            }
+            TrackDefinition def = mapManager.StepMapSelection(delta, track, environmentDecorator);
+            if (def != null)
+            {
+                ApplyActiveMapSettings();
+                ApplyDifficultyToAI();
+                raceHud?.RebuildMinimapTexture();
+                if (audioController != null) audioController.PlayUpgradeResult(true);
+            }
+            return def;
+        }
+
+        public bool TryUnlockPlayerMap(string mapId)
+        {
+            EnsureStatesInitialized();
+            if (mapManager == null)
+            {
+                mapManager = GetOrAdd(mapManager);
+            }
+            if (mapManager.SaveSystem != _upgradeSystem)
+            {
+                mapManager.BindSaveSystem(_upgradeSystem);
+            }
+
+            bool unlocked = mapManager.TryPurchaseMapUnlock(mapId);
+            if (unlocked)
+            {
+                mapManager.SelectMap(mapId, track, environmentDecorator);
+                ApplyActiveMapSettings();
+                ApplyDifficultyToAI();
+                raceHud?.RebuildMinimapTexture();
+            }
+            if (audioController != null) audioController.PlayUpgradeResult(unlocked);
+            return unlocked;
+        }
+
+        private void ApplyActiveMapSettings()
+        {
+            TrackDefinition activeMap = mapManager != null ? mapManager.SelectedMap : null;
+            if (activeMap == null) return;
+
+            if (track != null) track.ApplyTrackDefinition(activeMap);
+            if (obstacleSystem != null) obstacleSystem.ApplyMapSettings(activeMap);
+            if (policeController != null) policeController.ApplyMapSettings(activeMap);
+            if (environmentDecorator != null && track != null)
+            {
+                environmentDecorator.RebuildEnvironment(track, activeMap.Theme);
+            }
         }
 
         public bool SelectPlayerSkin(DriverBrandSkin brand)
@@ -388,8 +479,17 @@ namespace RacingGame
 
         public void ResetSaveData()
         {
-            if (_upgradeSystem == null) return;
-            _upgradeSystem.ResetProgress();
+            if (_upgradeSystem != null)
+            {
+                _upgradeSystem.ResetProgress();
+            }
+            if (mapManager != null)
+            {
+                mapManager.ResetProgress();
+                ApplyActiveMapSettings();
+                ApplyDifficultyToAI();
+                raceHud?.RebuildMinimapTexture();
+            }
             ApplyPlayerUpgrades();
         }
 
@@ -503,9 +603,15 @@ namespace RacingGame
 
             _prizeAwardedForCurrentRace = true;
             _lastFinishPosition = p.IsFinished ? p.FinishPosition : lapManager.GetPosition(playerCar);
+            TrackDefinition activeMap = mapManager != null ? mapManager.SelectedMap : null;
+            float rewardMult = activeMap != null ? activeMap.RewardMultiplier : 1.0f;
             _lastPrizeEarned = _upgradeSystem != null
-                ? _upgradeSystem.AwardRaceResult(_lastFinishPosition, p.FinishTime)
+                ? _upgradeSystem.AwardRaceResult(_lastFinishPosition, p.FinishTime, rewardMult)
                 : 0;
+            if (activeMap != null && p.IsFinished)
+            {
+                mapManager.RecordBestTime(activeMap.MapId, p.FinishTime);
+            }
         }
 
         public void SetEngineSoundActive(bool active)
@@ -550,18 +656,75 @@ namespace RacingGame
         private void ApplyDifficultyToAI()
         {
             AIProfile activeProfile = GetProfileForDifficulty(difficulty);
+            TrackDefinition activeMap = mapManager != null ? mapManager.SelectedMap : null;
+            float cornerMult = activeMap != null ? activeMap.AiCornerSpeedMultiplier : 1f;
 
             for (int i = 0; i < _aiDrivers.Count; i++)
             {
                 var racer = DefaultAiRacers[i % DefaultAiRacers.Length];
-                _aiDrivers[i].Configure(racer.name, activeProfile, racer.latOffset, racer.skillOffset);
+                float laneOffset = GetAiPreferredLateralOffset(i);
+                _aiDrivers[i].Configure(racer.name, activeProfile, laneOffset, racer.skillOffset);
+                _aiDrivers[i].SetMapCornerSpeedMultiplier(cornerMult);
             }
+        }
+
+        public float GetAiPreferredLateralOffset(int racerIndex)
+        {
+            return GetAiPreferredLateralOffset(track, racerIndex);
+        }
+
+        public static float GetAiPreferredLateralOffset(WaypointTrack targetTrack, int racerIndex)
+        {
+            int safeIndex = Mathf.Max(0, racerIndex);
+            if (targetTrack == null)
+            {
+                return DefaultAiRacers[safeIndex % DefaultAiRacers.Length].latOffset;
+            }
+
+            int lanes = targetTrack.LaneCount;
+            int halfPairs = (lanes + 1) / 2;
+            int pairStep = (safeIndex / 2) % halfPairs;
+            int laneIdx = (safeIndex % 2 == 0)
+                ? pairStep
+                : (lanes - 1) - pairStep;
+            return targetTrack.GetLaneCenterOffset(laneIdx);
+        }
+
+        public float GetGridSlotLateralOffset(int slot)
+        {
+            return GetGridSlotLateralOffset(track, slot, gridLaneOffset);
+        }
+
+        public static float GetGridSlotLateralOffset(WaypointTrack targetTrack, int slot, float fallbackLaneOffset = 2.8f)
+        {
+            if (targetTrack == null)
+            {
+                return (slot % 2 == 0) ? -fallbackLaneOffset : fallbackLaneOffset;
+            }
+
+            int lanes = targetTrack.LaneCount;
+            int leftLane;
+            int rightLane;
+            if (lanes % 2 == 0)
+            {
+                leftLane = (lanes / 2) - 1;
+                rightLane = lanes / 2;
+            }
+            else
+            {
+                int center = lanes / 2;
+                leftLane = Mathf.Max(0, center - 1);
+                rightLane = Mathf.Min(lanes - 1, center + 1);
+            }
+
+            int laneIdx = (slot % 2 == 0) ? leftLane : rightLane;
+            return targetTrack.GetLaneCenterOffset(laneIdx);
         }
 
         private Vector2 GridSlotPosition(int slot, Vector2 origin, Vector2 dir, Vector2 right)
         {
             int row = slot / 2;
-            float side = (slot % 2 == 0) ? -gridLaneOffset : gridLaneOffset;
+            float side = GetGridSlotLateralOffset(slot);
             return origin - dir * (gridFirstRowOffset + row * gridRowSpacing) + right * side;
         }
 

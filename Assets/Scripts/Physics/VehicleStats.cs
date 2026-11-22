@@ -23,12 +23,12 @@ namespace RacingGame
         public static VehicleStats Default => new VehicleStats
         {
             mass = 220f,
-            enginePower = 6200f,
-            brakePower = 8500f,
-            grip = 8.5f,
-            drag = 0.45f,
+            enginePower = 4800f,
+            brakePower = 7800f,
+            grip = 9.2f,
+            drag = 0.48f,
             rollingResistance = 0.8f,
-            maxSpeed = 62f,
+            maxSpeed = 48f,
             maxReverseSpeed = 8f,
             turnRate = 2.4f
         };

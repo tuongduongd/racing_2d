@@ -47,6 +47,14 @@ namespace RacingGame
         public bool IsSirenRedPhase => Mathf.FloorToInt(_sirenTimer * sirenFlashFrequency) % 2 == 0;
         public Color CurrentSirenColor => IsSirenRedPhase ? SirenRedColor : SirenBlueColor;
 
+        public void ApplyMapSettings(TrackDefinition def)
+        {
+            if (def == null) return;
+            enablePoliceChase = def.EnablePoliceChase;
+            policeSpeedBonus = def.PoliceSpeedBonus;
+            warningRangeMeters = def.PoliceWarningRangeMeters;
+        }
+
         public Car EnsurePoliceUnit(Car playerCar, WaypointTrack track, VehicleStatsAsset defaultStats = null)
         {
             _playerCar = playerCar;

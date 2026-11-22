@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: RacingGame::RacingGame.VehicleStatsAsset
   stats:
     mass: 220
-    enginePower: 6200
-    brakePower: 8500
-    grip: 8.5
-    drag: 0.45
+    enginePower: 4800
+    brakePower: 7800
+    grip: 9.2
+    drag: 0.48
     rollingResistance: 0.8
-    maxSpeed: 62
+    maxSpeed: 48
     maxReverseSpeed: 8
     turnRate: 2.4
