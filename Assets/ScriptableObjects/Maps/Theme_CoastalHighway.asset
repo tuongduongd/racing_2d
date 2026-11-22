@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c07efb5eaf6e56e478a0905d60f6f8c2, type: 3}
+  m_Name: Theme_CoastalHighway
+  m_EditorClassIdentifier: RacingGame::RacingGame.MapTheme
+  themeId: coastal_highway
+  themeName: "\u0110\u1EA1i L\u1ED9 Ven Bi\u1EC3n"
+  skyTop: {r: 0.05, g: 0.36, b: 0.84, a: 1}
+  skyMid: {r: 0.22, g: 0.64, b: 0.94, a: 1}
+  skyHorizon: {r: 0.76, g: 0.9, b: 0.98, a: 1}
+  sunGlow: {r: 1, g: 0.92, b: 0.56, a: 1}
+  showSun: 1
+  sunScale: 1.35
+  showStars: 0
+  horizonStyle: 1
+  farRidgeTop: {r: 0.2, g: 0.52, b: 0.74, a: 1}
+  farRidgeBase: {r: 0.14, g: 0.42, b: 0.65, a: 1}
+  midHillLight: {r: 0.74, g: 0.66, b: 0.44, a: 1}
+  midHillDark: {r: 0.58, g: 0.5, b: 0.32, a: 1}
+  terrainEarthLight: {r: 0.84, g: 0.75, b: 0.52, a: 1}
+  terrainEarthDark: {r: 0.76, g: 0.67, b: 0.45, a: 1}
+  terrainGrassLight: {r: 0.76, g: 0.7, b: 0.46, a: 1}
+  terrainGrassDark: {r: 0.68, g: 0.62, b: 0.39, a: 1}
+  shoulderLight: {r: 0.78, g: 0.72, b: 0.6, a: 1}
+  shoulderDark: {r: 0.7, g: 0.64, b: 0.52, a: 1}
+  asphaltLight: {r: 0.28, g: 0.3, b: 0.34, a: 1}
+  asphaltDark: {r: 0.24, g: 0.26, b: 0.3, a: 1}
+  centerYellowLine: {r: 0.98, g: 0.78, b: 0.14, a: 1}
+  laneWhiteLine: {r: 0.95, g: 0.97, b: 1, a: 1}
+  fogDensity: 0.72
+  slotIntervalMeters: 9.5
+  zones:
+  - zoneName: "B\u1EDD Bi\u1EC3n H\xE0ng D\u1EEBa"
+    propDensityMultiplier: 1.05
+    leftProps: 080000000700000005000000i
+    rightProps: 080000000600000005000000i
+    customLeftSprites: []
+    customRightSprites: []
+  - zoneName: "C\u1EA7u C\u1EA3ng & Resort"
+    propDensityMultiplier: 1
+    leftProps: 060000000800000001000000i
+    rightProps: 070000000800000005000000i
+    customLeftSprites: []
+    customRightSprites: []

@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30e63b86d2109824e8234ba08daceee4, type: 3}
+  m_Name: Map_02_CoastalHighway
+  m_EditorClassIdentifier: RacingGame::RacingGame.TrackDefinition
+  mapId: coastal_highway
+  displayName: "\u0110\u1EA1i L\u1ED9 Ven Bi\u1EC3n"
+  description: "\u0110\u1EA1i l\u1ED9 r\u1ED9ng 6 l\xE0n t\u1ED1c \u0111\u1ED9 cao ven bi\u1EC3n, cua d\xE0i m\u01B0\u1EE3t v\xE0 nhi\u1EC1u xe tranh l\xE0n."
+  difficultyStars: 3
+  previewBannerSprite: {fileID: 0}
+  unlockedByDefault: 1
+  waypoints:
+  - {x: 0, y: 0}
+  - {x: 120, y: 0}
+  - {x: 250, y: 10}
+  - {x: 360, y: 55}
+  - {x: 420, y: 140}
+  - {x: 410, y: 240}
+  - {x: 340, y: 315}
+  - {x: 230, y: 345}
+  - {x: 115, y: 330}
+  - {x: 0, y: 295}
+  - {x: -120, y: 315}
+  - {x: -235, y: 285}
+  - {x: -315, y: 205}
+  - {x: -335, y: 110}
+  - {x: -290, y: 35}
+  - {x: -195, y: -5}
+  - {x: -95, y: -4}
+  - {x: -40, y: 0}
+  laneCount: 6
+  laneWidth: 4.4
+  shoulderExtraWidth: 4.5
+  elevationAmplitude: 2.6
+  elevationFrequency: 2
+  elevationSecondaryAmp: 1
+  obstacleCount: 14
+  obstacleMinSpacingMeters: 34
+  allowedObstacles: 000000000300000002000000i
+  enablePoliceChase: 1
+  policeSpeedBonus: 4.8
+  policeWarningRangeMeters: 44
+  aiCornerSpeedMultiplier: 1.05
+  rewardMultiplier: 1.3
+  recommendedLaps: 3
+  theme: {fileID: 11400000, guid: 855fb6b6e6385f8409bb0511ef0bc461, type: 2}

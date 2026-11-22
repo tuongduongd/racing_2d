@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30e63b86d2109824e8234ba08daceee4, type: 3}
+  m_Name: Map_01_CityMorning
+  m_EditorClassIdentifier: RacingGame::RacingGame.TrackDefinition
+  mapId: city_morning
+  displayName: "Ph\u1ED1 S\xE1ng Ban Mai"
+  description: "\u0110\u01B0\u1EDDng ph\u1ED1 4 l\xE0n c\xE2n b\u1EB1ng, t\u1EA7m nh\xECn s\xE1ng r\xF5, ph\xF9 h\u1EE3p luy\u1EC7n t\u1EADp."
+  difficultyStars: 2
+  previewBannerSprite: {fileID: 0}
+  unlockedByDefault: 1
+  waypoints:
+  - {x: 0, y: 0}
+  - {x: 90, y: 0}
+  - {x: 180, y: 0}
+  - {x: 260, y: 15}
+  - {x: 320, y: 60}
+  - {x: 345, y: 125}
+  - {x: 325, y: 195}
+  - {x: 270, y: 240}
+  - {x: 200, y: 255}
+  - {x: 145, y: 220}
+  - {x: 115, y: 165}
+  - {x: 70, y: 145}
+  - {x: 20, y: 175}
+  - {x: -25, y: 235}
+  - {x: -95, y: 265}
+  - {x: -175, y: 245}
+  - {x: -225, y: 185}
+  - {x: -235, y: 110}
+  - {x: -200, y: 45}
+  - {x: -140, y: 8}
+  - {x: -75, y: -4}
+  - {x: -35, y: 0}
+  laneCount: 4
+  laneWidth: 4.6
+  shoulderExtraWidth: 4.5
+  elevationAmplitude: 3.5
+  elevationFrequency: 3
+  elevationSecondaryAmp: 1.5
+  obstacleCount: 10
+  obstacleMinSpacingMeters: 38
+  allowedObstacles: 00000000010000000200000003000000i
+  enablePoliceChase: 1
+  policeSpeedBonus: 3.8
+  policeWarningRangeMeters: 40
+  aiCornerSpeedMultiplier: 0.96
+  rewardMultiplier: 1
+  recommendedLaps: 3
+  theme: {fileID: 11400000, guid: 478490362e4e2f74182b3af0f52e2bb4, type: 2}

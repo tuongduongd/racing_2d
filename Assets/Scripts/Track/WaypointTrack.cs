@@ -27,15 +27,33 @@ namespace RacingGame
     /// </summary>
     public class WaypointTrack : MonoBehaviour
     {
+        [Header("Map Data (TrackDefinition)")]
+        [SerializeField] private TrackDefinition trackDefinition;
+
         [Header("Track Geometry")]
         [SerializeField] private Vector2[] waypoints;
+        [Range(2, 6)]
+        [SerializeField] private int laneCount = 4;
+        [Min(2.4f)]
+        [SerializeField] private float laneWidth = 4f;
         [SerializeField] private float trackWidth = 16f;
-        [SerializeField] private float maxOffRoadWidth = 28f;
+        [SerializeField] private float maxOffRoadWidth = 25f;
+
+        private float _elevationAmplitude = 3.5f;
+        private float _elevationFrequency = 3.0f;
+        private float _elevationSecondaryAmp = 1.5f;
+        private TrackFeatureZone[] _featureZones = System.Array.Empty<TrackFeatureZone>();
 
         private float[] _cumulativeDistances;
         private float _totalLength;
         private bool _cacheDirty = true;
 
+        public TrackDefinition ActiveDefinition => trackDefinition;
+        public MapTheme ActiveTheme => trackDefinition != null ? trackDefinition.Theme : null;
+        public TrackFeatureZone[] FeatureZones => _featureZones;
+        public int LaneCount => Mathf.Clamp(laneCount, 2, 6);
+        public float LaneWidth => Mathf.Max(2.4f, laneWidth);
+        public float MaxLaneCenterOffset => (LaneCount - 1) * 0.5f * LaneWidth;
         public IReadOnlyList<Vector2> Waypoints => waypoints;
         public float TrackWidth => trackWidth;
         public float MaxOffRoadWidth => maxOffRoadWidth;
@@ -52,46 +70,102 @@ namespace RacingGame
 
         private void Awake()
         {
-            if (waypoints == null || waypoints.Length < 3)
+            if (trackDefinition != null)
+            {
+                ApplyTrackDefinition(trackDefinition);
+            }
+            else if (waypoints == null || waypoints.Length < 3)
             {
                 BuildDefaultCircuit();
             }
             EnsureCache();
         }
 
+        public void ApplyTrackDefinition(TrackDefinition definition)
+        {
+            if (definition == null) return;
+
+            trackDefinition = definition;
+            if (definition.Waypoints != null && definition.Waypoints.Length >= 3)
+            {
+                waypoints = (Vector2[])definition.Waypoints.Clone();
+            }
+            else if (waypoints == null || waypoints.Length < 3)
+            {
+                waypoints = TrackDefinition.GetDefaultCityWaypoints();
+            }
+
+            laneCount = definition.LaneCount;
+            laneWidth = definition.LaneWidth;
+            trackWidth = laneCount * laneWidth;
+            maxOffRoadWidth = definition.MaxOffRoadWidth;
+            _elevationAmplitude = definition.ElevationAmplitude;
+            _elevationFrequency = definition.ElevationFrequency;
+            _elevationSecondaryAmp = definition.ElevationSecondaryAmp;
+            _featureZones = definition.FeatureZones ?? System.Array.Empty<TrackFeatureZone>();
+
+            _cacheDirty = true;
+            EnsureCache();
+        }
+
+        public bool TryGetFeatureAtDistance(float distanceAlongTrack, out TrackFeatureKind kind, out float zoneProgress)
+        {
+            kind = TrackFeatureKind.None;
+            zoneProgress = 0f;
+            if (_featureZones == null || _featureZones.Length == 0 || TotalLength <= 0.01f)
+            {
+                return false;
+            }
+
+            float norm = WrapDistance(distanceAlongTrack) / _totalLength;
+            for (int i = 0; i < _featureZones.Length; i++)
+            {
+                TrackFeatureZone z = _featureZones[i];
+                if (z == null || z.kind == TrackFeatureKind.None) continue;
+                float start = Mathf.Clamp01(Mathf.Min(z.startNormalized, z.endNormalized));
+                float end = Mathf.Clamp01(Mathf.Max(z.startNormalized, z.endNormalized));
+                if (norm >= start && norm <= end && end > start)
+                {
+                    kind = z.kind;
+                    zoneProgress = Mathf.Clamp01((norm - start) / (end - start));
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void OnValidate()
         {
+            laneCount = Mathf.Clamp(laneCount, 2, 6);
+            laneWidth = Mathf.Max(2.4f, laneWidth);
+            if (trackDefinition != null)
+            {
+                ApplyTrackDefinition(trackDefinition);
+                return;
+            }
+
+            trackWidth = laneCount * laneWidth;
             _cacheDirty = true;
         }
 
         [ContextMenu("Build Default 22-Waypoint Circuit")]
         public void BuildDefaultCircuit()
         {
-            waypoints = new Vector2[]
+            if (trackDefinition != null)
             {
-                new Vector2(  0f,   0f),
-                new Vector2( 90f,   0f),
-                new Vector2(180f,   0f),
-                new Vector2(260f,  15f),
-                new Vector2(320f,  60f),
-                new Vector2(345f, 125f),
-                new Vector2(325f, 195f),
-                new Vector2(270f, 240f),
-                new Vector2(200f, 255f),
-                new Vector2(145f, 220f),
-                new Vector2(115f, 165f),
-                new Vector2( 70f, 145f),
-                new Vector2( 20f, 175f),
-                new Vector2(-25f, 235f),
-                new Vector2(-95f, 265f),
-                new Vector2(-175f, 245f),
-                new Vector2(-225f, 185f),
-                new Vector2(-235f, 110f),
-                new Vector2(-200f,  45f),
-                new Vector2(-140f,   8f),
-                new Vector2( -75f,  -4f),
-                new Vector2( -35f,   0f),
-            };
+                ApplyTrackDefinition(trackDefinition);
+                return;
+            }
+
+            waypoints = TrackDefinition.GetDefaultValleyWaypoints();
+            laneCount = 4;
+            laneWidth = 4f;
+            trackWidth = laneCount * laneWidth;
+            maxOffRoadWidth = 25f;
+            _elevationAmplitude = 3.5f;
+            _elevationFrequency = 3.0f;
+            _elevationSecondaryAmp = 1.5f;
+            _featureZones = System.Array.Empty<TrackFeatureZone>();
             _cacheDirty = true;
             EnsureCache();
         }
@@ -136,6 +210,17 @@ namespace RacingGame
             int i1 = (i0 + 1) % count;
             Vector2 dir = waypoints[i1] - waypoints[i0];
             return dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.right;
+        }
+
+        /// <summary>
+        /// Returns the lateral center offset (in meters, negative = left, positive = right)
+        /// for lane index in [0 .. LaneCount - 1].
+        /// </summary>
+        public float GetLaneCenterOffset(int laneIndex)
+        {
+            int count = LaneCount;
+            int safeIdx = Mathf.Clamp(laneIndex, 0, count - 1);
+            return (-(count - 1) * 0.5f + safeIdx) * LaneWidth;
         }
 
         public bool IsOnTrack(Vector2 pos)
@@ -237,7 +322,15 @@ namespace RacingGame
             float curvature = angleDiff / step;
 
             float normalizedS = (s / _totalLength) * Mathf.PI * 2f;
-            float elevation = Mathf.Sin(normalizedS * 3f) * 3.5f + Mathf.Cos(normalizedS * 5f) * 1.5f;
+            float elevation = Mathf.Sin(normalizedS * _elevationFrequency) * _elevationAmplitude +
+                              Mathf.Cos(normalizedS * (_elevationFrequency + 2f)) * _elevationSecondaryAmp;
+
+            if (TryGetFeatureAtDistance(s, out TrackFeatureKind featKind, out float zoneProgress) &&
+                featKind == TrackFeatureKind.Overpass)
+            {
+                float boost = GetOverpassBoostAt(s);
+                elevation += Mathf.Sin(zoneProgress * Mathf.PI) * boost;
+            }
 
             return new TrackSample
             {
@@ -255,6 +348,22 @@ namespace RacingGame
             s %= _totalLength;
             if (s < 0f) s += _totalLength;
             return s;
+        }
+
+        private float GetOverpassBoostAt(float s)
+        {
+            if (_featureZones == null || _totalLength <= 0.01f) return 0f;
+            float norm = WrapDistance(s) / _totalLength;
+            for (int i = 0; i < _featureZones.Length; i++)
+            {
+                TrackFeatureZone z = _featureZones[i];
+                if (z != null && z.kind == TrackFeatureKind.Overpass &&
+                    norm >= z.startNormalized && norm <= z.endNormalized)
+                {
+                    return Mathf.Max(0f, z.elevationBoostMeters);
+                }
+            }
+            return 0f;
         }
 
         private Vector2 SampleTangentRaw(float s)

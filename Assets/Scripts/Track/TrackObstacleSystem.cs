@@ -9,7 +9,8 @@ namespace RacingGame
         TrafficCone = 0,
         OilBarrel = 1,
         RoadBarrier = 2,
-        OilSlick = 3
+        OilSlick = 3,
+        ParkedBus = 4
     }
 
     [Serializable]
@@ -34,6 +35,7 @@ namespace RacingGame
             ObstacleKind.OilBarrel => RoadsidePropKind.OilBarrel,
             ObstacleKind.RoadBarrier => RoadsidePropKind.RoadBarrier,
             ObstacleKind.OilSlick => RoadsidePropKind.OilSlick,
+            ObstacleKind.ParkedBus => RoadsidePropKind.ParkedBus,
             _ => RoadsidePropKind.TrafficCone
         };
     }
@@ -68,6 +70,7 @@ namespace RacingGame
         [SerializeField] private Sprite[] customObstacleSprites;
 
         private readonly List<TrackObstacle> _obstacles = new List<TrackObstacle>();
+        private ObstacleKind[] _allowedKindsOverride;
 
         public event Action<Car, TrackObstacle> ObstacleHit;
 
@@ -85,6 +88,21 @@ namespace RacingGame
 
         public IReadOnlyList<TrackObstacle> Obstacles => _obstacles;
 
+        public void ApplyMapSettings(TrackDefinition def)
+        {
+            if (def == null)
+            {
+                _allowedKindsOverride = null;
+                return;
+            }
+
+            obstacleCount = def.ObstacleCount;
+            minSpacingMeters = def.ObstacleMinSpacingMeters;
+            _allowedKindsOverride = (def.AllowedObstacles != null && def.AllowedObstacles.Length > 0)
+                ? def.AllowedObstacles
+                : null;
+        }
+
         public void SpawnObstacles(WaypointTrack track, int? overrideSeed = null)
         {
             _obstacles.Clear();
@@ -100,15 +118,19 @@ namespace RacingGame
             float usableStart = startSafeZoneMeters;
             float usableEnd = totalLen - 25f;
             float usableSpan = Mathf.Max(40f, usableEnd - usableStart);
-            float maxLat = track.TrackWidth * 0.36f;
+            int laneCount = track.LaneCount;
+            float maxLaneJitter = track.LaneWidth * 0.22f;
+            float maxBound = track.MaxLaneCenterOffset + maxLaneJitter;
 
-            ObstacleKind[] allKinds =
-            {
-                ObstacleKind.TrafficCone,
-                ObstacleKind.OilBarrel,
-                ObstacleKind.RoadBarrier,
-                ObstacleKind.OilSlick
-            };
+            ObstacleKind[] allKinds = _allowedKindsOverride != null && _allowedKindsOverride.Length > 0
+                ? _allowedKindsOverride
+                : new[]
+                {
+                    ObstacleKind.TrafficCone,
+                    ObstacleKind.OilBarrel,
+                    ObstacleKind.RoadBarrier,
+                    ObstacleKind.OilSlick
+                };
 
             float segmentStep = usableSpan / obstacleCount;
             float lastPlacedS = -999f;
@@ -126,9 +148,28 @@ namespace RacingGame
                 }
                 lastPlacedS = s;
 
-                float latUnit = (float)(rng.NextDouble() * 2.0 - 1.0);
-                float lateral = latUnit * maxLat;
                 ObstacleKind kind = allKinds[rng.Next(0, allKinds.Length)];
+                bool inFeature = track.TryGetFeatureAtDistance(s, out TrackFeatureKind featureKind, out _);
+                if (kind == ObstacleKind.ParkedBus && inFeature && (featureKind == TrackFeatureKind.Tunnel || featureKind == TrackFeatureKind.Overpass))
+                {
+                    // Không đặt xe buýt đỗ chắn trong hầm hẹp hoặc trên mặt cầu vượt
+                    kind = ObstacleKind.TrafficCone;
+                }
+
+                float lateral;
+                if (kind == ObstacleKind.ParkedBus)
+                {
+                    int outerLaneIdx = rng.Next(0, 2) == 0 ? 0 : (laneCount - 1);
+                    float edgePush = (outerLaneIdx == 0 ? -1f : 1f) * (track.LaneWidth * 0.12f);
+                    lateral = Mathf.Clamp(track.GetLaneCenterOffset(outerLaneIdx) + edgePush, -maxBound, maxBound);
+                }
+                else
+                {
+                    int laneIdx = rng.Next(0, laneCount);
+                    float laneCenter = track.GetLaneCenterOffset(laneIdx);
+                    float jitterUnit = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    lateral = Mathf.Clamp(laneCenter + jitterUnit * maxLaneJitter, -maxBound, maxBound);
+                }
 
                 GetKindParameters(kind, out float radius, out float speedMult, out float knockImpulse);
 
@@ -237,6 +278,7 @@ namespace RacingGame
                 ObstacleKind.OilBarrel => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.OilBarrel),
                 ObstacleKind.RoadBarrier => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.RoadBarrier),
                 ObstacleKind.OilSlick => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.OilSlick),
+                ObstacleKind.ParkedBus => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.ParkedBus),
                 _ => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.TrafficCone)
             };
         }
@@ -259,6 +301,11 @@ namespace RacingGame
                     radius = defaultHitRadius * 1.25f;
                     speedMult = Mathf.Clamp(defaultSpeedPenalty - 0.08f, 0.35f, 0.85f);
                     knockImpulse = defaultLateralImpulse * 1.25f;
+                    break;
+                case ObstacleKind.ParkedBus:
+                    radius = defaultHitRadius * 1.32f;
+                    speedMult = Mathf.Clamp(defaultSpeedPenalty - 0.18f, 0.32f, 0.72f);
+                    knockImpulse = defaultLateralImpulse * 1.35f;
                     break;
                 default: // OilSlick
                     radius = defaultHitRadius * 1.15f;
