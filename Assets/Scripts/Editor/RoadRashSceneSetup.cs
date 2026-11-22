@@ -282,6 +282,7 @@ namespace RacingGame.Editor
             menuSo.FindProperty("isStandaloneLobbyScene").boolValue = true;
             menuSo.FindProperty("gameplaySceneName").stringValue = "SampleScene";
             menuSo.ApplyModifiedPropertiesWithoutUndo();
+            EnsureLobbyBackgroundConfigured(menuUi);
 
             EditorSceneManager.SaveScene(lobbyScene, LobbyScenePath);
             RegisterScenesInBuildSettings();
@@ -419,6 +420,7 @@ namespace RacingGame.Editor
             gmSo.FindProperty("normalProfile").objectReferenceValue = normalProfile;
             gmSo.FindProperty("hardProfile").objectReferenceValue = hardProfile;
             gmSo.ApplyModifiedPropertiesWithoutUndo();
+            EnsureLobbyBackgroundConfigured(menuUi);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -531,6 +533,76 @@ namespace RacingGame.Editor
                 so.FindProperty("crtShader").objectReferenceValue = crtShader;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(crt);
+            }
+        }
+        [MenuItem("Tools/Road Rash/Wire Stage 4A Lobby UI & TMP Essentials")]
+        public static void WireStage4ALobbyAndTmp()
+        {
+            ImportTmpEssentialsIfMissing();
+            WireLobbyBackgroundInScene(LobbyScenePath);
+            WireLobbyBackgroundInScene(SampleScenePath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[RoadRashSceneSetup] Wired Stage 4A Lobby UI background & TMP Essential Resources.");
+        }
+
+        private static void ImportTmpEssentialsIfMissing()
+        {
+            if (File.Exists("Assets/TextMesh Pro/Resources/TMP Settings.asset"))
+            {
+                return;
+            }
+
+            string pkgCacheDir = Path.GetFullPath("Library/PackageCache");
+            if (!Directory.Exists(pkgCacheDir))
+            {
+                Debug.LogWarning("[RoadRashSceneSetup] Library/PackageCache not found; skipping TMP Essentials import.");
+                return;
+            }
+
+            string[] packages = Directory.GetFiles(pkgCacheDir, "TMP Essential Resources.unitypackage", SearchOption.AllDirectories);
+            if (packages.Length == 0)
+            {
+                Debug.LogWarning("[RoadRashSceneSetup] TMP Essential Resources.unitypackage not found in PackageCache.");
+                return;
+            }
+
+            UnityEditor.AssetPackage.Package.Import(packages[0], false);
+            AssetDatabase.Refresh();
+        }
+
+        private static void WireLobbyBackgroundInScene(string scenePath)
+        {
+            if (!File.Exists(scenePath))
+            {
+                Debug.LogWarning($"[RoadRashSceneSetup] Scene not found: {scenePath}");
+                return;
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            GameMenuUI menuUi = Object.FindAnyObjectByType<GameMenuUI>();
+            if (menuUi != null)
+            {
+                EnsureLobbyBackgroundConfigured(menuUi);
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        private static void EnsureLobbyBackgroundConfigured(GameMenuUI menuUi)
+        {
+            if (menuUi == null) return;
+            Sprite bgSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Bg_Lobby_SaigonNight.png");
+            if (bgSprite == null) return;
+
+            SerializedObject so = new SerializedObject(menuUi);
+            SerializedProperty prop = so.FindProperty("lobbyBackgroundSprite");
+            if (prop != null)
+            {
+                prop.objectReferenceValue = bgSprite;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(menuUi);
             }
         }
     }

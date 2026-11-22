@@ -365,6 +365,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RacingGame::RacingGame.GameMenuUI
   customBannerSprite: {fileID: 0}
   customBannerTexture: {fileID: 0}
+  lobbyBackgroundSprite: {fileID: 21300000, guid: 63bd9f28b8cffb84e860f7abb6ad0f94, type: 3}
+  customTmpFont: {fileID: 0}
   bannerTitle: "ROAD RASH 2D: \u0110\u1EA0I CHI\u1EBEN SHIPPER"
   bannerSubtitle: "XANH SM  \u2022  SHOPEE FOOD  \u2022  GRAB  \u2022  AHAMOVE"
   isStandaloneLobbyScene: 1

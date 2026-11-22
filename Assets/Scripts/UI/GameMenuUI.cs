@@ -1,25 +1,26 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace RacingGame
 {
     /// <summary>
-    /// Giao diện Sảnh Chờ (Main Menu & Lobby) và Cửa hàng nâng cấp (Garage).
-    /// Bao gồm:
-    /// - Banner / Logo của game ở đầu sảnh chờ (hỗ trợ gắn Sprite/Texture tùy chỉnh).
-    /// - Hệ thống chọn 4 Skin thương hiệu: Xanh SM, Shopee Food, Grab, Ahamove (kèm Preview trực tiếp).
-    /// - Nút "PLAY" bắt đầu vào trận (hỗ trợ cả chuyển từ LobbyScene sang SampleScene hoặc bắt đầu ngay).
-    /// - Nút biểu tượng "X" ở góc phải sảnh chờ để thoát game (Application.Quit).
+    /// Giao diện Sảnh Chờ (Main Menu & Lobby), Chọn Skin (4 hãng), Chọn Map Carousel,
+    /// và Cửa hàng nâng cấp (Garage).
+    /// Tuân thủ View != Logic: mọi nghiệp vụ tiền/mở khóa/lưu dữ liệu ủy thác cho Manager.
     /// </summary>
     public class GameMenuUI : MonoBehaviour
     {
-        [Header("Banner / Logo Sảnh Chờ (Kéo thả Sprite hoặc Texture vào đây)")]
+        [Header("Banner / Logo & Hình Nền Sảnh Chờ")]
         [SerializeField] private Sprite customBannerSprite;
         [SerializeField] private Texture2D customBannerTexture;
-        [SerializeField] private string bannerTitle = "ROAD RASH 2D: ĐẠI CHIẾN SHIPPER";
-        [SerializeField] private string bannerSubtitle = "XANH SM  •  SHOPEE FOOD  •  GRAB  •  AHAMOVE";
+        [SerializeField] private Sprite lobbyBackgroundSprite;
+        [SerializeField] private TMP_FontAsset customTmpFont;
+        [SerializeField] private string bannerTitle = "ROAD RASH";
+        [SerializeField] private string bannerSubtitle = "CHIẾN THẦN GIAO HÀNG";
 
         [Header("Thiết lập Scene Khởi Động (Lobby)")]
         [SerializeField] private bool isStandaloneLobbyScene;
@@ -29,43 +30,71 @@ namespace RacingGame
         private SkinManager _skinManager;
         private MapManager _mapManager;
         private CarUpgradeSystem _standaloneUpgradeSystem;
+        private CrtScanlineController _crtController;
 
         private Canvas _canvas;
         private GameObject _menuPanel;
+        private GameObject _skinSelectorPanel;
         private GameObject _garagePanel;
         private Button _outerQuitButtonX;
         private Image _bannerImage;
+        private Image _lobbyBackgroundImg;
         private Sprite _generatedBannerSprite;
 
-        // Main Menu & Lobby elements
-        private Text _menuStatsText;
-        private Text _selectedSkinStatusText;
-        private Text _mapNameText;
-        private Text _mapMetaText;
-        private Text _mapDescText;
+        // Lobby Header & Command Column
+        private TMP_Text _menuStatsText;
+        private TMP_Text _lobbyFeedbackText;
+        private float _lobbyFeedbackUntil;
+        private TMP_Text _menuMuteLabel;
+        private TMP_Text _crtBtnLabel;
+        private Image _crtBtnImg;
+        private TMP_Text _resetBtnLabel;
+        private bool _confirmResetPending;
+
+        private int _selectedLaps = 3;
+        private DifficultyLevel _selectedDifficulty = DifficultyLevel.Normal;
+        private readonly Dictionary<DifficultyLevel, Image> _diffBtnImgs = new Dictionary<DifficultyLevel, Image>();
+        private readonly Dictionary<DifficultyLevel, TMP_Text> _diffBtnLabels = new Dictionary<DifficultyLevel, TMP_Text>();
+        private readonly Dictionary<int, Image> _lapBtnImgs = new Dictionary<int, Image>();
+        private readonly Dictionary<int, TMP_Text> _lapBtnLabels = new Dictionary<int, TMP_Text>();
+
+        // Lobby Right Top: Active Bike Showcase
+        private TMP_Text _selectedSkinStatusText;
+        private TMP_Text _activeBikeTaglineText;
+        private Image _activeBikeAccentBar;
+        private Image _activeBikePreviewImage;
+
+        // Lobby Right Bottom: Map Carousel
+        private Image _mapBannerImage;
         private Image _mapAccentStrip;
+        private TMP_Text _mapStatusBadgeText;
+        private Image _mapStatusBadgeBg;
+        private TMP_Text _mapNameText;
+        private TMP_Text _mapMetaText;
+        private TMP_Text _mapDescText;
         private Button _mapActionButton;
         private Image _mapActionBtnImg;
-        private Text _mapActionBtnLabel;
+        private TMP_Text _mapActionBtnLabel;
         private RectTransform _mapTabsContainer;
         private readonly List<MapTabWidgets> _mapTabs = new List<MapTabWidgets>();
         private int _browsedMapIndex;
         private string _mapFeedbackMsg;
         private Color _mapFeedbackColor;
         private float _mapFeedbackUntil;
-        private readonly Dictionary<DifficultyLevel, Image> _diffBtnImgs = new Dictionary<DifficultyLevel, Image>();
-        private readonly Dictionary<int, Image> _lapBtnImgs = new Dictionary<int, Image>();
-        private readonly List<SkinCardWidgets> _skinCards = new List<SkinCardWidgets>();
-        private Text _menuMuteLabel;
-        private Text _resetBtnLabel;
-        private bool _confirmResetPending;
 
-        // Garage elements
+        // Dedicated Skin Selector Panel (4 Brands)
+        private readonly List<SkinCardWidgets> _skinCards = new List<SkinCardWidgets>();
+        private Image _skinModalPreviewImage;
+        private Image _skinModalAccentBar;
+        private TMP_Text _skinModalBrandTitle;
+        private TMP_Text _skinModalBrandTagline;
+        private TMP_Text _skinModalWalletText;
+
+        // Garage elements (Stage 4B preserves existing Garage functionality)
         private Text _garageMoneyText;
         private Text _garageStatsText;
         private Text _garageFeedbackText;
         private float _shopFeedbackUntil;
-
         private Image _speedBarFill;
         private Image _powerBarFill;
         private Image _brakeBarFill;
@@ -74,28 +103,7 @@ namespace RacingGame
         private float _dispPowerBar;
         private float _dispBrakeBar;
         private float _dispGripBar;
-
         private readonly List<UpgradeCardWidgets> _upgradeCards = new List<UpgradeCardWidgets>();
-
-        private class MapTabWidgets
-        {
-            public string MapId;
-            public Button Button;
-            public Image Bg;
-            public Text Label;
-        }
-
-        private class SkinCardWidgets
-        {
-            public DriverBrandSkin Brand;
-            public Image CardBg;
-            public Image HeaderStrip;
-            public Image PreviewIcon;
-            public Text NameText;
-            public Text TaglineText;
-            public Text SelectBtnLabel;
-            public Image SelectBtnImg;
-        }
 
         private class UpgradeCardWidgets
         {
@@ -115,6 +123,14 @@ namespace RacingGame
             UpgradeType.WeightReduction
         };
 
+        private static readonly DriverBrandSkin[] AllBrandOrder =
+        {
+            DriverBrandSkin.XanhSM,
+            DriverBrandSkin.ShopeeFood,
+            DriverBrandSkin.Grab,
+            DriverBrandSkin.Ahamove
+        };
+
         private static readonly int[] LapChoices = { 1, 2, 3, 5 };
 
         public Canvas MenuCanvas => _canvas;
@@ -129,6 +145,10 @@ namespace RacingGame
         public Button MapActionButton => _mapActionButton;
         public string MapActionButtonLabel => _mapActionBtnLabel != null ? _mapActionBtnLabel.text : string.Empty;
         public string MapNameDisplayText => _mapNameText != null ? _mapNameText.text : string.Empty;
+        public int SelectedLaps => _gameManager != null ? _gameManager.TotalLaps : _selectedLaps;
+        public DifficultyLevel SelectedDifficulty => _gameManager != null ? _gameManager.Difficulty : _selectedDifficulty;
+        public bool IsSkinSelectorOpen => _skinSelectorPanel != null && _skinSelectorPanel.activeSelf;
+
         public bool IsBrowsedMapLocked
         {
             get
@@ -136,6 +156,19 @@ namespace RacingGame
                 MapManager mm = ResolveMapManager();
                 TrackDefinition browsed = BrowsedMap;
                 return mm != null && browsed != null && !mm.IsMapUnlocked(browsed.MapId);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_generatedBannerSprite != null)
+            {
+                if (_generatedBannerSprite.texture != null)
+                {
+                    DestroyUnityObject(_generatedBannerSprite.texture);
+                }
+                DestroyUnityObject(_generatedBannerSprite);
+                _generatedBannerSprite = null;
             }
         }
 
@@ -199,9 +232,17 @@ namespace RacingGame
             return _mapManager;
         }
 
+        private CrtScanlineController ResolveCrtController()
+        {
+            if (_crtController == null)
+            {
+                _crtController = FindAnyObjectByType<CrtScanlineController>();
+            }
+            return _crtController;
+        }
+
         private void Start()
         {
-            // Hỗ trợ chạy độc lập trong LobbyScene (khi không có GameManager trong scene)
             if (_gameManager == null)
             {
                 _gameManager = FindAnyObjectByType<GameManager>();
@@ -234,12 +275,16 @@ namespace RacingGame
                 else _mapManager.EnsureInitialized();
             }
             _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
+
             WaypointTrack track = FindAnyObjectByType<WaypointTrack>();
             EnvironmentDecorator env = FindAnyObjectByType<EnvironmentDecorator>();
             if (track != null)
             {
                 _mapManager.ApplySelectedMapToTrack(track, env);
             }
+
+            _selectedLaps = GameManager.LoadSavedTotalLaps(3);
+            _selectedDifficulty = GameManager.LoadSavedDifficulty(DifficultyLevel.Normal);
 
             EnsureBuilt();
             RefreshMenu();
@@ -257,6 +302,12 @@ namespace RacingGame
             _skinManager?.EnsureInitialized();
             ResolveMapManager();
             _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
+
+            if (_gameManager != null)
+            {
+                _selectedLaps = _gameManager.TotalLaps;
+                _selectedDifficulty = _gameManager.Difficulty;
+            }
 
             _confirmResetPending = false;
             _shopFeedbackUntil = 0f;
@@ -298,9 +349,61 @@ namespace RacingGame
             return changed;
         }
 
-        /// <summary>
-        /// Chuyển đổi Map đang xem/chọn ở sảnh chờ; nếu map đã mở khóa thì chọn và cập nhật nền đường đua xem trước trực tiếp.
-        /// </summary>
+        public void OpenSkinSelector()
+        {
+            EnsureBuilt();
+            if (_skinSelectorPanel != null)
+            {
+                _skinSelectorPanel.SetActive(true);
+                RefreshSkinCards();
+            }
+        }
+
+        public void CloseSkinSelector()
+        {
+            if (_skinSelectorPanel != null)
+            {
+                _skinSelectorPanel.SetActive(false);
+                RefreshSkinCards();
+            }
+        }
+
+        public void SelectLapsFromLobby(int laps)
+        {
+            _selectedLaps = Mathf.Clamp(laps, 1, 10);
+            if (_gameManager != null)
+            {
+                _gameManager.SetTotalLaps(_selectedLaps);
+            }
+            else
+            {
+                GameManager.SaveTotalLapsPreference(_selectedLaps);
+            }
+            RefreshMenu();
+        }
+
+        public void SelectDifficultyFromLobby(DifficultyLevel level)
+        {
+            _selectedDifficulty = level;
+            if (_gameManager != null)
+            {
+                _gameManager.SetDifficulty(level);
+            }
+            else
+            {
+                GameManager.SaveDifficultyPreference(level);
+            }
+            RefreshMenu();
+        }
+
+        public bool ToggleCrtFromLobby()
+        {
+            CrtScanlineController crt = ResolveCrtController();
+            bool result = crt != null && crt.ToggleCrt();
+            RefreshMenuDynamic();
+            return result;
+        }
+
         public TrackDefinition StepMapFromLobby(int delta)
         {
             MapManager mm = ResolveMapManager();
@@ -378,12 +481,12 @@ namespace RacingGame
 
             if (unlocked)
             {
-                SetMapFeedback($"Đã mở khóa và chọn {target.DisplayName}!", RoadRashVisualTheme.AccentGreen);
+                SetMapFeedback($"Đã mở khóa và chọn {target.DisplayName}!", LobbyUiBuilder.SuccessGreen);
                 RefreshMenu();
             }
             else
             {
-                SetMapFeedback($"Không đủ tiền! Cần ${cost} để mở khóa {target.DisplayName}.", RoadRashVisualTheme.DangerRed);
+                SetMapFeedback($"Không đủ tiền! Cần ${cost} để mở khóa {target.DisplayName}.", LobbyUiBuilder.DangerRed);
                 RefreshMapCarousel();
             }
 
@@ -445,7 +548,7 @@ namespace RacingGame
                 int cost = ResolveMapManager() != null && browsed != null
                     ? _mapManager.GetMapUnlockCost(browsed.MapId)
                     : 0;
-                SetMapFeedback($"Map đang khóa! Bấm MỞ KHÓA (${cost}) hoặc chọn map đã mở.", RoadRashVisualTheme.DangerRed);
+                SetMapFeedback($"Map đang khóa! Bấm MỞ KHÓA (${cost}) hoặc chọn map đã mở.", LobbyUiBuilder.DangerRed);
                 RefreshMapCarousel();
                 return;
             }
@@ -460,9 +563,24 @@ namespace RacingGame
             _mapFeedbackUntil = Time.unscaledTime + 2.5f;
         }
 
+        private void SetLobbyFeedback(string msg, Color color)
+        {
+            if (_lobbyFeedbackText == null) return;
+            _lobbyFeedbackText.text = msg;
+            _lobbyFeedbackText.color = color;
+            _lobbyFeedbackText.gameObject.SetActive(true);
+            _lobbyFeedbackUntil = Time.unscaledTime + 2.5f;
+        }
+
         public void TriggerPlay()
         {
             _confirmResetPending = false;
+            if (_gameManager == null)
+            {
+                GameManager.SaveTotalLapsPreference(_selectedLaps);
+                GameManager.SaveDifficultyPreference(_selectedDifficulty);
+            }
+
             if (_gameManager != null && !isStandaloneLobbyScene)
             {
                 _gameManager.StartRace();
@@ -494,10 +612,22 @@ namespace RacingGame
         {
             if (_canvas == null) return;
 
+            if (_skinSelectorPanel != null && _skinSelectorPanel.activeSelf &&
+                Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                CloseSkinSelector();
+                return;
+            }
+
+            if (_lobbyFeedbackText != null && _lobbyFeedbackText.gameObject.activeSelf &&
+                Time.unscaledTime > _lobbyFeedbackUntil)
+            {
+                _lobbyFeedbackText.gameObject.SetActive(false);
+            }
+
             if (_gameManager == null)
             {
-                // Chế độ LobbyScene độc lập: luôn hiển thị sảnh chờ và nút X
-                if (!_menuPanel.activeSelf) _menuPanel.SetActive(true);
+                if (_menuPanel != null && !_menuPanel.activeSelf) _menuPanel.SetActive(true);
                 if (_outerQuitButtonX != null && !_outerQuitButtonX.gameObject.activeSelf)
                 {
                     _outerQuitButtonX.gameObject.SetActive(true);
@@ -522,6 +652,10 @@ namespace RacingGame
             if (_menuPanel.activeSelf != showMenu)
             {
                 _menuPanel.SetActive(showMenu);
+                if (!showMenu && _skinSelectorPanel != null && _skinSelectorPanel.activeSelf)
+                {
+                    _skinSelectorPanel.SetActive(false);
+                }
                 if (showMenu)
                 {
                     _confirmResetPending = false;
@@ -561,28 +695,40 @@ namespace RacingGame
 
         private void RefreshMenu()
         {
+            CarUpgradeSystem upg = ResolveUpgradeSystem();
+            int money = upg != null ? upg.Money : 200;
+            int won = upg != null ? upg.RacesWon : 0;
+            int played = upg != null ? upg.RacesPlayed : 0;
+            string best = (upg != null && upg.BestRaceTime > 0f) ? RaceHUD.FormatTime(upg.BestRaceTime) : "--:--.--";
+
             if (_menuStatsText != null)
             {
-                CarUpgradeSystem upg = ResolveUpgradeSystem();
-                int money = upg != null ? upg.Money : 200;
-                int won = upg != null ? upg.RacesWon : 0;
-                int played = upg != null ? upg.RacesPlayed : 0;
-                string best = (upg != null && upg.BestRaceTime > 0f) ? RaceHUD.FormatTime(upg.BestRaceTime) : "--:--.--";
-                _menuStatsText.text = $"Tiền: ${money}   |   Thắng: {won}/{played}   |   Kỷ lục: {best}";
+                _menuStatsText.text = $"{money:N0} XU   •   THẮNG {won}/{played}   •   KỶ LỤC {best}";
+            }
+            if (_skinModalWalletText != null)
+            {
+                _skinModalWalletText.text = $"{money:N0} XU";
             }
 
-            if (_gameManager != null)
+            DifficultyLevel activeDiff = SelectedDifficulty;
+            foreach (KeyValuePair<DifficultyLevel, Image> kv in _diffBtnImgs)
             {
-                foreach (var kv in _diffBtnImgs)
+                bool sel = activeDiff == kv.Key;
+                kv.Value.color = sel ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.SurfaceHigh;
+                if (_diffBtnLabels.TryGetValue(kv.Key, out TMP_Text lbl) && lbl != null)
                 {
-                    bool sel = _gameManager.Difficulty == kv.Key;
-                    kv.Value.color = sel ? RoadRashVisualTheme.HudYellow : RoadRashVisualTheme.MetalMid;
+                    lbl.color = sel ? LobbyUiBuilder.OnAmber : LobbyUiBuilder.TextPrimary;
                 }
+            }
 
-                foreach (var kv in _lapBtnImgs)
+            int activeLaps = SelectedLaps;
+            foreach (KeyValuePair<int, Image> kv in _lapBtnImgs)
+            {
+                bool sel = activeLaps == kv.Key;
+                kv.Value.color = sel ? LobbyUiBuilder.ElectricCyan : LobbyUiBuilder.SurfaceHigh;
+                if (_lapBtnLabels.TryGetValue(kv.Key, out TMP_Text lbl) && lbl != null)
                 {
-                    bool sel = _gameManager.TotalLaps == kv.Key;
-                    kv.Value.color = sel ? RoadRashVisualTheme.HudYellow : RoadRashVisualTheme.MetalMid;
+                    lbl.color = sel ? LobbyUiBuilder.OnCyan : LobbyUiBuilder.TextPrimary;
                 }
             }
 
@@ -607,20 +753,48 @@ namespace RacingGame
             int idx = _browsedMapIndex + 1;
             int total = mm.MapCount;
 
-            if (_mapAccentStrip != null && displayMap.Theme != null)
+            if (_mapBannerImage != null)
+            {
+                _mapBannerImage.sprite = displayMap.PreviewBannerSprite;
+                _mapBannerImage.color = displayMap.PreviewBannerSprite != null
+                    ? (isUnlocked ? Color.white : new Color(0.55f, 0.42f, 0.42f, 1f))
+                    : new Color(0.08f, 0.10f, 0.14f, 1f);
+            }
+
+            if (_mapAccentStrip != null)
             {
                 _mapAccentStrip.color = isUnlocked
-                    ? displayMap.Theme.CenterYellowLine
-                    : new Color(0.55f, 0.25f, 0.25f);
+                    ? (displayMap.Theme != null ? displayMap.Theme.CenterYellowLine : LobbyUiBuilder.ElectricCyan)
+                    : LobbyUiBuilder.DangerRed;
+            }
+
+            if (_mapStatusBadgeText != null && _mapStatusBadgeBg != null)
+            {
+                if (!isUnlocked)
+                {
+                    _mapStatusBadgeText.text = $"KHÓA • ${mm.GetMapUnlockCost(displayMap.MapId)}";
+                    _mapStatusBadgeBg.color = LobbyUiBuilder.DangerRed;
+                    _mapStatusBadgeText.color = Color.white;
+                }
+                else if (isSelected)
+                {
+                    _mapStatusBadgeText.text = "ĐÃ CHỌN";
+                    _mapStatusBadgeBg.color = LobbyUiBuilder.ElectricCyan;
+                    _mapStatusBadgeText.color = LobbyUiBuilder.OnCyan;
+                }
+                else
+                {
+                    _mapStatusBadgeText.text = "ĐÃ MỞ KHÓA";
+                    _mapStatusBadgeBg.color = LobbyUiBuilder.SuccessGreen;
+                    _mapStatusBadgeText.color = LobbyUiBuilder.OnCyan;
+                }
             }
 
             if (_mapNameText != null)
             {
-                string prefix = isUnlocked ? "ĐƯỜNG ĐUA" : "[ĐÃ KHÓA] ĐƯỜNG ĐUA";
-                _mapNameText.text = $"{prefix} ({idx}/{total}): {displayMap.DisplayName.ToUpperInvariant()}";
-                _mapNameText.color = isUnlocked
-                    ? RoadRashVisualTheme.HudYellow
-                    : new Color(0.95f, 0.54f, 0.45f);
+                string prefix = isUnlocked ? $"MAP {idx:00}/{total:00}" : $"[KHÓA] MAP {idx:00}/{total:00}";
+                _mapNameText.text = $"{prefix}: {displayMap.DisplayName.ToUpperInvariant()}";
+                _mapNameText.color = isUnlocked ? Color.white : new Color(1f, 0.68f, 0.62f, 1f);
             }
 
             if (_mapMetaText != null)
@@ -629,11 +803,8 @@ namespace RacingGame
                 float best = mm.GetBestTime(displayMap.MapId);
                 string bestStr = best > 0f ? RaceHUD.FormatTime(best) : "--:--.--";
                 string policeTag = displayMap.EnablePoliceChase ? "CS: BẬT" : "CS: TẮT";
-                string lockTag = isUnlocked
-                    ? (isSelected ? "Đang chọn" : "Đã mở")
-                    : $"Khóa (${mm.GetMapUnlockCost(displayMap.MapId)})";
                 _mapMetaText.text =
-                    $"{displayMap.LaneCount} Làn ({displayMap.TotalTrackWidth:0}m)  |  {stars}  |  x{displayMap.RewardMultiplier:0.0}  |  {policeTag}  |  {lockTag}  |  {bestStr}";
+                    $"{displayMap.LaneCount} LÀN ({displayMap.TotalTrackWidth:0}m)  •  {stars}  •  x{displayMap.RewardMultiplier:0.0}  •  {policeTag}  •  KỶ LỤC {bestStr}";
             }
 
             if (_mapDescText != null)
@@ -646,7 +817,7 @@ namespace RacingGame
                 else
                 {
                     _mapDescText.text = displayMap.Description;
-                    _mapDescText.color = new Color(0.76f, 0.80f, 0.86f);
+                    _mapDescText.color = LobbyUiBuilder.TextMuted;
                 }
             }
 
@@ -658,22 +829,20 @@ namespace RacingGame
                     CarUpgradeSystem upg = ResolveUpgradeSystem();
                     bool canAfford = upg != null && upg.Money >= cost;
                     _mapActionBtnLabel.text = $"MỞ KHÓA (${cost})";
-                    _mapActionBtnImg.color = canAfford
-                        ? new Color(0.20f, 0.62f, 0.30f)
-                        : new Color(0.48f, 0.24f, 0.22f);
-                    _mapActionBtnLabel.color = Color.white;
+                    _mapActionBtnImg.color = canAfford ? LobbyUiBuilder.SuccessGreen : LobbyUiBuilder.DangerRed;
+                    _mapActionBtnLabel.color = canAfford ? LobbyUiBuilder.OnCyan : Color.white;
                 }
                 else if (isSelected)
                 {
                     _mapActionBtnLabel.text = "✓ ĐANG CHỌN";
-                    _mapActionBtnImg.color = RoadRashVisualTheme.HudYellow;
-                    _mapActionBtnLabel.color = new Color(0.10f, 0.10f, 0.12f);
+                    _mapActionBtnImg.color = LobbyUiBuilder.ElectricCyan;
+                    _mapActionBtnLabel.color = LobbyUiBuilder.OnCyan;
                 }
                 else
                 {
                     _mapActionBtnLabel.text = "CHỌN MAP";
-                    _mapActionBtnImg.color = new Color(0.20f, 0.44f, 0.74f);
-                    _mapActionBtnLabel.color = Color.white;
+                    _mapActionBtnImg.color = LobbyUiBuilder.SafetyAmber;
+                    _mapActionBtnLabel.color = LobbyUiBuilder.OnAmber;
                 }
             }
 
@@ -693,20 +862,20 @@ namespace RacingGame
                 if (!tabUnlocked)
                 {
                     tab.Label.text = $"[KHÓA] {shortName}";
-                    tab.Bg.color = tabBrowsed ? new Color(0.46f, 0.24f, 0.24f) : new Color(0.20f, 0.16f, 0.18f);
-                    tab.Label.color = new Color(0.92f, 0.72f, 0.72f);
+                    tab.Bg.color = tabBrowsed ? new Color(0.46f, 0.20f, 0.20f) : new Color(0.18f, 0.14f, 0.16f);
+                    tab.Label.color = new Color(0.95f, 0.72f, 0.70f);
                 }
                 else if (tabSelected)
                 {
                     tab.Label.text = $"▶ {shortName}";
-                    tab.Bg.color = RoadRashVisualTheme.HudYellow;
-                    tab.Label.color = new Color(0.10f, 0.10f, 0.12f);
+                    tab.Bg.color = LobbyUiBuilder.ElectricCyan;
+                    tab.Label.color = LobbyUiBuilder.OnCyan;
                 }
                 else
                 {
                     tab.Label.text = shortName;
-                    tab.Bg.color = tabBrowsed ? new Color(0.26f, 0.36f, 0.50f) : RoadRashVisualTheme.MetalMid;
-                    tab.Label.color = Color.white;
+                    tab.Bg.color = tabBrowsed ? LobbyUiBuilder.OutlineVariant : LobbyUiBuilder.SurfaceHigh;
+                    tab.Label.color = LobbyUiBuilder.TextPrimary;
                 }
             }
         }
@@ -733,16 +902,14 @@ namespace RacingGame
 
             for (int i = _mapTabsContainer.childCount - 1; i >= 0; i--)
             {
-                GameObject child = _mapTabsContainer.GetChild(i).gameObject;
-                if (Application.isPlaying) Destroy(child);
-                else DestroyImmediate(child);
+                DestroyUnityObject(_mapTabsContainer.GetChild(i).gameObject);
             }
             _mapTabs.Clear();
 
             int count = mm.MapCount;
             if (count <= 0) return;
 
-            const float totalWidth = 688f;
+            const float totalWidth = 612f;
             const float gap = 6f;
             float tabWidth = (totalWidth - gap * (count - 1)) / count;
 
@@ -751,19 +918,17 @@ namespace RacingGame
                 TrackDefinition def = mm.GetMapAt(i);
                 if (def == null) continue;
 
-                int capturedIdx = i;
-                Button tabBtn = RoadRashUiSprites.CreateBevelButton(
-                    _mapTabsContainer, $"MapTab_{i}", def.DisplayName, RoadRashVisualTheme.MetalMid, 11);
-                PlaceTopLeft(tabBtn.GetComponent<RectTransform>(), i * (tabWidth + gap), 0f, tabWidth, 24f);
-                tabBtn.onClick.AddListener(() => FocusOrSelectMapIndex(capturedIdx));
-
-                _mapTabs.Add(new MapTabWidgets
-                {
-                    MapId = def.MapId,
-                    Button = tabBtn,
-                    Bg = tabBtn.GetComponent<Image>(),
-                    Label = tabBtn.GetComponentInChildren<Text>()
-                });
+                MapTabWidgets tab = LobbyUiBuilder.CreateMapTab(
+                    _mapTabsContainer,
+                    i,
+                    def.MapId,
+                    def.DisplayName,
+                    i * (tabWidth + gap),
+                    tabWidth,
+                    28f,
+                    idx => FocusOrSelectMapIndex(idx),
+                    customTmpFont);
+                _mapTabs.Add(tab);
             }
         }
 
@@ -778,9 +943,46 @@ namespace RacingGame
             DriverBrandSkin activeBrand = _skinManager.SelectedBrand;
             BikeSkinData activeData = _skinManager.SelectedSkin;
 
-            if (_selectedSkinStatusText != null && activeData != null)
+            if (activeData != null)
             {
-                _selectedSkinStatusText.text = $"CHỌN SKIN ĐỒNG PHỤC XE (Đang chọn: {activeData.DisplayName.ToUpperInvariant()})";
+                Sprite activePreview = ResolveSkinPreviewSprite(activeData);
+
+                if (_selectedSkinStatusText != null)
+                {
+                    _selectedSkinStatusText.text = activeData.DisplayName.ToUpperInvariant();
+                    _selectedSkinStatusText.color = Color.Lerp(activeData.PrimaryColor, Color.white, 0.35f);
+                }
+                if (_activeBikeTaglineText != null)
+                {
+                    _activeBikeTaglineText.text = activeData.Tagline.ToUpperInvariant();
+                }
+                if (_activeBikeAccentBar != null)
+                {
+                    _activeBikeAccentBar.color = activeData.PrimaryColor;
+                }
+                if (_activeBikePreviewImage != null)
+                {
+                    _activeBikePreviewImage.sprite = activePreview;
+                    _activeBikePreviewImage.color = activePreview != null ? Color.white : LobbyUiBuilder.SurfaceLowest;
+                }
+
+                if (_skinModalPreviewImage != null)
+                {
+                    _skinModalPreviewImage.sprite = activePreview;
+                }
+                if (_skinModalAccentBar != null)
+                {
+                    _skinModalAccentBar.color = activeData.PrimaryColor;
+                }
+                if (_skinModalBrandTitle != null)
+                {
+                    _skinModalBrandTitle.text = activeData.DisplayName.ToUpperInvariant();
+                    _skinModalBrandTitle.color = Color.Lerp(activeData.PrimaryColor, Color.white, 0.35f);
+                }
+                if (_skinModalBrandTagline != null)
+                {
+                    _skinModalBrandTagline.text = activeData.Tagline;
+                }
             }
 
             for (int i = 0; i < _skinCards.Count; i++)
@@ -791,38 +993,53 @@ namespace RacingGame
 
                 if (data != null)
                 {
-                    card.NameText.text = data.DisplayName;
+                    card.NameText.text = data.DisplayName.ToUpperInvariant();
                     card.TaglineText.text = data.Tagline;
                     card.HeaderStrip.color = data.PrimaryColor;
-
-                    Sprite preview = data.CustomLogoSprite != null
-                        ? data.CustomLogoSprite
-                        : (data.GetOverrideSprite() != null
-                            ? data.GetOverrideSprite()
-                            : RoadRashBikeSprites.GetOrCreateSet(data).Upright0);
-                    card.PreviewIcon.sprite = preview;
+                    card.PreviewIcon.sprite = ResolveSkinPreviewSprite(data);
                 }
 
                 card.CardBg.color = isSelected
-                    ? new Color(0.22f, 0.27f, 0.35f, 0.98f)
-                    : new Color(0.12f, 0.14f, 0.18f, 0.94f);
-                card.SelectBtnLabel.text = isSelected ? "ĐANG CHỌN" : "CHỌN SKIN";
+                    ? new Color(0.11f, 0.21f, 0.26f, 0.98f)
+                    : LobbyUiBuilder.SurfaceContainer;
+                card.SelectBtnLabel.text = isSelected ? "✓ ĐANG CHỌN" : "CHỌN SKIN";
                 card.SelectBtnImg.color = isSelected
-                    ? RoadRashVisualTheme.HudYellow
-                    : (data != null ? Color.Lerp(data.PrimaryColor, Color.black, 0.25f) : RoadRashVisualTheme.MetalMid);
-                card.SelectBtnLabel.color = isSelected ? new Color(0.10f, 0.10f, 0.12f) : Color.white;
+                    ? LobbyUiBuilder.ElectricCyan
+                    : (data != null ? Color.Lerp(data.PrimaryColor, LobbyUiBuilder.SurfaceHigh, 0.45f) : LobbyUiBuilder.SurfaceHigh);
+                card.SelectBtnLabel.color = isSelected ? LobbyUiBuilder.OnCyan : Color.white;
             }
+        }
+
+        private static Sprite ResolveSkinPreviewSprite(BikeSkinData data)
+        {
+            if (data == null) return null;
+            if (data.CustomLogoSprite != null) return data.CustomLogoSprite;
+            Sprite ov = data.GetOverrideSprite();
+            if (ov != null) return ov;
+            return BikePaletteSwapper.GetOrCreateSet(data).Upright0;
         }
 
         private void RefreshMenuDynamic()
         {
             if (_menuMuteLabel != null && _gameManager != null && _gameManager.AudioController != null)
             {
-                _menuMuteLabel.text = _gameManager.AudioController.IsMuted ? "Âm thanh: TẮT" : "Âm thanh: BẬT";
+                _menuMuteLabel.text = _gameManager.AudioController.IsMuted ? "ÂM: TẮT" : "ÂM: BẬT";
             }
+
+            if (_crtBtnLabel != null)
+            {
+                CrtScanlineController crt = ResolveCrtController();
+                bool crtOn = crt != null && crt.IsEnabled;
+                _crtBtnLabel.text = crtOn ? "CRT FX: BẬT" : "CRT FX: TẮT";
+                if (_crtBtnImg != null)
+                {
+                    _crtBtnImg.color = crtOn ? new Color(0.08f, 0.24f, 0.28f, 1f) : LobbyUiBuilder.SurfaceHigh;
+                }
+            }
+
             if (_resetBtnLabel != null)
             {
-                _resetBtnLabel.text = _confirmResetPending ? "Bấm lần nữa ĐỂ XÓA!" : "Xóa dữ liệu lưu";
+                _resetBtnLabel.text = _confirmResetPending ? "BẤM LẦN 2 ĐỂ XÓA!" : "XÓA DỮ LIỆU";
             }
         }
 
@@ -912,290 +1129,526 @@ namespace RacingGame
             if (_canvas != null) return;
 
             _canvas = RoadRashUiSprites.CreateOverlayCanvas("GameMenuCanvas", 20);
-            BuildOuterQuitButton();
             BuildMainMenuPanel();
+            BuildSkinSelectorPanel();
             BuildGaragePanel();
+            BuildOuterQuitButton();
         }
 
-        /// <summary>
-        /// Nút biểu tượng "X" ở góc phải ngoài sảnh chờ để thoát game (Application.Quit).
-        /// </summary>
         private void BuildOuterQuitButton()
         {
-            _outerQuitButtonX = RoadRashUiSprites.CreateBevelButton(
+            _outerQuitButtonX = LobbyUiBuilder.CreateCyberButton(
                 _canvas.transform,
                 "QuitButtonX",
-                "X",
-                new Color(0.82f, 0.18f, 0.18f),
-                22);
+                "[X] THOÁT",
+                LobbyUiBuilder.DangerRed,
+                Color.white,
+                12f,
+                null,
+                customTmpFont);
 
             RectTransform rt = _outerQuitButtonX.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(1f, 1f);
             rt.anchorMax = new Vector2(1f, 1f);
             rt.pivot = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-22f, -18f);
-            rt.sizeDelta = new Vector2(48f, 48f);
+            rt.anchoredPosition = new Vector2(-24f, -10f);
+            rt.sizeDelta = new Vector2(96f, 36f);
 
             _outerQuitButtonX.onClick.AddListener(TriggerQuit);
         }
 
         private void BuildMainMenuPanel()
         {
-            _menuPanel = CreateCenteredPanel(_canvas.transform, "MainMenuPanel", 760f, 696f);
+            _menuPanel = new GameObject("MainMenuPanel");
+            _menuPanel.transform.SetParent(_canvas.transform, false);
+            RectTransform rootRt = _menuPanel.AddComponent<RectTransform>();
+            LobbyUiBuilder.StretchFill(rootRt);
 
-            // 1. Khung Banner / Logo ở đầu Sảnh Chờ
+            // 1. Full-screen Lobby Background + Cyber Gradient Scrim
+            GameObject bgObj = new GameObject("LobbyBackground");
+            bgObj.transform.SetParent(_menuPanel.transform, false);
+            _lobbyBackgroundImg = bgObj.AddComponent<Image>();
+            _lobbyBackgroundImg.sprite = lobbyBackgroundSprite;
+            _lobbyBackgroundImg.color = lobbyBackgroundSprite != null
+                ? Color.white
+                : new Color(0.06f, 0.08f, 0.11f, 0.85f);
+            _lobbyBackgroundImg.preserveAspect = false;
+            _lobbyBackgroundImg.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(_lobbyBackgroundImg.rectTransform);
+
+            GameObject scrimObj = new GameObject("LobbyScrim");
+            scrimObj.transform.SetParent(_menuPanel.transform, false);
+            Image scrimImg = scrimObj.AddComponent<Image>();
+            scrimImg.sprite = LobbyUiBuilder.GetSoftDarkScrimSprite();
+            scrimImg.color = new Color(1f, 1f, 1f, 0.90f);
+            scrimImg.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(scrimImg.rectTransform);
+
+            // 2. Top Header Bar (56px)
+            Image headerBar = LobbyUiBuilder.CreateCyberPanel(
+                _menuPanel.transform, "LobbyHeaderBar", LobbyUiBuilder.SurfaceLowest);
+            LobbyUiBuilder.PlaceTop(headerBar.rectTransform, 0f, 1280f, 56f);
+            headerBar.rectTransform.anchorMin = new Vector2(0f, 1f);
+            headerBar.rectTransform.anchorMax = new Vector2(1f, 1f);
+            headerBar.rectTransform.sizeDelta = new Vector2(0f, 56f);
+
             GameObject bannerObj = new GameObject("LobbyBanner");
-            bannerObj.transform.SetParent(_menuPanel.transform, false);
+            bannerObj.transform.SetParent(headerBar.transform, false);
             _bannerImage = bannerObj.AddComponent<Image>();
             _bannerImage.sprite = ResolveBannerSprite();
-            _bannerImage.type = Image.Type.Simple;
-            _bannerImage.preserveAspect = false;
-            PlaceTop(_bannerImage.rectTransform, -14f, 724f, 92f);
+            _bannerImage.preserveAspect = true;
+            _bannerImage.raycastTarget = false;
+            LobbyUiBuilder.PlaceTopLeft(_bannerImage.rectTransform, 24f, -10f, 120f, 36f);
 
-            Text title = RoadRashUiSprites.CreateStyledText(
-                bannerObj.transform, "Title", bannerTitle, 30, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleCenter);
-            PlaceTop(title.rectTransform, -12f, 700f, 40f);
+            TMP_Text logoTitle = LobbyUiBuilder.CreateTmpText(
+                headerBar.transform, "HeaderLogoTitle", bannerTitle, 20f, LobbyUiBuilder.ElectricCyan,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(logoTitle.rectTransform, 154f, -8f, 180f, 22f);
 
-            Text sub = RoadRashUiSprites.CreateStyledText(
-                bannerObj.transform, "Subtitle", bannerSubtitle, 13, new Color(0.95f, 0.97f, 1.00f), TextAnchor.MiddleCenter);
-            PlaceTop(sub.rectTransform, -54f, 700f, 24f);
+            TMP_Text logoSub = LobbyUiBuilder.CreateTmpText(
+                headerBar.transform, "HeaderLogoSub", "ARCADE MOTORBIKE 2D", 10f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(logoSub.rectTransform, 154f, -30f, 180f, 16f);
 
-            // Nút "X" phụ gắn ngay góc phải trên của Sảnh Chờ để thao tác nhanh
-            Button panelCloseX = RoadRashUiSprites.CreateBevelButton(
-                _menuPanel.transform, "LobbyCloseXBtn", "X", new Color(0.78f, 0.18f, 0.18f), 16);
-            PlaceTopLeft(panelCloseX.GetComponent<RectTransform>(), 710f, -16f, 34f, 34f);
-            panelCloseX.onClick.AddListener(TriggerQuit);
+            Image walletPill = LobbyUiBuilder.CreateCyberPanel(headerBar.transform, "WalletPill", LobbyUiBuilder.SurfaceHigh);
+            LobbyUiBuilder.PlaceTopRight(walletPill.rectTransform, -356f, -10f, 390f, 36f);
+            _menuStatsText = LobbyUiBuilder.CreateTmpText(
+                walletPill.transform, "Stats", "200 XU", 12f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.Center, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.StretchFill(_menuStatsText.rectTransform, 10f, 2f);
 
-            _menuStatsText = RoadRashUiSprites.CreateStyledText(
-                _menuPanel.transform, "Stats", "", 15, RoadRashVisualTheme.AccentGreen, TextAnchor.MiddleCenter);
-            PlaceTop(_menuStatsText.rectTransform, -112f, 700f, 24f);
-
-            // 2. Khu vực Chọn 4 Skin: Xanh SM, Shopee Food, Grab, Ahamove
-            _selectedSkinStatusText = RoadRashUiSprites.CreateStyledText(
-                _menuPanel.transform,
-                "SkinSectionTitle",
-                "CHỌN SKIN ĐỒNG PHỤC XE (XANH SM / SHOPEE FOOD / GRAB / AHAMOVE)",
-                14,
-                RoadRashVisualTheme.HudYellow,
-                TextAnchor.MiddleCenter);
-            PlaceTop(_selectedSkinStatusText.rectTransform, -140f, 700f, 22f);
-
-            _skinCards.Clear();
-            DriverBrandSkin[] brands =
-            {
-                DriverBrandSkin.XanhSM,
-                DriverBrandSkin.ShopeeFood,
-                DriverBrandSkin.Grab,
-                DriverBrandSkin.Ahamove
-            };
-
-            const float firstCardX = 22f;
-            const float cardWidth = 170f;
-            const float cardSpacing = 180f;
-            const float cardY = -166f;
-            const float cardHeight = 166f;
-
-            for (int i = 0; i < brands.Length; i++)
-            {
-                DriverBrandSkin brand = brands[i];
-                float x = firstCardX + i * cardSpacing;
-                BuildSkinCard(brand, x, cardY, cardWidth, cardHeight);
-            }
-
-            // 2b. Map Carousel + Lock/Unlock + Map Tabs (Chọn Map đường đua + Live Preview nền phía sau)
-            GameObject mapBox = new GameObject("MapSelectorBox");
-            mapBox.transform.SetParent(_menuPanel.transform, false);
-            Image mapBoxBg = mapBox.AddComponent<Image>();
-            mapBoxBg.sprite = RoadRashUiSprites.GetPanelSprite();
-            mapBoxBg.type = Image.Type.Sliced;
-            mapBoxBg.color = new Color(0.10f, 0.12f, 0.17f, 0.94f);
-            PlaceTopLeft(mapBoxBg.rectTransform, 26f, -340f, 708f, 108f);
-
-            GameObject stripObj = new GameObject("MapAccentStrip");
-            stripObj.transform.SetParent(mapBox.transform, false);
-            _mapAccentStrip = stripObj.AddComponent<Image>();
-            _mapAccentStrip.raycastTarget = false;
-            _mapAccentStrip.color = RoadRashVisualTheme.HudYellow;
-            PlaceTopLeft(_mapAccentStrip.rectTransform, 4f, -4f, 700f, 5f);
-
-            Button prevMapBtn = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "PrevMapBtn", "◀", RoadRashVisualTheme.MetalMid, 18);
-            PlaceTopLeft(prevMapBtn.GetComponent<RectTransform>(), 10f, -14f, 40f, 54f);
-            prevMapBtn.onClick.AddListener(() => StepMapFromLobby(-1));
-
-            Button nextMapBtn = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "NextMapBtn", "▶", RoadRashVisualTheme.MetalMid, 18);
-            PlaceTopLeft(nextMapBtn.GetComponent<RectTransform>(), 658f, -14f, 40f, 54f);
-            nextMapBtn.onClick.AddListener(() => StepMapFromLobby(1));
-
-            _mapNameText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapNameText", "ĐƯỜNG ĐUA (1/4): PHỐ SÁNG BAN MAI", 14, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleLeft, FontStyle.Bold);
-            PlaceTopLeft(_mapNameText.rectTransform, 58f, -11f, 446f, 22f);
-
-            _mapMetaText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapMetaText", "4 Làn (16m)  |  ★★☆☆☆  |  x1.0  |  --:--.--", 11, Color.white, TextAnchor.MiddleLeft, FontStyle.Normal);
-            PlaceTopLeft(_mapMetaText.rectTransform, 58f, -33f, 446f, 18f);
-
-            _mapDescText = RoadRashUiSprites.CreateStyledText(mapBox.transform, "MapDescText", "Đường phố 4 làn cổ điển với khúc cua vừa phải.", 11, new Color(0.76f, 0.80f, 0.86f), TextAnchor.MiddleLeft, FontStyle.Italic);
-            PlaceTopLeft(_mapDescText.rectTransform, 58f, -51f, 446f, 18f);
-
-            _mapActionButton = RoadRashUiSprites.CreateBevelButton(mapBox.transform, "MapActionBtn", "✓ ĐANG CHỌN", RoadRashVisualTheme.HudYellow, 12);
-            PlaceTopLeft(_mapActionButton.GetComponent<RectTransform>(), 510f, -15f, 140f, 52f);
-            _mapActionBtnImg = _mapActionButton.GetComponent<Image>();
-            _mapActionBtnLabel = _mapActionButton.GetComponentInChildren<Text>();
-            _mapActionButton.onClick.AddListener(OnMapActionButtonClicked);
-
-            GameObject tabsObj = new GameObject("MapTabsRow");
-            tabsObj.transform.SetParent(mapBox.transform, false);
-            _mapTabsContainer = tabsObj.AddComponent<RectTransform>();
-            PlaceTopLeft(_mapTabsContainer, 10f, -75f, 688f, 26f);
-            _mapTabs.Clear();
-
-            // 3. Hàng chọn Độ khó AI & Số vòng đua
-            Text diffLabel = RoadRashUiSprites.CreateStyledText(_menuPanel.transform, "DiffLabel", "Độ khó AI:", 14, Color.white);
-            PlaceTopLeft(diffLabel.rectTransform, 26f, -458f, 95f, 30f);
-
-            AddDifficultyButton(118f, -458f, DifficultyLevel.Easy, "Dễ");
-            AddDifficultyButton(206f, -458f, DifficultyLevel.Normal, "Vừa");
-            AddDifficultyButton(294f, -458f, DifficultyLevel.Hard, "Khó");
-
-            Text lapLabel = RoadRashUiSprites.CreateStyledText(_menuPanel.transform, "LapLabel", "Số vòng:", 14, Color.white);
-            PlaceTopLeft(lapLabel.rectTransform, 398f, -458f, 76f, 30f);
-
-            for (int i = 0; i < LapChoices.Length; i++)
-            {
-                int laps = LapChoices[i];
-                Button btn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, $"LapBtn_{laps}", $"{laps}V", RoadRashVisualTheme.MetalMid, 13);
-                PlaceTopLeft(btn.GetComponent<RectTransform>(), 474f + i * 66f, -458f, 60f, 30f);
-                _lapBtnImgs[laps] = btn.GetComponent<Image>();
-                btn.onClick.AddListener(() =>
-                {
-                    _gameManager?.SetTotalLaps(laps);
-                    RefreshMenu();
-                });
-            }
-
-            // 4. Nút PLAY chính & Nút mở GARAGE
-            Button playBtn = RoadRashUiSprites.CreateBevelButton(
-                _menuPanel.transform,
-                "PlayBtn",
-                "▶  PLAY (BẮT ĐẦU ĐUA)",
-                new Color(0.18f, 0.64f, 0.28f),
-                21);
-            PlaceTopLeft(playBtn.GetComponent<RectTransform>(), 26f, -502f, 445f, 50f);
-            playBtn.onClick.AddListener(OnPlayButtonClicked);
-
-            Button garageBtn = RoadRashUiSprites.CreateBevelButton(
-                _menuPanel.transform,
-                "GarageBtn",
-                "NÂNG CẤP XE (GARAGE)",
-                new Color(0.20f, 0.42f, 0.74f),
-                15);
-            PlaceTopLeft(garageBtn.GetComponent<RectTransform>(), 485f, -502f, 249f, 50f);
-            garageBtn.onClick.AddListener(() =>
-            {
-                _confirmResetPending = false;
-                _gameManager?.OpenGarage();
-            });
-
-            // 5. Hàng Âm thanh + Xóa dữ liệu + Thoát Game
-            Button muteBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "MuteBtn", "Âm thanh: BẬT", RoadRashVisualTheme.MetalMid, 13);
-            PlaceTopLeft(muteBtn.GetComponent<RectTransform>(), 26f, -564f, 220f, 34f);
-            _menuMuteLabel = muteBtn.GetComponentInChildren<Text>();
+            Button muteBtn = LobbyUiBuilder.CreateCyberButton(
+                headerBar.transform, "MuteBtn", "ÂM: BẬT",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 11f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(muteBtn.GetComponent<RectTransform>(), -248f, -10f, 100f, 36f);
+            _menuMuteLabel = LobbyUiBuilder.GetPrimaryLabel(muteBtn);
             muteBtn.onClick.AddListener(() =>
             {
                 _gameManager?.AudioController?.ToggleMute();
                 RefreshMenuDynamic();
             });
 
-            Button resetBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "ResetBtn", "Xóa dữ liệu lưu", new Color(0.52f, 0.24f, 0.22f), 13);
-            PlaceTopLeft(resetBtn.GetComponent<RectTransform>(), 260f, -564f, 230f, 34f);
-            _resetBtnLabel = resetBtn.GetComponentInChildren<Text>();
-            resetBtn.onClick.AddListener(() =>
+            Button crtBtn = LobbyUiBuilder.CreateCyberButton(
+                headerBar.transform, "CrtToggleBtn", "CRT FX: BẬT",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.ElectricCyan, 11f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(crtBtn.GetComponent<RectTransform>(), -128f, -10f, 112f, 36f);
+            _crtBtnImg = crtBtn.GetComponent<Image>();
+            _crtBtnLabel = LobbyUiBuilder.GetPrimaryLabel(crtBtn);
+            crtBtn.onClick.AddListener(() => ToggleCrtFromLobby());
+
+            // 3. Left Command Column (x = 32, y = -74, w = 556)
+            TMP_Text tagBadge = LobbyUiBuilder.CreateTmpText(
+                _menuPanel.transform, "EditionTag", "OFFLINE ARCADE EDITION // V2.0", 11f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(tagBadge.rectTransform, 32f, -74f, 540f, 20f);
+
+            TMP_Text heroTitle = LobbyUiBuilder.CreateTmpText(
+                _menuPanel.transform, "HeroTitle", bannerTitle, 54f, LobbyUiBuilder.ElectricCyan,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(heroTitle.rectTransform, 30f, -94f, 550f, 58f);
+
+            TMP_Text heroSub = LobbyUiBuilder.CreateTmpText(
+                _menuPanel.transform, "HeroSubtitle", bannerSubtitle, 28f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(heroSub.rectTransform, 32f, -150f, 550f, 34f);
+
+            TMP_Text heroDesc = LobbyUiBuilder.CreateTmpText(
+                _menuPanel.transform, "HeroDesc",
+                "Đua xe tay ga đường phố bất quy tắc. Đạp xe đối thủ, né chướng ngại vật và bứt tốc qua 4 cung đường!",
+                13f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.TopLeft, FontStyles.Normal, customTmpFont, wrap: true);
+            LobbyUiBuilder.PlaceTopLeft(heroDesc.rectTransform, 32f, -190f, 548f, 40f);
+
+            Button playBtn = LobbyUiBuilder.CreateCyberButton(
+                _menuPanel.transform,
+                "PlayBtn",
+                "▶  CHƠI NGAY (PLAY)",
+                LobbyUiBuilder.ElectricCyan,
+                LobbyUiBuilder.OnCyan,
+                22f,
+                "XUẤT PHÁT ĐẤU TRƯỜNG TỐC ĐỘ ĐƯỜNG PHỐ",
+                customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(playBtn.GetComponent<RectTransform>(), 32f, -242f, 556f, 70f);
+            playBtn.onClick.AddListener(OnPlayButtonClicked);
+
+            const float actionBtnY = -324f;
+            const float actionBtnW = 178f;
+            const float actionBtnGap = 11f;
+
+            Button skinModalBtn = LobbyUiBuilder.CreateCyberButton(
+                _menuPanel.transform, "OpenSkinsBtn", "CHỌN SKIN (4 HÃNG)",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 13f,
+                "Xanh SM • Shopee • Grab • Ahamove", customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(skinModalBtn.GetComponent<RectTransform>(), 32f, actionBtnY, actionBtnW, 62f);
+            skinModalBtn.onClick.AddListener(OpenSkinSelector);
+
+            Button garageBtn = LobbyUiBuilder.CreateCyberButton(
+                _menuPanel.transform, "GarageBtn", "GARAGE NÂNG CẤP",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.SafetyAmber, 13f,
+                "Động cơ • Phanh • Bám • Trọng lượng", customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(garageBtn.GetComponent<RectTransform>(), 32f + (actionBtnW + actionBtnGap), actionBtnY, actionBtnW, 62f);
+            garageBtn.onClick.AddListener(() =>
             {
-                if (_confirmResetPending)
+                _confirmResetPending = false;
+                if (_gameManager != null)
                 {
-                    if (_gameManager != null)
-                    {
-                        _gameManager.ResetSaveData();
-                    }
-                    else
-                    {
-                        ResolveUpgradeSystem()?.ResetProgress();
-                        ResolveMapManager()?.ResetProgress();
-                    }
-                    _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
-                    _confirmResetPending = false;
-                    _mapFeedbackMsg = null;
-                    RefreshMenu();
+                    _gameManager.OpenGarage();
                 }
                 else
                 {
-                    _confirmResetPending = true;
-                    RefreshMenuDynamic();
+                    SetLobbyFeedback("Hãy bấm CHƠI NGAY để mở Garage trong trận đua!", LobbyUiBuilder.SafetyAmber);
                 }
             });
 
-            Button quitLobbyBtn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, "QuitLobbyBtn", "✕ THOÁT GAME", new Color(0.72f, 0.18f, 0.18f), 13);
-            PlaceTopLeft(quitLobbyBtn.GetComponent<RectTransform>(), 504f, -564f, 230f, 34f);
-            quitLobbyBtn.onClick.AddListener(TriggerQuit);
+            Button resetBtn = LobbyUiBuilder.CreateCyberButton(
+                _menuPanel.transform, "ResetBtn", "XÓA DỮ LIỆU",
+                new Color(0.28f, 0.14f, 0.14f, 1f), LobbyUiBuilder.TextPrimary, 13f,
+                "Đặt lại tiền & map đã mở", customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(resetBtn.GetComponent<RectTransform>(), 32f + 2f * (actionBtnW + actionBtnGap), actionBtnY, actionBtnW, 62f);
+            _resetBtnLabel = LobbyUiBuilder.GetPrimaryLabel(resetBtn);
+            resetBtn.onClick.AddListener(OnResetSaveClicked);
 
-            Text controls = RoadRashUiSprites.CreateStyledText(
-                _menuPanel.transform, "ControlsHint",
-                "W/↑ Ga  |  S/↓ Phanh  |  A/D Lái  |  SPACE Đá đối thủ  |  M Tắt/Bật tiếng",
-                12, new Color(0.80f, 0.84f, 0.90f), TextAnchor.MiddleCenter);
-            PlaceTop(controls.rectTransform, -612f, 700f, 22f);
+            // Race Settings Box (Difficulty + Laps)
+            Image settingsPanel = LobbyUiBuilder.CreateCyberPanel(
+                _menuPanel.transform, "RaceSettingsBox", LobbyUiBuilder.SurfaceLow, LobbyUiBuilder.OutlineVariant);
+            LobbyUiBuilder.PlaceTopLeft(settingsPanel.rectTransform, 32f, -398f, 556f, 224f);
 
-            Text skinHint = RoadRashUiSprites.CreateStyledText(
-                _menuPanel.transform, "SkinEditorHint",
-                "Mẹo Editor: Gắn Material / Texture / Map Theme trong Assets/ScriptableObjects/",
-                11, new Color(0.68f, 0.78f, 0.90f), TextAnchor.MiddleCenter);
-            PlaceTop(skinHint.rectTransform, -636f, 700f, 20f);
+            TMP_Text settingsTitle = LobbyUiBuilder.CreateTmpText(
+                settingsPanel.transform, "SettingsHeader", "CẤU HÌNH TRẬN ĐẤU (RACE SETTINGS)", 12f,
+                LobbyUiBuilder.ElectricCyan, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(settingsTitle.rectTransform, 16f, -12f, 360f, 22f);
+
+            TMP_Text localBadge = LobbyUiBuilder.CreateTmpText(
+                settingsPanel.transform, "LocalBadge", "ARCADE LOCAL", 10f,
+                LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineRight, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(localBadge.rectTransform, -16f, -14f, 140f, 18f);
+
+            TMP_Text diffHeader = LobbyUiBuilder.CreateTmpText(
+                settingsPanel.transform, "DiffLabel", "ĐỘ KHÓ AI ĐỐI THỦ", 11f,
+                LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(diffHeader.rectTransform, 16f, -44f, 260f, 20f);
+
+            _diffBtnImgs.Clear();
+            _diffBtnLabels.Clear();
+            AddDifficultyButton(settingsPanel.transform, 16f, -68f, 168f, 40f, DifficultyLevel.Easy, "DỄ (EASY)");
+            AddDifficultyButton(settingsPanel.transform, 194f, -68f, 168f, 40f, DifficultyLevel.Normal, "VỪA (NORMAL)");
+            AddDifficultyButton(settingsPanel.transform, 372f, -68f, 168f, 40f, DifficultyLevel.Hard, "KHÓ (HARD)");
+
+            TMP_Text lapHeader = LobbyUiBuilder.CreateTmpText(
+                settingsPanel.transform, "LapLabel", "SỐ VÒNG ĐUA (LAPS)", 11f,
+                LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(lapHeader.rectTransform, 16f, -122f, 260f, 20f);
+
+            _lapBtnImgs.Clear();
+            _lapBtnLabels.Clear();
+            for (int i = 0; i < LapChoices.Length; i++)
+            {
+                int laps = LapChoices[i];
+                Button btn = LobbyUiBuilder.CreateCyberButton(
+                    settingsPanel.transform, $"LapBtn_{laps}", $"{laps} VÒNG",
+                    LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 13f, null, customTmpFont);
+                LobbyUiBuilder.PlaceTopLeft(btn.GetComponent<RectTransform>(), 16f + i * 133f, -146f, 125f, 40f);
+                _lapBtnImgs[laps] = btn.GetComponent<Image>();
+                _lapBtnLabels[laps] = LobbyUiBuilder.GetPrimaryLabel(btn);
+                btn.onClick.AddListener(() => SelectLapsFromLobby(laps));
+            }
+
+            _lobbyFeedbackText = LobbyUiBuilder.CreateTmpText(
+                settingsPanel.transform, "LobbyFeedback", "", 12f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_lobbyFeedbackText.rectTransform, 16f, -194f, 524f, 22f);
+            _lobbyFeedbackText.gameObject.SetActive(false);
+
+            // 4. Right Column: Active Equipped Bike Showcase (top) + Map Carousel (bottom)
+            BuildRightActiveBikeCard();
+            BuildRightMapCarouselCard();
+
+            // 5. Bottom Keyboard Hints Strip (32px)
+            Image bottomBar = LobbyUiBuilder.CreateCyberPanel(
+                _menuPanel.transform, "BottomControlsBar", LobbyUiBuilder.SurfaceLowest);
+            LobbyUiBuilder.PlaceBottomStretch(bottomBar.rectTransform, 32f);
+
+            TMP_Text controlsHint = LobbyUiBuilder.CreateTmpText(
+                bottomBar.transform, "ControlsHint",
+                "THAO TÁC:   [W / ↑] TĂNG GA   •   [S / ↓] PHANH   •   [A / D] LÁI XE   •   [SPACE] ĐẠP ĐỐI THỦ   •   [M] ÂM THANH   •   [ESC] TẠM DỪNG",
+                11f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.Center, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.StretchFill(controlsHint.rectTransform, 16f, 2f);
         }
 
-        private void BuildSkinCard(DriverBrandSkin brand, float x, float y, float w, float h)
+        private void BuildRightActiveBikeCard()
         {
-            GameObject cardObj = new GameObject($"SkinCard_{brand}");
-            cardObj.transform.SetParent(_menuPanel.transform, false);
-            Image cardBg = cardObj.AddComponent<Image>();
-            cardBg.sprite = RoadRashUiSprites.GetPanelSprite();
-            cardBg.type = Image.Type.Sliced;
-            cardBg.color = new Color(0.12f, 0.14f, 0.18f, 0.94f);
-            PlaceTopLeft(cardBg.rectTransform, x, y, w, h);
+            Image card = LobbyUiBuilder.CreateCyberPanel(
+                _menuPanel.transform, "ActiveBikeCard", LobbyUiBuilder.SurfaceContainer, LobbyUiBuilder.ElectricCyan);
+            LobbyUiBuilder.PlaceTopLeft(card.rectTransform, 612f, -72f, 636f, 266f);
 
-            GameObject stripObj = new GameObject("BrandColorStrip");
-            stripObj.transform.SetParent(cardObj.transform, false);
-            Image stripImg = stripObj.AddComponent<Image>();
-            stripImg.raycastTarget = false;
-            PlaceTopLeft(stripImg.rectTransform, 4f, -4f, w - 8f, 8f);
+            TMP_Text badge = LobbyUiBuilder.CreateTmpText(
+                card.transform, "EquippedHeader", "● XẾ CHIẾN ĐANG TRANG BỊ", 11f, LobbyUiBuilder.ElectricCyan,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(badge.rectTransform, 16f, -12f, 260f, 20f);
 
-            GameObject iconObj = new GameObject("BikePreviewIcon");
-            iconObj.transform.SetParent(cardObj.transform, false);
-            Image iconImg = iconObj.AddComponent<Image>();
-            iconImg.preserveAspect = true;
-            iconImg.raycastTarget = false;
-            PlaceTop(iconImg.rectTransform, -16f, 64f, 64f);
+            Button swapSkinBtn = LobbyUiBuilder.CreateCyberButton(
+                card.transform, "QuickChangeSkinBtn", "ĐỔI SKIN ⇄",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 12f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(swapSkinBtn.GetComponent<RectTransform>(), -16f, -10f, 130f, 30f);
+            swapSkinBtn.onClick.AddListener(OpenSkinSelector);
 
-            Text nameTxt = RoadRashUiSprites.CreateStyledText(
-                cardObj.transform, "BrandName", brand.ToString(), 15, Color.white, TextAnchor.MiddleCenter);
-            PlaceTop(nameTxt.rectTransform, -84f, w - 10f, 22f);
+            _selectedSkinStatusText = LobbyUiBuilder.CreateTmpText(
+                card.transform, "ActiveSkinName", "XANH SM", 24f, LobbyUiBuilder.ElectricCyan,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_selectedSkinStatusText.rectTransform, 16f, -38f, 440f, 30f);
 
-            Text tagTxt = RoadRashUiSprites.CreateStyledText(
-                cardObj.transform, "BrandTagline", "", 11, new Color(0.80f, 0.86f, 0.92f), TextAnchor.MiddleCenter, FontStyle.Normal);
-            PlaceTop(tagTxt.rectTransform, -106f, w - 10f, 18f);
+            _activeBikeTaglineText = LobbyUiBuilder.CreateTmpText(
+                card.transform, "ActiveSkinTagline", "THUẦN ĐIỆN XANH CYAN", 12f, LobbyUiBuilder.TextMuted,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Normal, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_activeBikeTaglineText.rectTransform, 16f, -68f, 440f, 20f);
 
-            Button selectBtn = RoadRashUiSprites.CreateBevelButton(
-                cardObj.transform, $"SelectSkinBtn_{brand}", "CHỌN SKIN", RoadRashVisualTheme.MetalMid, 12);
-            PlaceTop(selectBtn.GetComponent<RectTransform>(), -130f, w - 18f, 28f);
-            selectBtn.onClick.AddListener(() => SelectSkinFromLobby(brand));
+            Image previewFrame = LobbyUiBuilder.CreateCyberPanel(card.transform, "ActivePreviewStage", LobbyUiBuilder.SurfaceLowest);
+            LobbyUiBuilder.PlaceTopLeft(previewFrame.rectTransform, 16f, -94f, 604f, 158f);
 
-            _skinCards.Add(new SkinCardWidgets
+            GameObject previewImgObj = new GameObject("ActiveBikePreviewImg");
+            previewImgObj.transform.SetParent(previewFrame.transform, false);
+            _activeBikePreviewImage = previewImgObj.AddComponent<Image>();
+            _activeBikePreviewImage.preserveAspect = true;
+            _activeBikePreviewImage.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(_activeBikePreviewImage.rectTransform, 3f, 3f);
+
+            GameObject accentBarObj = new GameObject("ActiveBikeAccent");
+            accentBarObj.transform.SetParent(previewFrame.transform, false);
+            _activeBikeAccentBar = accentBarObj.AddComponent<Image>();
+            _activeBikeAccentBar.raycastTarget = false;
+            _activeBikeAccentBar.color = LobbyUiBuilder.ElectricCyan;
+            LobbyUiBuilder.PlaceBottomStretch(_activeBikeAccentBar.rectTransform, 4f);
+        }
+
+        private void BuildRightMapCarouselCard()
+        {
+            Image mapBox = LobbyUiBuilder.CreateCyberPanel(
+                _menuPanel.transform, "MapSelectorBox", LobbyUiBuilder.SurfaceContainer);
+            LobbyUiBuilder.PlaceTopLeft(mapBox.rectTransform, 612f, -350f, 636f, 272f);
+
+            GameObject stripObj = new GameObject("MapAccentStrip");
+            stripObj.transform.SetParent(mapBox.transform, false);
+            _mapAccentStrip = stripObj.AddComponent<Image>();
+            _mapAccentStrip.raycastTarget = false;
+            _mapAccentStrip.color = LobbyUiBuilder.ElectricCyan;
+            LobbyUiBuilder.PlaceTopLeft(_mapAccentStrip.rectTransform, 2f, -2f, 632f, 4f);
+
+            TMP_Text header = LobbyUiBuilder.CreateTmpText(
+                mapBox.transform, "MapBoxHeader", "BẢN ĐỒ THI ĐẤU (TRACK SELECT)", 11f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(header.rectTransform, 16f, -12f, 300f, 20f);
+
+            _mapStatusBadgeBg = LobbyUiBuilder.CreateCyberPanel(mapBox.transform, "MapStatusBadge", LobbyUiBuilder.ElectricCyan);
+            LobbyUiBuilder.PlaceTopRight(_mapStatusBadgeBg.rectTransform, -16f, -10f, 136f, 22f);
+            _mapStatusBadgeText = LobbyUiBuilder.CreateTmpText(
+                _mapStatusBadgeBg.transform, "BadgeTxt", "ĐÃ CHỌN", 10f, LobbyUiBuilder.OnCyan,
+                TextAlignmentOptions.Center, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.StretchFill(_mapStatusBadgeText.rectTransform, 4f, 1f);
+
+            // Banner stage with dark scrim for map title/meta
+            Image bannerStage = LobbyUiBuilder.CreateCyberPanel(mapBox.transform, "MapBannerStage", LobbyUiBuilder.SurfaceLowest);
+            LobbyUiBuilder.PlaceTopLeft(bannerStage.rectTransform, 12f, -38f, 612f, 146f);
+
+            GameObject bannerImgObj = new GameObject("MapBannerImg");
+            bannerImgObj.transform.SetParent(bannerStage.transform, false);
+            _mapBannerImage = bannerImgObj.AddComponent<Image>();
+            _mapBannerImage.preserveAspect = false;
+            _mapBannerImage.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(_mapBannerImage.rectTransform, 2f, 2f);
+
+            GameObject bannerScrimObj = new GameObject("MapBannerScrim");
+            bannerScrimObj.transform.SetParent(bannerStage.transform, false);
+            Image bannerScrim = bannerScrimObj.AddComponent<Image>();
+            bannerScrim.sprite = LobbyUiBuilder.GetSoftDarkScrimSprite();
+            bannerScrim.color = new Color(1f, 1f, 1f, 0.88f);
+            bannerScrim.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(bannerScrim.rectTransform, 2f, 2f);
+
+            Button prevMapBtn = LobbyUiBuilder.CreateCyberButton(
+                bannerStage.transform, "PrevMapBtn", "◀", LobbyUiBuilder.SurfaceLowest, Color.white, 18f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(prevMapBtn.GetComponent<RectTransform>(), 8f, -44f, 38f, 58f);
+            prevMapBtn.onClick.AddListener(() => StepMapFromLobby(-1));
+
+            Button nextMapBtn = LobbyUiBuilder.CreateCyberButton(
+                bannerStage.transform, "NextMapBtn", "▶", LobbyUiBuilder.SurfaceLowest, Color.white, 18f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(nextMapBtn.GetComponent<RectTransform>(), -8f, -44f, 38f, 58f);
+            nextMapBtn.onClick.AddListener(() => StepMapFromLobby(1));
+
+            _mapNameText = LobbyUiBuilder.CreateTmpText(
+                bannerStage.transform, "MapNameText", "MAP 01/04: PHỐ SÁNG BAN MAI", 20f, Color.white,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_mapNameText.rectTransform, 54f, -18f, 504f, 28f);
+
+            _mapMetaText = LobbyUiBuilder.CreateTmpText(
+                bannerStage.transform, "MapMetaText", "4 LÀN (16m)  •  ★★☆☆☆  •  x1.0  •  --:--.--", 11f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_mapMetaText.rectTransform, 54f, -48f, 504f, 20f);
+
+            _mapDescText = LobbyUiBuilder.CreateTmpText(
+                bannerStage.transform, "MapDescText", "Đường phố 4 làn cổ điển với khúc cua vừa phải.", 12f, LobbyUiBuilder.TextMuted,
+                TextAlignmentOptions.TopLeft, FontStyles.Normal, customTmpFont, wrap: true);
+            LobbyUiBuilder.PlaceTopLeft(_mapDescText.rectTransform, 54f, -72f, 376f, 60f);
+
+            _mapActionButton = LobbyUiBuilder.CreateCyberButton(
+                bannerStage.transform, "MapActionBtn", "✓ ĐANG CHỌN",
+                LobbyUiBuilder.ElectricCyan, LobbyUiBuilder.OnCyan, 13f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(_mapActionButton.GetComponent<RectTransform>(), -54f, -90f, 136f, 44f);
+            _mapActionBtnImg = _mapActionButton.GetComponent<Image>();
+            _mapActionBtnLabel = LobbyUiBuilder.GetPrimaryLabel(_mapActionButton);
+            _mapActionButton.onClick.AddListener(OnMapActionButtonClicked);
+
+            // Map quick tabs row
+            GameObject tabsObj = new GameObject("MapTabsRow");
+            tabsObj.transform.SetParent(mapBox.transform, false);
+            _mapTabsContainer = tabsObj.AddComponent<RectTransform>();
+            LobbyUiBuilder.PlaceTopLeft(_mapTabsContainer, 12f, -196f, 612f, 30f);
+            _mapTabs.Clear();
+
+            TMP_Text tabsHint = LobbyUiBuilder.CreateTmpText(
+                mapBox.transform, "TabsHint", "Chọn nhanh 4 cung đường đua Việt Nam • Bấm ◀ ▶ để xem trước nền đường",
+                10f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineLeft, FontStyles.Normal, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(tabsHint.rectTransform, 14f, -236f, 608f, 22f);
+        }
+
+        private void BuildSkinSelectorPanel()
+        {
+            _skinSelectorPanel = new GameObject("SkinSelectorPanel");
+            _skinSelectorPanel.transform.SetParent(_canvas.transform, false);
+            RectTransform rootRt = _skinSelectorPanel.AddComponent<RectTransform>();
+            LobbyUiBuilder.StretchFill(rootRt);
+
+            Image modalBackdrop = _skinSelectorPanel.AddComponent<Image>();
+            modalBackdrop.color = new Color(0.03f, 0.04f, 0.06f, 0.96f);
+
+            // Header bar
+            Image headerBar = LobbyUiBuilder.CreateCyberPanel(
+                _skinSelectorPanel.transform, "SkinModalHeader", LobbyUiBuilder.SurfaceLowest, LobbyUiBuilder.ElectricCyan);
+            LobbyUiBuilder.PlaceTop(headerBar.rectTransform, 0f, 1280f, 60f);
+            headerBar.rectTransform.anchorMin = new Vector2(0f, 1f);
+            headerBar.rectTransform.anchorMax = new Vector2(1f, 1f);
+            headerBar.rectTransform.sizeDelta = new Vector2(0f, 60f);
+
+            TMP_Text headerTitle = LobbyUiBuilder.CreateTmpText(
+                headerBar.transform, "SkinModalTitle", "CHỌN CHIẾN MÃ & TRANG PHỤC SHIPPER", 22f, Color.white,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(headerTitle.rectTransform, 32f, -12f, 680f, 36f);
+
+            Image walletPill = LobbyUiBuilder.CreateCyberPanel(headerBar.transform, "SkinWalletPill", LobbyUiBuilder.SurfaceHigh);
+            LobbyUiBuilder.PlaceTopRight(walletPill.rectTransform, -196f, -12f, 160f, 36f);
+            _skinModalWalletText = LobbyUiBuilder.CreateTmpText(
+                walletPill.transform, "WalletTxt", "0 XU", 13f, LobbyUiBuilder.SafetyAmber,
+                TextAlignmentOptions.Center, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.StretchFill(_skinModalWalletText.rectTransform, 6f, 2f);
+
+            Button backBtn = LobbyUiBuilder.CreateCyberButton(
+                headerBar.transform, "SkinBackBtn", "[ESC] QUAY LẠI",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 13f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopRight(backBtn.GetComponent<RectTransform>(), -24f, -12f, 156f, 36f);
+            backBtn.onClick.AddListener(CloseSkinSelector);
+
+            // Left Featured Bike Stage (x=32, y=-80, w=500, h=600)
+            Image stagePanel = LobbyUiBuilder.CreateCyberPanel(
+                _skinSelectorPanel.transform, "SkinFeaturedStage", LobbyUiBuilder.SurfaceLow);
+            LobbyUiBuilder.PlaceTopLeft(stagePanel.rectTransform, 32f, -80f, 500f, 600f);
+
+            _skinModalBrandTitle = LobbyUiBuilder.CreateTmpText(
+                stagePanel.transform, "StageBrandTitle", "XANH SM", 30f, LobbyUiBuilder.ElectricCyan,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Bold, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_skinModalBrandTitle.rectTransform, 24f, -20f, 452f, 38f);
+
+            _skinModalBrandTagline = LobbyUiBuilder.CreateTmpText(
+                stagePanel.transform, "StageBrandTagline", "Thuần điện Xanh Cyan", 14f, LobbyUiBuilder.TextMuted,
+                TextAlignmentOptions.MidlineLeft, FontStyles.Normal, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_skinModalBrandTagline.rectTransform, 24f, -60f, 452f, 24f);
+
+            Image previewBox = LobbyUiBuilder.CreateCyberPanel(stagePanel.transform, "StagePreviewBox", LobbyUiBuilder.SurfaceLowest);
+            LobbyUiBuilder.PlaceTopLeft(previewBox.rectTransform, 24f, -98f, 452f, 360f);
+
+            GameObject stageImgObj = new GameObject("StagePreviewImg");
+            stageImgObj.transform.SetParent(previewBox.transform, false);
+            _skinModalPreviewImage = stageImgObj.AddComponent<Image>();
+            _skinModalPreviewImage.preserveAspect = true;
+            _skinModalPreviewImage.raycastTarget = false;
+            LobbyUiBuilder.StretchFill(_skinModalPreviewImage.rectTransform, 4f, 4f);
+
+            GameObject stageAccent = new GameObject("StageAccent");
+            stageAccent.transform.SetParent(previewBox.transform, false);
+            _skinModalAccentBar = stageAccent.AddComponent<Image>();
+            _skinModalAccentBar.raycastTarget = false;
+            _skinModalAccentBar.color = LobbyUiBuilder.ElectricCyan;
+            LobbyUiBuilder.PlaceBottomStretch(_skinModalAccentBar.rectTransform, 5f);
+
+            TMP_Text stageHint = LobbyUiBuilder.CreateTmpText(
+                stagePanel.transform, "StageHint",
+                "Đổi màu xe & đồng phục trực tiếp trên đường đua • Tự động lưu lựa chọn",
+                12f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.Center, FontStyles.Normal, customTmpFont, wrap: true);
+            LobbyUiBuilder.PlaceTopLeft(stageHint.rectTransform, 24f, -474f, 452f, 40f);
+
+            Button confirmBtn = LobbyUiBuilder.CreateCyberButton(
+                stagePanel.transform, "ConfirmSkinBtn", "✓ XÁC NHẬN & QUAY LẠI",
+                LobbyUiBuilder.ElectricCyan, LobbyUiBuilder.OnCyan, 16f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(confirmBtn.GetComponent<RectTransform>(), 24f, -526f, 452f, 52f);
+            confirmBtn.onClick.AddListener(CloseSkinSelector);
+
+            // Right Fleet List (4 Brand Cards: x=556, y=-80, w=692)
+            _skinCards.Clear();
+            const float cardW = 692f;
+            const float cardH = 138f;
+            const float cardGap = 16f;
+
+            for (int i = 0; i < AllBrandOrder.Length; i++)
             {
-                Brand = brand,
-                CardBg = cardBg,
-                HeaderStrip = stripImg,
-                PreviewIcon = iconImg,
-                NameText = nameTxt,
-                TaglineText = tagTxt,
-                SelectBtnLabel = selectBtn.GetComponentInChildren<Text>(),
-                SelectBtnImg = selectBtn.GetComponent<Image>()
-            });
+                DriverBrandSkin brand = AllBrandOrder[i];
+                float cardY = -80f - i * (cardH + cardGap);
+                SkinCardWidgets card = LobbyUiBuilder.CreateSkinCard(
+                    _skinSelectorPanel.transform,
+                    brand,
+                    556f,
+                    cardY,
+                    cardW,
+                    cardH,
+                    b => SelectSkinFromLobby(b),
+                    customTmpFont);
+                _skinCards.Add(card);
+            }
+
+            _skinSelectorPanel.SetActive(false);
+        }
+
+        private void OnResetSaveClicked()
+        {
+            if (_confirmResetPending)
+            {
+                if (_gameManager != null)
+                {
+                    _gameManager.ResetSaveData();
+                }
+                else
+                {
+                    ResolveUpgradeSystem()?.ResetProgress();
+                    ResolveMapManager()?.ResetProgress();
+                }
+                _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
+                _confirmResetPending = false;
+                _mapFeedbackMsg = null;
+                SetLobbyFeedback("Đã đặt lại toàn bộ dữ liệu lưu!", LobbyUiBuilder.SuccessGreen);
+                RefreshMenu();
+            }
+            else
+            {
+                _confirmResetPending = true;
+                RefreshMenuDynamic();
+            }
+        }
+
+        private void AddDifficultyButton(Transform parent, float x, float y, float w, float h, DifficultyLevel level, string label)
+        {
+            Button btn = LobbyUiBuilder.CreateCyberButton(
+                parent, $"Diff_{level}", label,
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 12f, null, customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(btn.GetComponent<RectTransform>(), x, y, w, h);
+            _diffBtnImgs[level] = btn.GetComponent<Image>();
+            _diffBtnLabels[level] = LobbyUiBuilder.GetPrimaryLabel(btn);
+            btn.onClick.AddListener(() => SelectDifficultyFromLobby(level));
         }
 
         private Sprite ResolveBannerSprite()
@@ -1213,9 +1666,8 @@ namespace RacingGame
 
             if (_generatedBannerSprite != null) return _generatedBannerSprite;
 
-            // Sinh Banner mặc định mang 4 dải màu thương hiệu (Xanh SM, Shopee Food, Grab, Ahamove)
-            const int bw = 256;
-            const int bh = 48;
+            const int bw = 128;
+            const int bh = 32;
             Texture2D tex = new Texture2D(bw, bh, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Bilinear,
@@ -1224,10 +1676,10 @@ namespace RacingGame
 
             Color[] brandColors =
             {
-                new Color(0.00f, 0.72f, 0.71f), // Xanh SM
-                new Color(0.93f, 0.30f, 0.18f), // Shopee Food
-                new Color(0.00f, 0.69f, 0.31f), // Grab
-                new Color(0.96f, 0.50f, 0.13f)  // Ahamove
+                new Color(0.00f, 0.72f, 0.71f),
+                new Color(0.93f, 0.30f, 0.18f),
+                new Color(0.00f, 0.69f, 0.31f),
+                new Color(0.96f, 0.50f, 0.13f)
             };
 
             for (int y = 0; y < bh; y++)
@@ -1237,14 +1689,10 @@ namespace RacingGame
                 {
                     float u = x / (float)(bw - 1);
                     int stripe = Mathf.Clamp(Mathf.FloorToInt(u * 4f), 0, 3);
-                    Color baseDark = Color.Lerp(new Color(0.08f, 0.10f, 0.16f), new Color(0.16f, 0.20f, 0.28f), v);
+                    Color baseDark = Color.Lerp(new Color(0.04f, 0.06f, 0.09f), new Color(0.10f, 0.13f, 0.18f), v);
                     Color accent = brandColors[stripe];
-
-                    bool topOrBottomBorder = y < 4 || y >= bh - 4;
-                    Color c = topOrBottomBorder
-                        ? accent
-                        : Color.Lerp(baseDark, accent, 0.22f);
-                    tex.SetPixel(x, y, c);
+                    bool border = y < 3 || y >= bh - 3;
+                    tex.SetPixel(x, y, border ? accent : Color.Lerp(baseDark, accent, 0.28f));
                 }
             }
 
@@ -1253,41 +1701,27 @@ namespace RacingGame
             return _generatedBannerSprite;
         }
 
-        private void AddDifficultyButton(float x, float y, DifficultyLevel level, string label)
-        {
-            Button btn = RoadRashUiSprites.CreateBevelButton(_menuPanel.transform, $"Diff_{level}", label, RoadRashVisualTheme.MetalMid, 13);
-            PlaceTopLeft(btn.GetComponent<RectTransform>(), x, y, 82f, 30f);
-            _diffBtnImgs[level] = btn.GetComponent<Image>();
-            btn.onClick.AddListener(() =>
-            {
-                _gameManager?.SetDifficulty(level);
-                RefreshMenu();
-            });
-        }
-
         private void BuildGaragePanel()
         {
             _garagePanel = CreateCenteredPanel(_canvas.transform, "GaragePanel", 720f, 540f);
 
             Text title = RoadRashUiSprites.CreateStyledText(
                 _garagePanel.transform, "GarageTitle", "CỬA HÀNG NÂNG CẤP XE (GARAGE)", 26, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleCenter);
-            PlaceTop(title.rectTransform, -14f, 680f, 38f);
+            LobbyUiBuilder.PlaceTop(title.rectTransform, -14f, 680f, 38f);
 
             _garageMoneyText = RoadRashUiSprites.CreateStyledText(
                 _garagePanel.transform, "GarageMoney", "Tiền hiện có: $0", 18, RoadRashVisualTheme.AccentGreen, TextAnchor.MiddleCenter);
-            PlaceTop(_garageMoneyText.rectTransform, -54f, 680f, 26f);
+            LobbyUiBuilder.PlaceTop(_garageMoneyText.rectTransform, -54f, 680f, 26f);
 
             _garageStatsText = RoadRashUiSprites.CreateStyledText(
                 _garagePanel.transform, "GarageStats", "", 13, new Color(0.88f, 0.91f, 0.96f), TextAnchor.MiddleCenter);
-            PlaceTop(_garageStatsText.rectTransform, -82f, 680f, 22f);
+            LobbyUiBuilder.PlaceTop(_garageStatsText.rectTransform, -82f, 680f, 22f);
 
-            // Animated stat bars
             _speedBarFill = CreateStatBar("MAX SPD", 40f, -112f, new Color(0.95f, 0.72f, 0.18f));
             _powerBarFill = CreateStatBar("POWER", 205f, -112f, new Color(0.92f, 0.35f, 0.24f));
             _brakeBarFill = CreateStatBar("BRAKE", 370f, -112f, new Color(0.28f, 0.76f, 0.94f));
             _gripBarFill = CreateStatBar("GRIP", 535f, -112f, RoadRashVisualTheme.AccentGreen);
 
-            // 4 upgrade cards
             for (int i = 0; i < AllUpgradeTypes.Length; i++)
             {
                 UpgradeType type = AllUpgradeTypes[i];
@@ -1299,13 +1733,13 @@ namespace RacingGame
                 cardBg.sprite = RoadRashUiSprites.GetPanelSprite();
                 cardBg.type = Image.Type.Sliced;
                 cardBg.color = new Color(0.14f, 0.17f, 0.22f, 0.95f);
-                PlaceTop(cardBg.rectTransform, cardY, 664f, 66f);
+                LobbyUiBuilder.PlaceTop(cardBg.rectTransform, cardY, 664f, 66f);
 
                 Text cardTitle = RoadRashUiSprites.CreateStyledText(cardObj.transform, "CardTitle", "", 16, Color.white);
-                PlaceTopLeft(cardTitle.rectTransform, 16f, -6f, 280f, 24f);
+                LobbyUiBuilder.PlaceTopLeft(cardTitle.rectTransform, 16f, -6f, 280f, 24f);
 
                 Text cardEffect = RoadRashUiSprites.CreateStyledText(cardObj.transform, "CardEffect", "", 13, new Color(0.80f, 0.86f, 0.94f));
-                PlaceTopLeft(cardEffect.rectTransform, 16f, -34f, 430f, 22f);
+                LobbyUiBuilder.PlaceTopLeft(cardEffect.rectTransform, 16f, -34f, 430f, 22f);
 
                 UpgradeCardWidgets widgets = new UpgradeCardWidgets
                 {
@@ -1314,19 +1748,18 @@ namespace RacingGame
                     EffectText = cardEffect
                 };
 
-                // Level pips
                 for (int p = 0; p < CarUpgradeSystem.MaxUpgradeLevel; p++)
                 {
                     GameObject pip = new GameObject($"Pip_{p}");
                     pip.transform.SetParent(cardObj.transform, false);
                     Image pipImg = pip.AddComponent<Image>();
                     pipImg.raycastTarget = false;
-                    PlaceTopLeft(pipImg.rectTransform, 310f + p * 26f, -11f, 20f, 14f);
+                    LobbyUiBuilder.PlaceTopLeft(pipImg.rectTransform, 310f + p * 26f, -11f, 20f, 14f);
                     widgets.LevelPips.Add(pipImg);
                 }
 
                 Button buyBtn = RoadRashUiSprites.CreateBevelButton(cardObj.transform, "BuyBtn", "Nâng cấp", new Color(0.24f, 0.58f, 0.28f), 14);
-                PlaceTopLeft(buyBtn.GetComponent<RectTransform>(), 488f, -13f, 160f, 40f);
+                LobbyUiBuilder.PlaceTopLeft(buyBtn.GetComponent<RectTransform>(), 488f, -13f, 160f, 40f);
                 widgets.ButtonImg = buyBtn.GetComponent<Image>();
                 widgets.ButtonLabel = buyBtn.GetComponentInChildren<Text>();
                 buyBtn.onClick.AddListener(() => OnBuyUpgradeClicked(type));
@@ -1336,15 +1769,15 @@ namespace RacingGame
 
             _garageFeedbackText = RoadRashUiSprites.CreateStyledText(
                 _garagePanel.transform, "Feedback", "", 15, RoadRashVisualTheme.HudYellow, TextAnchor.MiddleCenter);
-            PlaceTop(_garageFeedbackText.rectTransform, -450f, 660f, 26f);
+            LobbyUiBuilder.PlaceTop(_garageFeedbackText.rectTransform, -450f, 660f, 26f);
             _garageFeedbackText.gameObject.SetActive(false);
 
             Button backBtn = RoadRashUiSprites.CreateBevelButton(_garagePanel.transform, "BackBtn", "QUAY LẠI SẢNH CHỜ", RoadRashVisualTheme.MetalMid, 16);
-            PlaceTopLeft(backBtn.GetComponent<RectTransform>(), 72f, -482f, 260f, 40f);
+            LobbyUiBuilder.PlaceTopLeft(backBtn.GetComponent<RectTransform>(), 72f, -482f, 260f, 40f);
             backBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
 
             Button raceBtn = RoadRashUiSprites.CreateBevelButton(_garagePanel.transform, "RaceNowBtn", "PLAY (ĐUA NGAY)", new Color(0.22f, 0.58f, 0.28f), 16);
-            PlaceTopLeft(raceBtn.GetComponent<RectTransform>(), 388f, -482f, 260f, 40f);
+            LobbyUiBuilder.PlaceTopLeft(raceBtn.GetComponent<RectTransform>(), 388f, -482f, 260f, 40f);
             raceBtn.onClick.AddListener(TriggerPlay);
 
             _garagePanel.SetActive(false);
@@ -1375,14 +1808,14 @@ namespace RacingGame
         private Image CreateStatBar(string label, float x, float y, Color fillColor)
         {
             Text lbl = RoadRashUiSprites.CreateStyledText(_garagePanel.transform, $"Lbl_{label}", label, 11, new Color(0.82f, 0.86f, 0.92f));
-            PlaceTopLeft(lbl.rectTransform, x, y, 70f, 18f);
+            LobbyUiBuilder.PlaceTopLeft(lbl.rectTransform, x, y, 70f, 18f);
 
             GameObject track = new GameObject($"Bar_{label}");
             track.transform.SetParent(_garagePanel.transform, false);
             Image trackImg = track.AddComponent<Image>();
             trackImg.color = new Color(0.14f, 0.16f, 0.20f, 1f);
             trackImg.raycastTarget = false;
-            PlaceTopLeft(trackImg.rectTransform, x + 64f, y + -3f, 82f, 12f);
+            LobbyUiBuilder.PlaceTopLeft(trackImg.rectTransform, x + 64f, y - 3f, 82f, 12f);
 
             GameObject fill = new GameObject("Fill");
             fill.transform.SetParent(track.transform, false);
@@ -1414,22 +1847,17 @@ namespace RacingGame
             return obj;
         }
 
-        private static void PlaceTop(RectTransform rt, float yOffset, float w, float h)
+        private static void DestroyUnityObject(Object obj)
         {
-            rt.anchorMin = new Vector2(0.5f, 1f);
-            rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, yOffset);
-            rt.sizeDelta = new Vector2(w, h);
-        }
-
-        private static void PlaceTopLeft(RectTransform rt, float x, float yOffset, float w, float h)
-        {
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            rt.anchoredPosition = new Vector2(x, yOffset);
-            rt.sizeDelta = new Vector2(w, h);
+            if (obj == null) return;
+            if (Application.isPlaying)
+            {
+                Destroy(obj);
+            }
+            else
+            {
+                DestroyImmediate(obj);
+            }
         }
     }
 }

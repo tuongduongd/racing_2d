@@ -12,6 +12,9 @@ namespace RacingGame
     /// </summary>
     public class GameManager : MonoBehaviour
     {
+        public const string SelectedLapsPrefKey = "RacingGame_SelectedLaps_v1";
+        public const string SelectedDifficultyPrefKey = "RacingGame_SelectedDifficulty_v1";
+
         [Header("Scene References")]
         [SerializeField] private WaypointTrack track;
         [SerializeField] private Car playerCar;
@@ -128,6 +131,8 @@ namespace RacingGame
         private void Start()
         {
             SetupReferences();
+            totalLaps = LoadSavedTotalLaps(totalLaps);
+            difficulty = LoadSavedDifficulty(difficulty);
             SpawnOrSyncOpponents();
             ApplyPlayerUpgrades();
             skinManager.ApplyToCar(playerCar);
@@ -447,15 +452,41 @@ namespace RacingGame
             TransitionTo(GameFlowState.MainMenu);
         }
 
+        public static int LoadSavedTotalLaps(int fallback = 3)
+        {
+            int fallbackClamped = Mathf.Clamp(fallback, 1, 10);
+            return Mathf.Clamp(PlayerPrefs.GetInt(SelectedLapsPrefKey, fallbackClamped), 1, 10);
+        }
+
+        public static void SaveTotalLapsPreference(int laps)
+        {
+            PlayerPrefs.SetInt(SelectedLapsPrefKey, Mathf.Clamp(laps, 1, 10));
+            PlayerPrefs.Save();
+        }
+
+        public static DifficultyLevel LoadSavedDifficulty(DifficultyLevel fallback = DifficultyLevel.Normal)
+        {
+            int raw = PlayerPrefs.GetInt(SelectedDifficultyPrefKey, (int)fallback);
+            return Enum.IsDefined(typeof(DifficultyLevel), raw) ? (DifficultyLevel)raw : fallback;
+        }
+
+        public static void SaveDifficultyPreference(DifficultyLevel level)
+        {
+            PlayerPrefs.SetInt(SelectedDifficultyPrefKey, (int)level);
+            PlayerPrefs.Save();
+        }
+
         public void SetDifficulty(DifficultyLevel newDifficulty)
         {
             difficulty = newDifficulty;
+            SaveDifficultyPreference(difficulty);
             ApplyDifficultyToAI();
         }
 
         public void SetTotalLaps(int laps)
         {
             totalLaps = Mathf.Clamp(laps, 1, 10);
+            SaveTotalLapsPreference(totalLaps);
             if (lapManager != null)
             {
                 lapManager.SetTotalLaps(totalLaps);
