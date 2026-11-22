@@ -81,14 +81,20 @@ namespace RacingGame
 
         // Post-Race Results Panel
         private GameObject _resultsPanel;
+        private TMP_Text _resultsTitleText;
+        private readonly List<Image> _resultRowBgs = new List<Image>();
         private readonly List<TMP_Text> _resultRows = new List<TMP_Text>();
         private TMP_Text _prizeText;
+        private Button _resultsRetryBtn;
+        private Button _resultsGarageBtn;
+        private Button _resultsMenuBtn;
 
         private int _lastCountdownWhole = -1;
         private float _countdownPopTimer;
 
         public Canvas HudCanvas => _canvas;
         public GameObject HudRoot => _hudRoot;
+        public GameObject ResultsPanel => _resultsPanel;
         public bool IsSubscribed => _isSubscribed;
         public string CurrentRankText => _rankText != null ? _rankText.text : string.Empty;
         public string CurrentSpeedText => _lcdSpeedText != null ? _lcdSpeedText.text : string.Empty;
@@ -97,11 +103,17 @@ namespace RacingGame
         public string CurrentLapText => _lapBottomText != null ? _lapBottomText.text : string.Empty;
         public string CurrentTimerText => _timerBottomText != null ? _timerBottomText.text : string.Empty;
         public string CurrentFlashText => _flashBannerText != null ? _flashBannerText.text : string.Empty;
+        public string CurrentPrizeText => _prizeText != null ? _prizeText.text : string.Empty;
         public bool IsFlashVisible => _flashBannerPanel != null && _flashBannerPanel.activeSelf;
         public bool IsCountdownVisible => _countdownPanel != null && _countdownPanel.activeSelf;
         public bool IsWrongWayVisible => _wrongWayPanel != null && _wrongWayPanel.activeSelf;
+        public bool IsResultsVisible => _resultsPanel != null && _resultsPanel.activeSelf;
         public int LeaderboardRowCount => _rankingRows.Count;
+        public int ResultRowCount => _resultRows.Count;
         public int MinimapDotCount => _mapDots.Count;
+        public Button ResultsRetryButton => _resultsRetryBtn;
+        public Button ResultsGarageButton => _resultsGarageBtn;
+        public Button ResultsMenuButton => _resultsMenuBtn;
 
         public void Bind(
             GameManager gameManager,
@@ -622,23 +634,45 @@ namespace RacingGame
             IReadOnlyList<RacerProgress> ranking = _lapManager.GetRanking();
             EnsureResultRows(ranking.Count);
 
+            int finishPos = _gameManager != null ? _gameManager.LastFinishPosition : 0;
+            if (_resultsTitleText != null)
+            {
+                _resultsTitleText.text = finishPos > 0
+                    ? $"🏆 HẠNG {finishPos} — KẾT QUẢ CUỘC ĐUA"
+                    : "KẾT QUẢ CUỘC ĐUA";
+            }
+
             for (int i = 0; i < _resultRows.Count; i++)
             {
                 bool active = i < ranking.Count;
-                _resultRows[i].gameObject.SetActive(active);
+                if (i < _resultRowBgs.Count && _resultRowBgs[i] != null)
+                {
+                    _resultRowBgs[i].gameObject.SetActive(active);
+                }
+                else
+                {
+                    _resultRows[i].gameObject.SetActive(active);
+                }
                 if (!active) continue;
 
                 RacerProgress r = ranking[i];
-                _resultRows[i].color = r.Car == _player ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.TextPrimary;
+                bool isPlayer = r.Car == _player;
+                if (i < _resultRowBgs.Count && _resultRowBgs[i] != null)
+                {
+                    _resultRowBgs[i].color = isPlayer
+                        ? new Color(0.00f, 0.30f, 0.36f, 0.90f)
+                        : LobbyUiBuilder.SurfaceContainer;
+                }
+                _resultRows[i].color = isPlayer ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.TextPrimary;
                 string finishTime = r.IsFinished ? FormatTime(r.FinishTime) : "đang chạy...";
                 string best = r.HasBestLap ? FormatTime(r.BestLapTime) : "--:--.--";
-                _resultRows[i].text = $"{i + 1}. {r.RacerName,-10}  {finishTime,-11}  Best {best}";
+                _resultRows[i].text = $"{i + 1,2}. {r.RacerName,-14}  {finishTime,-11}  Best {best}";
             }
 
             if (_prizeText != null && _gameManager != null)
             {
                 int totalMoney = _gameManager.UpgradeSystem != null ? _gameManager.UpgradeSystem.Money : 0;
-                _prizeText.text = $"Thưởng hạng {_gameManager.LastFinishPosition}: +${_gameManager.LastPrizeEarned}   |   Tổng tiền: ${totalMoney}";
+                _prizeText.text = $"Thưởng hạng {finishPos}: +${_gameManager.LastPrizeEarned}   |   Tổng tiền: ${totalMoney}";
             }
         }
 
@@ -1079,38 +1113,73 @@ namespace RacingGame
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(560f, 360f);
+            rt.sizeDelta = new Vector2(660f, 450f);
 
-            TMP_Text title = LobbyUiBuilder.CreateTmpText(
+            TMP_Text headerTag = LobbyUiBuilder.CreateTmpText(
+                _resultsPanel.transform, "ResultsHeaderTag", "● HOÀN THÀNH CHẶNG ĐUA // PODIUM TELEMETRY",
+                10f, LobbyUiBuilder.SafetyAmber, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+            LobbyUiBuilder.PlaceTopLeft(headerTag.rectTransform, 22f, -12f, 420f, 18f);
+
+            TMP_Text rightTag = LobbyUiBuilder.CreateTmpText(
+                _resultsPanel.transform, "ResultsRightTag", "RACE TELEMETRY",
+                9.5f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineRight, FontStyles.Bold);
+            LobbyUiBuilder.PlaceTopRight(rightTag.rectTransform, -22f, -12f, 160f, 18f);
+
+            _resultsTitleText = LobbyUiBuilder.CreateTmpText(
                 _resultsPanel.transform, "ResultsTitle", "KẾT QUẢ CUỘC ĐUA",
                 26f, LobbyUiBuilder.ElectricCyan, TextAlignmentOptions.Center, FontStyles.Bold);
-            LobbyUiBuilder.PlaceTop(title.rectTransform, -18f, 500f, 38f);
+            _resultsTitleText.enableAutoSizing = true;
+            _resultsTitleText.fontSizeMin = 18f;
+            _resultsTitleText.fontSizeMax = 26f;
+            LobbyUiBuilder.PlaceTop(_resultsTitleText.rectTransform, -34f, 616f, 36f);
+
+            Image tableHeaderBg = LobbyUiBuilder.CreateCyberPanel(
+                _resultsPanel.transform, "ResultsTableHeader", LobbyUiBuilder.SurfaceHigh);
+            tableHeaderBg.raycastTarget = false;
+            LobbyUiBuilder.PlaceTopLeft(tableHeaderBg.rectTransform, 22f, -76f, 616f, 26f);
+
+            TMP_Text tableHeaderTxt = LobbyUiBuilder.CreateTmpText(
+                tableHeaderBg.transform, "HeaderCols",
+                "HẠNG   •   TAY ĐUA                        THỜI GIAN ĐUA          BEST LAP",
+                10.5f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+            tableHeaderTxt.enableAutoSizing = true;
+            tableHeaderTxt.fontSizeMin = 8.5f;
+            tableHeaderTxt.fontSizeMax = 11f;
+            LobbyUiBuilder.StretchFill(tableHeaderTxt.rectTransform, 14f, 2f);
+
+            Image prizeCard = LobbyUiBuilder.CreateCyberPanel(
+                _resultsPanel.transform, "PrizeCard", LobbyUiBuilder.SurfaceContainer, LobbyUiBuilder.SuccessGreen);
+            prizeCard.raycastTarget = false;
+            LobbyUiBuilder.PlaceTopLeft(prizeCard.rectTransform, 22f, -316f, 616f, 48f);
 
             _prizeText = LobbyUiBuilder.CreateTmpText(
-                _resultsPanel.transform, "PrizeText", "",
-                17f, LobbyUiBuilder.SuccessGreen, TextAlignmentOptions.Center, FontStyles.Bold);
+                prizeCard.transform, "PrizeText", "Thưởng hạng 1: +$0   |   Tổng tiền: $0",
+                16f, LobbyUiBuilder.SuccessGreen, TextAlignmentOptions.Center, FontStyles.Bold);
             _prizeText.enableAutoSizing = true;
             _prizeText.fontSizeMin = 12f;
-            _prizeText.fontSizeMax = 18f;
-            SetAnchoredCenterBottom(_prizeText.rectTransform, 0f, 74f, 510f, 30f);
+            _prizeText.fontSizeMax = 17f;
+            LobbyUiBuilder.StretchFill(_prizeText.rectTransform, 14f, 4f);
 
-            Button raceBtn = LobbyUiBuilder.CreateCyberButton(
-                _resultsPanel.transform, "RetryBtn", "Đua lại [R]",
+            _resultsRetryBtn = LobbyUiBuilder.CreateCyberButton(
+                _resultsPanel.transform, "RetryBtn", "↻  Đua lại [R]",
                 LobbyUiBuilder.ElectricCyan, LobbyUiBuilder.OnCyan, 14f);
-            SetAnchoredCenterBottom(raceBtn.GetComponent<RectTransform>(), -168f, 18f, 154f, 40f);
-            raceBtn.onClick.AddListener(() => _gameManager?.StartRace());
+            EnableButtonLabelAutoSize(_resultsRetryBtn, 11f, 15f);
+            SetAnchoredCenterBottom(_resultsRetryBtn.GetComponent<RectTransform>(), -208f, 18f, 192f, 42f);
+            _resultsRetryBtn.onClick.AddListener(() => _gameManager?.StartRace());
 
-            Button garageBtn = LobbyUiBuilder.CreateCyberButton(
-                _resultsPanel.transform, "GarageBtn", "Nâng cấp xe",
+            _resultsGarageBtn = LobbyUiBuilder.CreateCyberButton(
+                _resultsPanel.transform, "GarageBtn", "⚙  Nâng cấp xe",
                 LobbyUiBuilder.SafetyAmber, LobbyUiBuilder.OnAmber, 14f);
-            SetAnchoredCenterBottom(garageBtn.GetComponent<RectTransform>(), 0f, 18f, 154f, 40f);
-            garageBtn.onClick.AddListener(() => _gameManager?.OpenGarage());
+            EnableButtonLabelAutoSize(_resultsGarageBtn, 11f, 15f);
+            SetAnchoredCenterBottom(_resultsGarageBtn.GetComponent<RectTransform>(), 0f, 18f, 192f, 42f);
+            _resultsGarageBtn.onClick.AddListener(() => _gameManager?.OpenGarage());
 
-            Button menuBtn = LobbyUiBuilder.CreateCyberButton(
-                _resultsPanel.transform, "ResultMenuBtn", "Về Menu [Esc]",
+            _resultsMenuBtn = LobbyUiBuilder.CreateCyberButton(
+                _resultsPanel.transform, "ResultMenuBtn", "⌂  Về Menu [Esc]",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 14f);
-            SetAnchoredCenterBottom(menuBtn.GetComponent<RectTransform>(), 168f, 18f, 154f, 40f);
-            menuBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
+            EnableButtonLabelAutoSize(_resultsMenuBtn, 11f, 15f);
+            SetAnchoredCenterBottom(_resultsMenuBtn.GetComponent<RectTransform>(), 208f, 18f, 192f, 42f);
+            _resultsMenuBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
 
             _resultsPanel.SetActive(false);
         }
@@ -1121,17 +1190,20 @@ namespace RacingGame
             while (_resultRows.Count < count)
             {
                 int idx = _resultRows.Count;
+                Image rowBg = LobbyUiBuilder.CreateCyberPanel(
+                    _resultsPanel.transform, $"ResRowBg_{idx}", LobbyUiBuilder.SurfaceContainer);
+                rowBg.raycastTarget = false;
+                LobbyUiBuilder.PlaceTopLeft(rowBg.rectTransform, 22f, -106f - idx * 32f, 616f, 28f);
+
                 TMP_Text row = LobbyUiBuilder.CreateTmpText(
-                    _resultsPanel.transform, $"ResRow_{idx}", "",
-                    15f, LobbyUiBuilder.TextPrimary, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+                    rowBg.transform, $"ResRow_{idx}", "",
+                    14f, LobbyUiBuilder.TextPrimary, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
                 row.enableAutoSizing = true;
-                row.fontSizeMin = 11f;
-                row.fontSizeMax = 16f;
-                row.rectTransform.anchorMin = new Vector2(0.5f, 1f);
-                row.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-                row.rectTransform.pivot = new Vector2(0.5f, 1f);
-                row.rectTransform.anchoredPosition = new Vector2(0f, -72f - idx * 28f);
-                row.rectTransform.sizeDelta = new Vector2(500f, 26f);
+                row.fontSizeMin = 10.5f;
+                row.fontSizeMax = 15f;
+                LobbyUiBuilder.StretchFill(row.rectTransform, 14f, 2f);
+
+                _resultRowBgs.Add(rowBg);
                 _resultRows.Add(row);
             }
         }

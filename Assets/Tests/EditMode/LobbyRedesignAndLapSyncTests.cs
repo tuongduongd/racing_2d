@@ -310,5 +310,116 @@ namespace RacingGame.Tests
                 Object.DestroyImmediate(trackGo);
             }
         }
+
+        [Test]
+        public void Stage4DModals_PauseOverlay_ControlsGuide_AndRaceResultsPanel_WorkWithTmpAndRealKeys()
+        {
+            var trackGo = new GameObject("Stage4DTrack");
+            var playerGo = new GameObject("Stage4DPlayer");
+            var aiGo = new GameObject("Stage4DAi");
+            var sysGo = new GameObject("Stage4DSystems");
+            CrtScanlineController crt = null;
+            Canvas hudCanvas = null;
+
+            try
+            {
+                var track = trackGo.AddComponent<WaypointTrack>();
+                track.BuildDefaultCircuit();
+
+                Vector2 wp0 = track.GetWaypoint(0);
+                Vector2 dir0 = track.GetTrackDirection(0);
+                float heading = Mathf.Atan2(dir0.y, dir0.x);
+
+                var playerCar = playerGo.AddComponent<Car>();
+                var playerDriver = playerGo.AddComponent<PlayerDriver>();
+                playerDriver.SetDriverName("Player");
+                playerCar.Initialize(playerDriver, wp0, heading, track);
+
+                var aiCar = aiGo.AddComponent<Car>();
+                var aiDriver = aiGo.AddComponent<AIRacerDriver>();
+                aiDriver.SetDriverName("Viper");
+                aiCar.Initialize(aiDriver, wp0 - dir0 * 3f, heading, track);
+
+                crt = sysGo.AddComponent<CrtScanlineController>();
+                crt.LoadSavedPreference();
+
+                var gm = sysGo.AddComponent<GameManager>();
+                var lapManager = sysGo.AddComponent<LapCheckpointManager>();
+                lapManager.Initialize(track, new[] { playerCar, aiCar }, 3);
+
+                var pauseUi = sysGo.AddComponent<PauseMenuUI>();
+                pauseUi.Bind(gm);
+
+                Assert.IsNotNull(pauseUi.PauseCanvas);
+                Assert.AreEqual(30, pauseUi.PauseCanvas.sortingOrder, "Pause overlay must stay at sortingOrder 30.");
+
+                gm.TransitionTo(GameFlowState.Racing);
+                gm.PauseGame();
+
+                Assert.IsTrue(pauseUi.IsShowing);
+                Assert.IsNotNull(pauseUi.ResumeButton);
+                Assert.IsNotNull(pauseUi.RestartButton);
+                Assert.IsNotNull(pauseUi.LobbyButton);
+                Assert.IsNotNull(pauseUi.QuitButton);
+                Assert.IsNotNull(pauseUi.CrtToggleButton);
+                Assert.IsNotNull(pauseUi.ControlsGuideButton);
+                Assert.GreaterOrEqual(pauseUi.PauseCanvas.GetComponentsInChildren<TMP_Text>(true).Length, 10);
+
+                // Controls Guide modal must display 100% real key bindings and toggle cleanly
+                Assert.IsFalse(pauseUi.IsControlsModalOpen);
+                pauseUi.OpenControlsModal();
+                Assert.IsTrue(pauseUi.IsControlsModalOpen);
+
+                TMP_Text[] modalLabels = pauseUi.ControlsModal.GetComponentsInChildren<TMP_Text>(true);
+                var labelSet = new System.Collections.Generic.HashSet<string>();
+                for (int i = 0; i < modalLabels.Length; i++)
+                {
+                    labelSet.Add(modalLabels[i].text);
+                }
+
+                string[] expectedKeys = { "W / ↑", "S / ↓", "A / D", "SPACE", "M", "R", "ESC / P" };
+                for (int i = 0; i < expectedKeys.Length; i++)
+                {
+                    Assert.IsTrue(labelSet.Contains(expectedKeys[i]), $"Missing real key binding '{expectedKeys[i]}' in Controls modal.");
+                }
+                Assert.IsFalse(labelSet.Contains("J"), "Controls modal must not show unimplemented keys.");
+
+                pauseUi.CloseControlsModal();
+                Assert.IsFalse(pauseUi.IsControlsModalOpen);
+
+                // CRT Scanline toggle from Pause overlay
+                bool prevCrt = crt.IsEnabled;
+                bool nextCrt = pauseUi.ToggleCrtFromPause();
+                Assert.AreEqual(!prevCrt, nextCrt);
+                Assert.AreEqual(nextCrt, crt.IsEnabled);
+
+                gm.ResumeGame();
+                Assert.IsFalse(pauseUi.IsShowing);
+
+                // Post-Race Results Panel in RaceHUD
+                var raceHud = sysGo.AddComponent<RaceHUD>();
+                raceHud.Bind(gm, playerCar, lapManager, track);
+                hudCanvas = raceHud.HudCanvas;
+
+                raceHud.RefreshHudImmediate(GameFlowState.Finished);
+                Assert.IsTrue(raceHud.IsResultsVisible);
+                Assert.AreEqual(2, raceHud.ResultRowCount);
+                StringAssert.Contains("+$", raceHud.CurrentPrizeText);
+                StringAssert.Contains("Tổng tiền: $", raceHud.CurrentPrizeText);
+                Assert.IsNotNull(raceHud.ResultsRetryButton);
+                Assert.IsNotNull(raceHud.ResultsGarageButton);
+                Assert.IsNotNull(raceHud.ResultsMenuButton);
+            }
+            finally
+            {
+                Time.timeScale = 1f;
+                if (crt != null) crt.ReleaseRuntimeResources();
+                if (hudCanvas != null) Object.DestroyImmediate(hudCanvas.gameObject);
+                Object.DestroyImmediate(sysGo);
+                Object.DestroyImmediate(aiGo);
+                Object.DestroyImmediate(playerGo);
+                Object.DestroyImmediate(trackGo);
+            }
+        }
     }
 }
