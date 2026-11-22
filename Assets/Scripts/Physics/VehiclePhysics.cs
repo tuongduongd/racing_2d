@@ -135,6 +135,27 @@ namespace RacingGame
             velocity *= Mathf.Clamp01(factor);
         }
 
+        /// <summary>
+        /// Smoothly aligns vehicle heading toward a target angle (used for barrier sliding and low-speed off-road recovery).
+        /// </summary>
+        public void AlignHeadingToward(float targetHeadingRad, float maxStepRad)
+        {
+            if (maxStepRad <= 0f) return;
+            float delta = NormalizeAngle(targetHeadingRad - heading);
+            float step = Mathf.Clamp(delta, -maxStepRad, maxStepRad);
+            heading = NormalizeAngle(heading + step);
+        }
+
+        public void SetVelocity(Vector2 newVelocity)
+        {
+            velocity = newVelocity;
+        }
+
+        public void SetHeading(float newHeadingRad)
+        {
+            heading = NormalizeAngle(newHeadingRad);
+        }
+
         public void Update(float dt)
         {
             if (dt <= 0f) return;

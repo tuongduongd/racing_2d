@@ -268,8 +268,9 @@ namespace RacingGame.Tests
                 const float firstRowOffset = 4f;
                 const float rowSpacing = 6.5f;
 
-                // AI cars occupy slots 0..3, Player occupies slot 4
+                // All 4 AI opponents line up abreast on row 0; Player starts centered behind them on row 1
                 int aiSlot = 0;
+                HashSet<float> seenAiOffsets = new HashSet<float>();
                 for (int i = 0; i < gm.AllCars.Count; i++)
                 {
                     Car car = gm.AllCars[i];
@@ -284,25 +285,34 @@ namespace RacingGame.Tests
                         continue;
                     }
 
-                    int slot = car == playerCar ? 4 : aiSlot++;
-                    int row = slot / 2;
-                    float expectedSlotLat = (slot % 2 == 0) ? -cfg.expectedInnerOffset : cfg.expectedInnerOffset;
-                    Vector2 expectedPos = origin - dir * (firstRowOffset + row * rowSpacing) + right * expectedSlotLat;
+                    bool isPlayerCar = car == playerCar;
+                    int aiIndex = isPlayerCar ? -1 : aiSlot++;
+                    float expectedSlotLat = isPlayerCar
+                        ? 0f
+                        : GameManager.GetAbreastGridLateralOffset(track, aiIndex, 4);
+                    float expectedBackDist = isPlayerCar ? (firstRowOffset + rowSpacing) : firstRowOffset;
+                    Vector2 expectedPos = origin - dir * expectedBackDist + right * expectedSlotLat;
 
                     Assert.AreEqual(expectedPos.x, car.Physics.Position.x, 0.01f,
-                        $"Slot {slot} X mismatch on {cfg.lanes}-lane grid.");
+                        $"Car {i} X mismatch on {cfg.lanes}-lane abreast grid.");
                     Assert.AreEqual(expectedPos.y, car.Physics.Position.y, 0.01f,
-                        $"Slot {slot} Y mismatch on {cfg.lanes}-lane grid.");
+                        $"Car {i} Y mismatch on {cfg.lanes}-lane abreast grid.");
                     Assert.AreEqual(expectedSlotLat, car.LateralOffset, 0.01f,
-                        $"Slot {slot} LateralOffset must align to inner lane center on {cfg.lanes} lanes.");
+                        $"Car {i} LateralOffset must align abreast on {cfg.lanes} lanes.");
                     Assert.Less(Mathf.Abs(car.LateralOffset), halfTrack,
-                        $"Slot {slot} must be strictly inside track bounds on {cfg.lanes} lanes.");
+                        $"Car {i} must be strictly inside track bounds on {cfg.lanes} lanes.");
                     Assert.IsTrue(track.ProjectPosition(car.Physics.Position).isOnTrack,
-                        $"Slot {slot} must project onto track on {cfg.lanes} lanes.");
+                        $"Car {i} must project onto track on {cfg.lanes} lanes.");
+
+                    if (!isPlayerCar)
+                    {
+                        Assert.IsTrue(seenAiOffsets.Add(Mathf.Round(car.LateralOffset * 100f) / 100f),
+                            $"AI opponents must occupy distinct abreast lateral positions on {cfg.lanes} lanes.");
+                    }
 
                     if (car.Driver is AIRacerDriver aiDriver)
                     {
-                        float expectedPreferred = GameManager.GetAiPreferredLateralOffset(track, slot);
+                        float expectedPreferred = GameManager.GetAiPreferredLateralOffset(track, aiIndex);
                         Assert.AreEqual(expectedPreferred, aiDriver.PreferredLateralOffset, 0.001f);
                         Assert.Less(Mathf.Abs(aiDriver.PreferredLateralOffset), halfTrack,
                             $"AI preferred lateral offset must be inside track bounds on {cfg.lanes} lanes.");

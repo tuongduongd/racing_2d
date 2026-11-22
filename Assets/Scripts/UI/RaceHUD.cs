@@ -89,8 +89,26 @@ namespace RacingGame
         private Button _resultsGarageBtn;
         private Button _resultsMenuBtn;
 
+        private static readonly string[] GearLabels = { "G1", "G2", "G3", "G4", "G5", "G6" };
+
         private int _lastCountdownWhole = -1;
         private float _countdownPopTimer;
+
+        // Dirty-check caches preventing per-frame TMP AutoSize & Canvas layout rebuilds
+        private int _lastDisplayedKmh = int.MinValue;
+        private int _lastDisplayedGear = -1;
+        private int _lastTrackStateCode = -1;
+        private int _lastLitRpmCount = -1;
+        private int _lastDisplayedRank = int.MinValue;
+        private int _lastDisplayedLap = -1;
+        private int _lastDisplayedTotalLaps = -1;
+        private int _lastDisplayedBestLapCentis = -2;
+        private int _lastDisplayedTimerCentis = -1;
+        private int _lastDisplayedMuteState = -1;
+        private int _lastDisplayedRacerCount = -1;
+        private int _lastRankingBoxRowCount = -1;
+        private float _nextLeaderboardRefreshTime = -1f;
+        private readonly List<string> _lastRankingRowTexts = new List<string>();
 
         public Canvas HudCanvas => _canvas;
         public GameObject HudRoot => _hudRoot;
@@ -135,6 +153,7 @@ namespace RacingGame
                         : _gameManager.GetComponent<TrackObstacleSystem>())
                     : null);
             _isBound = true;
+            ResetHudDirtyCaches();
 
             EnsureBuilt();
             if (isActiveAndEnabled)
@@ -144,6 +163,24 @@ namespace RacingGame
 
             RebuildMinimapTexture();
             ClearMessage();
+        }
+
+        private void ResetHudDirtyCaches()
+        {
+            _lastDisplayedKmh = int.MinValue;
+            _lastDisplayedGear = -1;
+            _lastTrackStateCode = -1;
+            _lastLitRpmCount = -1;
+            _lastDisplayedRank = int.MinValue;
+            _lastDisplayedLap = -1;
+            _lastDisplayedTotalLaps = -1;
+            _lastDisplayedBestLapCentis = -2;
+            _lastDisplayedTimerCentis = -1;
+            _lastDisplayedMuteState = -1;
+            _lastDisplayedRacerCount = -1;
+            _lastRankingBoxRowCount = -1;
+            _nextLeaderboardRefreshTime = -1f;
+            _lastRankingRowTexts.Clear();
         }
 
         public void ClearMessage()
@@ -160,14 +197,14 @@ namespace RacingGame
             EnsureBuilt();
             if (_player != null)
             {
-                UpdateDashboardCluster();
+                UpdateDashboardCluster(force: true);
             }
             if (_lapManager != null)
             {
-                UpdateTopCenterRank();
-                UpdateBottomRightStatus();
+                UpdateTopCenterRank(force: true);
+                UpdateBottomRightStatus(force: true);
             }
-            UpdateLeaderboardAndButtons();
+            UpdateLeaderboardAndButtons(force: true);
             UpdateMinimapDots();
 
             GameFlowState state = stateOverride ?? (_gameManager != null ? _gameManager.CurrentFlowState : GameFlowState.Racing);
@@ -209,6 +246,7 @@ namespace RacingGame
             if (_gameManager != null)
             {
                 _gameManager.RacerKicked += HandleRacerKicked;
+                _gameManager.PlayerRecoveredToTrack += HandlePlayerRecovered;
                 attachedAny = true;
             }
 
@@ -237,6 +275,7 @@ namespace RacingGame
             if (_gameManager != null)
             {
                 _gameManager.RacerKicked -= HandleRacerKicked;
+                _gameManager.PlayerRecoveredToTrack -= HandlePlayerRecovered;
                 if (_gameManager.ObstacleSystem != null)
                 {
                     _gameManager.ObstacleSystem.ObstacleHit -= HandleObstacleHit;
@@ -255,7 +294,7 @@ namespace RacingGame
         {
             if (this == null || !isActiveAndEnabled) return;
             if (car != _player || obstacle == null) return;
-            ShowFlash("⚠ VA CHẠM CHƯỚNG NGẠI VẬT!", LobbyUiBuilder.DangerRed, 1.0f);
+            ShowFlash("! VA CHẠM CHƯỚNG NGẠI VẬT!", LobbyUiBuilder.DangerRed, 1.0f);
         }
 
         private void HandleLapCompleted(RacerProgress progress)
@@ -284,8 +323,15 @@ namespace RacingGame
             }
             else if (target == _player)
             {
-                ShowFlash("⚠ BỊ ĐỐI THỦ ĐÁ!", LobbyUiBuilder.DangerRed, 1.0f);
+                ShowFlash("! BỊ ĐỐI THỦ ĐÁ!", LobbyUiBuilder.DangerRed, 1.0f);
             }
+        }
+
+        private void HandlePlayerRecovered(Car recoveredCar)
+        {
+            if (this == null || !isActiveAndEnabled) return;
+            if (recoveredCar != _player) return;
+            ShowFlash(">> ĐÃ ĐƯA XE VỀ ĐƯỜNG ĐUA!", LobbyUiBuilder.ElectricCyan, 1.25f);
         }
 
         private void ShowFlash(string msg, Color color, float duration = -1f)
@@ -314,15 +360,15 @@ namespace RacingGame
             }
             if (!visible) return;
 
-            UpdateDashboardCluster();
-            UpdateTopCenterRank();
-            UpdateBottomRightStatus();
-            UpdateLeaderboardAndButtons();
+            UpdateDashboardCluster(force: false);
+            UpdateTopCenterRank(force: false);
+            UpdateBottomRightStatus(force: false);
+            UpdateLeaderboardAndButtons(force: false);
             UpdateMinimapDots();
             UpdateStateOverlays(state);
         }
 
-        private void UpdateDashboardCluster()
+        private void UpdateDashboardCluster(bool force = false)
         {
             if (_player == null || _player.Physics == null) return;
 
@@ -330,38 +376,53 @@ namespace RacingGame
             int kmh = Mathf.RoundToInt(Mathf.Abs(_player.Physics.SpeedKmh));
             float speedNorm = Mathf.Clamp01(absSpeed / Mathf.Max(1f, _player.Physics.MaxSpeed));
 
-            if (_lcdSpeedText != null)
+            if (_lcdSpeedText != null && (force || kmh != _lastDisplayedKmh))
             {
+                _lastDisplayedKmh = kmh;
                 _lcdSpeedText.text = kmh.ToString("000");
             }
 
             if (_lcdGearText != null)
             {
                 int gear = Mathf.Clamp(1 + Mathf.FloorToInt(speedNorm * 5.9f), 1, 6);
-                _lcdGearText.text = $"G{gear}";
+                if (force || gear != _lastDisplayedGear)
+                {
+                    _lastDisplayedGear = gear;
+                    _lcdGearText.text = GearLabels[gear - 1];
+                }
             }
 
             if (_trackStateText != null)
             {
                 bool policeNear = _gameManager != null && _gameManager.PoliceController != null &&
                                   _gameManager.PoliceController.IsPlayerInWarningRange;
-                if (!_player.IsOnTrack)
+                int stateCode = !_player.IsOnTrack ? 1 : (policeNear ? 2 : 0);
+
+                if (force || stateCode != _lastTrackStateCode)
                 {
-                    _trackStateText.text = "OFF-ROAD!";
-                    _trackStateText.color = LobbyUiBuilder.DangerRed;
-                    if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = new Color(0.32f, 0.06f, 0.08f, 0.96f);
+                    _lastTrackStateCode = stateCode;
+                    if (stateCode == 1)
+                    {
+                        _trackStateText.text = "OFF-ROAD!";
+                        _trackStateText.color = LobbyUiBuilder.DangerRed;
+                        if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = new Color(0.32f, 0.06f, 0.08f, 0.96f);
+                    }
+                    else if (stateCode == 2)
+                    {
+                        _trackStateText.text = "CẢNH SÁT ĐUỔI!";
+                        if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = new Color(0.28f, 0.08f, 0.14f, 0.96f);
+                    }
+                    else
+                    {
+                        _trackStateText.text = "ON ROAD";
+                        _trackStateText.color = LobbyUiBuilder.SuccessGreen;
+                        if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = LobbyUiBuilder.SurfaceContainer;
+                    }
                 }
-                else if (policeNear)
+
+                if (stateCode == 2 && _gameManager != null && _gameManager.PoliceController != null)
                 {
-                    _trackStateText.text = "CẢNH SÁT ĐUỔI!";
                     _trackStateText.color = _gameManager.PoliceController.CurrentSirenColor;
-                    if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = new Color(0.28f, 0.08f, 0.14f, 0.96f);
-                }
-                else
-                {
-                    _trackStateText.text = "ON ROAD";
-                    _trackStateText.color = LobbyUiBuilder.SuccessGreen;
-                    if (_trackStateBadgeBg != null) _trackStateBadgeBg.color = LobbyUiBuilder.SurfaceContainer;
                 }
             }
 
@@ -380,26 +441,33 @@ namespace RacingGame
             if (_rpmSegments.Count > 0)
             {
                 int litCount = Mathf.RoundToInt(rpmNorm * _rpmSegments.Count);
-                for (int i = 0; i < _rpmSegments.Count; i++)
+                if (force || litCount != _lastLitRpmCount)
                 {
-                    if (i < litCount)
+                    _lastLitRpmCount = litCount;
+                    for (int i = 0; i < _rpmSegments.Count; i++)
                     {
-                        _rpmSegments[i].color = i >= 10
-                            ? LobbyUiBuilder.DangerRed
-                            : (i >= 7 ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.ElectricCyan);
-                    }
-                    else
-                    {
-                        _rpmSegments[i].color = LobbyUiBuilder.SurfaceHigh;
+                        if (i < litCount)
+                        {
+                            _rpmSegments[i].color = i >= 10
+                                ? LobbyUiBuilder.DangerRed
+                                : (i >= 7 ? LobbyUiBuilder.SafetyAmber : LobbyUiBuilder.ElectricCyan);
+                        }
+                        else
+                        {
+                            _rpmSegments[i].color = LobbyUiBuilder.SurfaceHigh;
+                        }
                     }
                 }
             }
         }
 
-        private void UpdateTopCenterRank()
+        private void UpdateTopCenterRank(bool force = false)
         {
             if (_rankText == null || _lapManager == null) return;
             int pos = _lapManager.GetPosition(_player);
+            if (!force && pos == _lastDisplayedRank) return;
+            _lastDisplayedRank = pos;
+
             _rankText.text = FormatOrdinal(pos);
             _rankText.color = pos == 1 ? LobbyUiBuilder.ElectricCyan : LobbyUiBuilder.SafetyAmber;
 
@@ -420,47 +488,80 @@ namespace RacingGame
             }
         }
 
-        private void UpdateBottomRightStatus()
+        private void UpdateBottomRightStatus(bool force = false)
         {
             if (_lapManager == null) return;
             RacerProgress progress = _lapManager.GetProgress(_player);
             if (_lapBottomText != null && progress != null)
             {
                 int curLap = Mathf.Min(progress.CompletedLaps + 1, _lapManager.TotalLaps);
-                _lapBottomText.text = $"LAP {curLap}/{_lapManager.TotalLaps}";
+                int totalLaps = _lapManager.TotalLaps;
+                if (force || curLap != _lastDisplayedLap || totalLaps != _lastDisplayedTotalLaps)
+                {
+                    _lastDisplayedLap = curLap;
+                    _lastDisplayedTotalLaps = totalLaps;
+                    _lapBottomText.text = $"LAP {curLap}/{totalLaps}";
+                }
             }
             if (_timerBottomText != null)
             {
-                _timerBottomText.text = FormatTime(_lapManager.RaceTime);
+                int timerCentis = Mathf.FloorToInt(Mathf.Max(0f, _lapManager.RaceTime) * 100f);
+                if (force || timerCentis != _lastDisplayedTimerCentis)
+                {
+                    _lastDisplayedTimerCentis = timerCentis;
+                    _timerBottomText.text = FormatTime(_lapManager.RaceTime);
+                }
             }
             if (_bestLapBottomText != null)
             {
-                _bestLapBottomText.text = progress != null && progress.HasBestLap
-                    ? FormatTime(progress.BestLapTime)
-                    : "--:--.--";
+                int bestCentis = progress != null && progress.HasBestLap
+                    ? Mathf.FloorToInt(Mathf.Max(0f, progress.BestLapTime) * 100f)
+                    : -1;
+                if (force || bestCentis != _lastDisplayedBestLapCentis)
+                {
+                    _lastDisplayedBestLapCentis = bestCentis;
+                    _bestLapBottomText.text = progress != null && progress.HasBestLap
+                        ? FormatTime(progress.BestLapTime)
+                        : "--:--.--";
+                }
             }
         }
 
-        private void UpdateLeaderboardAndButtons()
+        private void UpdateLeaderboardAndButtons(bool force = false)
         {
             if (_muteBtnLabel != null && _gameManager != null && _gameManager.AudioController != null)
             {
-                _muteBtnLabel.text = _gameManager.AudioController.IsMuted ? "Âm: TẮT [M]" : "Âm: BẬT [M]";
+                int muteState = _gameManager.AudioController.IsMuted ? 1 : 0;
+                if (force || muteState != _lastDisplayedMuteState)
+                {
+                    _lastDisplayedMuteState = muteState;
+                    _muteBtnLabel.text = muteState == 1 ? "Âm: TẮT [M]" : "Âm: BẬT [M]";
+                }
             }
 
             if (_lapManager == null) return;
+            if (!force && Time.unscaledTime < _nextLeaderboardRefreshTime)
+            {
+                return;
+            }
+            _nextLeaderboardRefreshTime = Time.unscaledTime + 0.10f;
+
             IReadOnlyList<RacerProgress> ranking = _lapManager.GetRanking();
             EnsureRankingRows(ranking.Count);
 
-            if (_racerCountText != null)
+            if (_racerCountText != null && (force || ranking.Count != _lastDisplayedRacerCount))
             {
+                _lastDisplayedRacerCount = ranking.Count;
                 _racerCountText.text = $"{ranking.Count} TAY ĐUA";
             }
 
             for (int i = 0; i < _rankingRows.Count; i++)
             {
                 bool active = i < ranking.Count;
-                _rankingRows[i].gameObject.SetActive(active);
+                if (_rankingRows[i].gameObject.activeSelf != active)
+                {
+                    _rankingRows[i].gameObject.SetActive(active);
+                }
                 if (!active) continue;
 
                 RacerProgress r = ranking[i];
@@ -471,11 +572,19 @@ namespace RacingGame
                 string st = r.IsFinished
                     ? FormatTime(r.FinishTime)
                     : $"L{Mathf.Min(r.CompletedLaps + 1, _lapManager.TotalLaps)}/{_lapManager.TotalLaps}";
-                _rankingRows[i].text = $"{i + 1}. {r.RacerName,-9} {st}";
+                string rowText = $"{i + 1}. {r.RacerName,-9} {st}";
+
+                while (_lastRankingRowTexts.Count <= i) _lastRankingRowTexts.Add(null);
+                if (force || !string.Equals(_lastRankingRowTexts[i], rowText, System.StringComparison.Ordinal))
+                {
+                    _lastRankingRowTexts[i] = rowText;
+                    _rankingRows[i].text = rowText;
+                }
             }
 
-            if (_rankingBoxRect != null)
+            if (_rankingBoxRect != null && (force || ranking.Count != _lastRankingBoxRowCount))
             {
+                _lastRankingBoxRowCount = ranking.Count;
                 _rankingBoxRect.sizeDelta = new Vector2(296f, 40f + ranking.Count * 23f);
             }
         }
@@ -520,7 +629,10 @@ namespace RacingGame
                 _mapDots[i].color = isPlayer
                     ? (car.IsOnTrack ? LobbyUiBuilder.ElectricCyan : LobbyUiBuilder.DangerRed)
                     : car.BikeColor;
-                if (isPlayer) rt.SetAsLastSibling();
+                if (isPlayer && rt.GetSiblingIndex() != _minimapRect.childCount - 1)
+                {
+                    rt.SetAsLastSibling();
+                }
             }
         }
 
@@ -985,7 +1097,7 @@ namespace RacingGame
             }
 
             TMP_Text hintStrip = LobbyUiBuilder.CreateTmpText(
-                dashBg.transform, "DashHint", "W/S/A/D: LÁI  •  [SPACE]: ĐẠP ĐỐI THỦ",
+                dashBg.transform, "DashHint", "W/S/A/D: LÁI  •  [SPACE]: ĐÁ  •  [R]: ĐUA LẠI",
                 9.5f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
             hintStrip.enableAutoSizing = true;
             hintStrip.fontSizeMin = 8f;

@@ -390,7 +390,7 @@ namespace RacingGame
             });
 
             _quitButton = LobbyUiBuilder.CreateCyberButton(
-                btnStack.transform, "QuitGameBtn", "✕   THOÁT GAME (QUIT GAME)",
+                btnStack.transform, "QuitGameBtn", "X   THOÁT GAME (QUIT GAME)",
                 new Color(0.54f, 0.14f, 0.16f, 1f), Color.white, 14f);
             EnableButtonLabelAutoSize(_quitButton, 11.5f, 15f);
             _quitButton.onClick.AddListener(() =>
@@ -439,7 +439,7 @@ namespace RacingGame
             LobbyUiBuilder.PlaceTopLeft(badge.rectTransform, 24f, -14f, 420f, 18f);
 
             Button closeXBtn = LobbyUiBuilder.CreateCyberButton(
-                _controlsModal.transform, "CloseControlsXBtn", "✕",
+                _controlsModal.transform, "CloseControlsXBtn", "X",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 14f);
             LobbyUiBuilder.PlaceTopRight(closeXBtn.GetComponent<RectTransform>(), -20f, -14f, 38f, 34f);
             closeXBtn.onClick.AddListener(CloseControlsModal);
@@ -460,7 +460,7 @@ namespace RacingGame
             LobbyUiBuilder.PlaceTopLeft(listRt, 24f, -86f, 592f, 378f);
 
             VerticalLayoutGroup vlg = listObj.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 8f;
+            vlg.spacing = 6f;
             vlg.padding = new RectOffset(0, 0, 2, 2);
             vlg.childControlWidth = true;
             vlg.childControlHeight = true;

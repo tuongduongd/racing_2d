@@ -319,7 +319,8 @@ namespace RacingGame
             float step = 4f;
             Vector2 tanNext = SampleTangentRaw(s + step);
             float angleDiff = SignedAngleRad(tangent, tanNext);
-            float curvature = angleDiff / step;
+            // Positive curvature = right turn (CW), negative = left turn (CCW), matching visual curve projection & chevrons
+            float curvature = -angleDiff / step;
 
             float normalizedS = (s / _totalLength) * Mathf.PI * 2f;
             float elevation = Mathf.Sin(normalizedS * _elevationFrequency) * _elevationAmplitude +

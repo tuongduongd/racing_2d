@@ -37,6 +37,8 @@ namespace RacingGame
         [SerializeField] private int totalLaps = 3;
         [SerializeField] private float countdownDuration = 3f;
         [SerializeField] private float bikeCollisionRadius = 1.3f;
+        [SerializeField, Range(0f, 1f)] private float collisionRestitution = 0.68f;
+        [SerializeField, Range(0f, 1f)] private float collisionFriction = 0.28f;
         [SerializeField] private DifficultyLevel difficulty = DifficultyLevel.Normal;
         [SerializeField] private bool startInMainMenu = true;
 
@@ -70,6 +72,7 @@ namespace RacingGame
 
         public event Action<Car, Car, Vector2> RacerKicked;
         public event Action<Car, Car, Vector2> RacersCollided;
+        public event Action<Car> PlayerRecoveredToTrack;
 
         public IReadOnlyList<Car> AllCars => _allCars;
         public Car PlayerCar => playerCar;
@@ -546,17 +549,29 @@ namespace RacingGame
             Vector2 right = new Vector2(dir.y, -dir.x);
             float heading = Mathf.Atan2(dir.y, dir.x);
 
-            int slot = 0;
+            int aiCount = 0;
             for (int i = 0; i < _aiDrivers.Count; i++)
             {
-                Car aiCar = _aiDrivers[i].GetComponent<Car>();
+                if (_aiDrivers[i] != null && _aiDrivers[i].GetComponent<Car>() != null)
+                {
+                    aiCount++;
+                }
+            }
+
+            int aiIdx = 0;
+            for (int i = 0; i < _aiDrivers.Count; i++)
+            {
+                Car aiCar = _aiDrivers[i] != null ? _aiDrivers[i].GetComponent<Car>() : null;
                 if (aiCar == null) continue;
-                aiCar.Initialize(_aiDrivers[i], GridSlotPosition(slot++, origin, dir, right), heading, track);
+                float lat = GetAbreastGridLateralOffset(track, aiIdx++, aiCount);
+                Vector2 aiPos = origin - dir * gridFirstRowOffset + right * lat;
+                aiCar.Initialize(_aiDrivers[i], aiPos, heading, track);
             }
 
             if (playerCar != null)
             {
-                playerCar.Initialize(playerDriver, GridSlotPosition(slot, origin, dir, right), heading, track);
+                Vector2 playerPos = origin - dir * (gridFirstRowOffset + gridRowSpacing);
+                playerCar.Initialize(playerDriver, playerPos, heading, track);
             }
 
             EnsurePoliceSetup();
@@ -577,6 +592,25 @@ namespace RacingGame
 
             if (lapManager != null) lapManager.ResetRace();
             if (raceHud != null) raceHud.ClearMessage();
+        }
+
+        /// <summary>
+        /// Immediately repositions the player back onto the nearest road center when requested manually ([F] / [Backspace]).
+        /// </summary>
+        public bool RecoverPlayerToTrack(bool automatic = false)
+        {
+            if (playerCar == null || track == null || track.WaypointCount < 2)
+            {
+                return false;
+            }
+
+            TrackProjection proj = track.ProjectPosition(playerCar.Physics.Position);
+            float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
+            playerCar.ResetToTrackPoint(proj.closestPoint, trackHeading, track);
+            playerCar.Physics.ApplyVelocityImpulse(proj.tangent * 14f);
+
+            PlayerRecoveredToTrack?.Invoke(playerCar);
+            return true;
         }
 
         public void StepRaceSimulation(float dt)
@@ -752,11 +786,31 @@ namespace RacingGame
             return targetTrack.GetLaneCenterOffset(laneIdx);
         }
 
-        private Vector2 GridSlotPosition(int slot, Vector2 origin, Vector2 dir, Vector2 right)
+        public static float GetAbreastGridLateralOffset(WaypointTrack targetTrack, int opponentIndex, int totalOpponents)
         {
-            int row = slot / 2;
-            float side = GetGridSlotLateralOffset(slot);
-            return origin - dir * (gridFirstRowOffset + row * gridRowSpacing) + right * side;
+            if (totalOpponents <= 1)
+            {
+                return 0f;
+            }
+
+            int safeIdx = Mathf.Clamp(opponentIndex, 0, totalOpponents - 1);
+            if (targetTrack == null)
+            {
+                float span = Mathf.Min(18f, (totalOpponents - 1) * 4.5f);
+                float tNull = safeIdx / (float)(totalOpponents - 1);
+                return Mathf.Lerp(-span * 0.5f, span * 0.5f, tNull);
+            }
+
+            if (totalOpponents <= targetTrack.LaneCount)
+            {
+                return GetAiPreferredLateralOffset(targetTrack, safeIdx);
+            }
+
+            float usableHalf = Mathf.Max(
+                targetTrack.MaxLaneCenterOffset,
+                Mathf.Max(0.5f, targetTrack.TrackWidth * 0.5f - 0.65f));
+            float t = safeIdx / (float)(totalOpponents - 1);
+            return Mathf.Lerp(-usableHalf, usableHalf, t);
         }
 
         private void Update()
@@ -799,9 +853,6 @@ namespace RacingGame
 
         private void ResolveVehicleCollisions()
         {
-            float minDist = bikeCollisionRadius * 2f;
-            float minDistSq = minDist * minDist;
-
             for (int i = 0; i < _allCars.Count; i++)
             {
                 Car a = _allCars[i];
@@ -812,24 +863,21 @@ namespace RacingGame
                     Car b = _allCars[j];
                     if (b == null) continue;
 
-                    Vector2 delta = b.Physics.Position - a.Physics.Position;
-                    float distSq = delta.sqrMagnitude;
+                    VehicleCollisionResult res = VehicleCollisionPhysics.Resolve(
+                        a.Physics.Position, a.Physics.Velocity, a.Physics.Mass, bikeCollisionRadius,
+                        b.Physics.Position, b.Physics.Velocity, b.Physics.Mass, bikeCollisionRadius,
+                        collisionRestitution, collisionFriction);
 
-                    if (distSq < minDistSq)
+                    if (!res.Collided) continue;
+
+                    a.ApplyPhysicalCollisionImpact(
+                        res.PositionDeltaA, res.VelocityDeltaA, res.AngularVelocityDeltaA, res.VerticalLaunchVelA);
+                    b.ApplyPhysicalCollisionImpact(
+                        res.PositionDeltaB, res.VelocityDeltaB, res.AngularVelocityDeltaB, res.VerticalLaunchVelB);
+
+                    if (res.NormalImpulse > 120f)
                     {
-                        float dist = Mathf.Sqrt(distSq);
-                        Vector2 normal = dist > 0.001f ? delta / dist : Vector2.right;
-                        float overlap = (minDist - dist) * 0.5f;
-
-                        Vector2 relVel = b.Physics.Velocity - a.Physics.Velocity;
-                        float closingSpeed = Vector2.Dot(relVel, normal);
-                        Vector2 impulse = closingSpeed < 0f ? normal * (-closingSpeed * 0.45f) : Vector2.zero;
-
-                        a.ApplyCollisionPush(-normal * overlap, -impulse);
-                        b.ApplyCollisionPush(normal * overlap, impulse);
-
-                        Vector2 mid = (a.Physics.Position + b.Physics.Position) * 0.5f;
-                        RacersCollided?.Invoke(a, b, mid);
+                        RacersCollided?.Invoke(a, b, res.ContactPoint);
 
                         if ((a == playerCar || b == playerCar) && audioController != null)
                         {

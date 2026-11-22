@@ -11,7 +11,7 @@ namespace RacingGame
     public class InputHandler : MonoBehaviour
     {
         [Header("Steering Smoothing")]
-        [SerializeField] private float steerResponseSpeed = 9f;
+        [SerializeField] private float steerResponseSpeed = 13f;
 
         private float _smoothedSteer;
         private bool _kickQueued;
