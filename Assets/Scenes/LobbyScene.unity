@@ -180,6 +180,7 @@ GameObject:
   - component: {fileID: 245377505}
   - component: {fileID: 245377504}
   - component: {fileID: 245377503}
+  - component: {fileID: 245377506}
   m_Layer: 0
   m_Name: RoadRashRenderer2D
   m_TagString: Untagged
@@ -200,6 +201,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: RacingGame::RacingGame.RaceVfxController
   customVolumeProfile: {fileID: 0}
+  bloomThreshold: 1
+  bloomIntensity: 0.36
+  bloomScatter: 0.58
+  bloomClamp: 4
 --- !u!114 &245377504
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -245,6 +250,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &245377506
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 245377502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c46102fa92daea439f5dee5db9fac3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: RacingGame::RacingGame.CrtScanlineController
+  defaultEnabled: 1
+  crtShader: {fileID: 4800000, guid: f8f08ba41fff2a642a6c4683e0621f66, type: 3}
+  scanlineIntensity: 0.16
+  scanlineDensity: 320
+  vignetteStrength: 0.16
+  overallOpacity: 1
+  canvasSortingOrder: 95
 --- !u!1 &255995032
 GameObject:
   m_ObjectHideFlags: 0

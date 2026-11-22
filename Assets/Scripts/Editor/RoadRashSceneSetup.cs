@@ -261,6 +261,7 @@ namespace RacingGame.Editor
             GameObject rendererObj = new GameObject("RoadRashRenderer2D");
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
+            EnsureCrtControllerConfigured(rendererObj);
             AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
             Stage2ArtWiringEditor.WireSceneObjects(roadRenderer, null, skinAssets != null && skinAssets.Length > 0 ? skinAssets[0] : null);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
@@ -368,6 +369,7 @@ namespace RacingGame.Editor
             GameObject rendererObj = new GameObject("RoadRashRenderer2D");
             RoadRashRenderer2D roadRenderer = rendererObj.AddComponent<RoadRashRenderer2D>();
             rendererObj.AddComponent<RaceVfxController>();
+            EnsureCrtControllerConfigured(rendererObj);
             AssignDefaultThemeSerialized(roadRenderer, _cachedValleyTheme);
             Stage2ArtWiringEditor.WireSceneObjects(roadRenderer, null, skinAssets != null && skinAssets.Length > 0 ? skinAssets[0] : null);
             roadRenderer.SetSceneReferences(mainCam, track, playerCar, new[] { playerCar });
@@ -481,6 +483,54 @@ namespace RacingGame.Editor
             if (existing != null)
             {
                 Object.DestroyImmediate(existing);
+            }
+        }
+
+        [MenuItem("Tools/Road Rash/Wire Stage 3 VFX & CRT Overlay")]
+        public static void WireStage3VfxInScenes()
+        {
+            WireStage3InScene(LobbyScenePath);
+            WireStage3InScene(SampleScenePath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[RoadRashSceneSetup] Wired CrtScanlineController into LobbyScene and SampleScene.");
+        }
+
+        private static void WireStage3InScene(string scenePath)
+        {
+            if (!File.Exists(scenePath))
+            {
+                Debug.LogWarning($"[RoadRashSceneSetup] Scene not found: {scenePath}");
+                return;
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            RoadRashRenderer2D renderer = Object.FindAnyObjectByType<RoadRashRenderer2D>();
+            if (renderer != null)
+            {
+                EnsureCrtControllerConfigured(renderer.gameObject);
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        private static void EnsureCrtControllerConfigured(GameObject targetObj)
+        {
+            if (targetObj == null) return;
+            CrtScanlineController crt = targetObj.GetComponent<CrtScanlineController>();
+            if (crt == null)
+            {
+                crt = targetObj.AddComponent<CrtScanlineController>();
+            }
+
+            Shader crtShader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/Shaders/CrtScanlineOverlay.shader");
+            if (crtShader != null)
+            {
+                SerializedObject so = new SerializedObject(crt);
+                so.FindProperty("crtShader").objectReferenceValue = crtShader;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(crt);
             }
         }
     }

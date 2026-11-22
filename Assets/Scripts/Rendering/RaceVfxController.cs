@@ -12,8 +12,15 @@ namespace RacingGame
     {
         [SerializeField] private VolumeProfile customVolumeProfile = null;
 
+        [Header("URP Bloom Tuning (Neon Night Balance)")]
+        [SerializeField, Range(0.8f, 2.0f)] private float bloomThreshold = 1.0f;
+        [SerializeField, Range(0f, 1.5f)] private float bloomIntensity = 0.36f;
+        [SerializeField, Range(0.1f, 0.9f)] private float bloomScatter = 0.58f;
+        [SerializeField, Min(1f)] private float bloomClamp = 4.0f;
+
         private Camera _camera;
         private Volume _globalVolume;
+        private VolumeProfile _runtimeProfile;
         private Vignette _vignette;
         private ChromaticAberration _chromaticAberration;
 
@@ -21,9 +28,25 @@ namespace RacingGame
         private ParticleSystem _dustPs;
         private ParticleSystem _speedLinesPs;
         private Sprite _softParticleSprite;
+        private Texture2D _softParticleTexture;
         private Material _particleMaterial;
 
         private float _impactImpulse;
+
+        private void OnDestroy()
+        {
+            DestroyUnityObject(_runtimeProfile);
+            _runtimeProfile = null;
+
+            DestroyUnityObject(_particleMaterial);
+            _particleMaterial = null;
+
+            DestroyUnityObject(_softParticleSprite);
+            _softParticleSprite = null;
+
+            DestroyUnityObject(_softParticleTexture);
+            _softParticleTexture = null;
+        }
 
         public void Initialize(Camera cam)
         {
@@ -96,19 +119,20 @@ namespace RacingGame
                 _globalVolume.priority = 10f;
             }
 
-            VolumeProfile profile = customVolumeProfile != null ? customVolumeProfile : _globalVolume.sharedProfile;
-            if (profile == null)
+            VolumeProfile sourceProfile = customVolumeProfile != null ? customVolumeProfile : _globalVolume.sharedProfile;
+            DestroyUnityObject(_runtimeProfile);
+            if (sourceProfile == null)
             {
-                profile = ScriptableObject.CreateInstance<VolumeProfile>();
-                profile.name = "RuntimeRoadRashVolumeProfile";
-                _globalVolume.profile = profile;
+                _runtimeProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+                _runtimeProfile.name = "RuntimeRoadRashVolumeProfile";
             }
             else
             {
                 // Clone into runtime instance so PlayMode tuning never mutates project assets unexpectedly
-                _globalVolume.profile = Instantiate(profile);
-                profile = _globalVolume.profile;
+                _runtimeProfile = Instantiate(sourceProfile);
             }
+            _globalVolume.profile = _runtimeProfile;
+            VolumeProfile profile = _runtimeProfile;
 
             if (!profile.TryGet(out Tonemapping tonemapping))
             {
@@ -122,11 +146,13 @@ namespace RacingGame
                 bloom = profile.Add<Bloom>(true);
             }
             bloom.threshold.overrideState = true;
-            bloom.threshold.value = 1.05f;
+            bloom.threshold.value = bloomThreshold;
             bloom.intensity.overrideState = true;
-            bloom.intensity.value = 0.42f;
+            bloom.intensity.value = bloomIntensity;
             bloom.scatter.overrideState = true;
-            bloom.scatter.value = 0.62f;
+            bloom.scatter.value = bloomScatter;
+            bloom.clamp.overrideState = true;
+            bloom.clamp.value = bloomClamp;
 
             if (!profile.TryGet(out _vignette))
             {
@@ -301,8 +327,22 @@ namespace RacingGame
             }
 
             tex.Apply();
+            _softParticleTexture = tex;
             _softParticleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32f);
             return tex;
+        }
+
+        private static void DestroyUnityObject(Object obj)
+        {
+            if (obj == null) return;
+            if (Application.isPlaying)
+            {
+                Destroy(obj);
+            }
+            else
+            {
+                DestroyImmediate(obj);
+            }
         }
     }
 }
