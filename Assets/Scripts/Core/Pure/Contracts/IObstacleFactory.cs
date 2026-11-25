@@ -11,6 +11,9 @@ namespace RacingGame
         public float LateralKnockImpulse { get; }
         public bool OuterLaneOnly { get; }
         public bool AvoidTunnelAndOverpass { get; }
+        public bool IsSurfaceHazard { get; }
+        public float BackwardKnockbackMeters { get; }
+        public float BackwardVelocityImpulse { get; }
 
         public ObstacleSpec(
             ObstacleKind kind,
@@ -18,14 +21,20 @@ namespace RacingGame
             float speedMultiplierOnHit,
             float lateralKnockImpulse,
             bool outerLaneOnly = false,
-            bool avoidTunnelAndOverpass = false)
+            bool avoidTunnelAndOverpass = false,
+            bool isSurfaceHazard = false,
+            float backwardKnockbackMeters = -1f,
+            float backwardVelocityImpulse = -1f)
         {
             Kind = kind;
+            IsSurfaceHazard = isSurfaceHazard;
             HitRadius = CoreMath.Max(0.4f, hitRadius);
             SpeedMultiplierOnHit = CoreMath.Clamp(speedMultiplierOnHit, 0.25f, 0.95f);
-            LateralKnockImpulse = CoreMath.Max(0.5f, lateralKnockImpulse);
+            LateralKnockImpulse = isSurfaceHazard ? 0f : CoreMath.Max(0.5f, lateralKnockImpulse);
             OuterLaneOnly = outerLaneOnly;
             AvoidTunnelAndOverpass = avoidTunnelAndOverpass;
+            BackwardKnockbackMeters = isSurfaceHazard ? 0f : (backwardKnockbackMeters >= 0f ? backwardKnockbackMeters : 2.6f);
+            BackwardVelocityImpulse = isSurfaceHazard ? 0f : (backwardVelocityImpulse >= 0f ? backwardVelocityImpulse : 12.0f);
         }
     }
 

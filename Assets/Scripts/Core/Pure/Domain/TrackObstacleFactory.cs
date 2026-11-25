@@ -12,7 +12,9 @@ namespace RacingGame
                 Kind,
                 defaultHitRadius * 0.90f,
                 CoreMath.Clamp(defaultSpeedPenalty + 0.14f, 0.4f, 0.9f),
-                defaultLateralImpulse * 0.65f);
+                defaultLateralImpulse * 0.65f,
+                backwardKnockbackMeters: 1.8f,
+                backwardVelocityImpulse: 9.5f);
         }
     }
 
@@ -26,7 +28,9 @@ namespace RacingGame
                 Kind,
                 defaultHitRadius * 1.05f,
                 defaultSpeedPenalty,
-                defaultLateralImpulse * 1.15f);
+                defaultLateralImpulse * 1.15f,
+                backwardKnockbackMeters: 2.8f,
+                backwardVelocityImpulse: 13.5f);
         }
     }
 
@@ -40,7 +44,9 @@ namespace RacingGame
                 Kind,
                 defaultHitRadius * 1.25f,
                 CoreMath.Clamp(defaultSpeedPenalty - 0.08f, 0.35f, 0.85f),
-                defaultLateralImpulse * 1.25f);
+                defaultLateralImpulse * 1.25f,
+                backwardKnockbackMeters: 3.6f,
+                backwardVelocityImpulse: 16.5f);
         }
     }
 
@@ -53,8 +59,9 @@ namespace RacingGame
             return new ObstacleSpec(
                 Kind,
                 defaultHitRadius * 1.15f,
-                CoreMath.Clamp(defaultSpeedPenalty + 0.08f, 0.4f, 0.9f),
-                defaultLateralImpulse * 1.30f);
+                CoreMath.Clamp(defaultSpeedPenalty + 0.06f, 0.45f, 0.85f),
+                0f,
+                isSurfaceHazard: true);
         }
     }
 
@@ -70,7 +77,24 @@ namespace RacingGame
                 CoreMath.Clamp(defaultSpeedPenalty - 0.18f, 0.32f, 0.72f),
                 defaultLateralImpulse * 1.35f,
                 outerLaneOnly: true,
-                avoidTunnelAndOverpass: true);
+                avoidTunnelAndOverpass: true,
+                backwardKnockbackMeters: 4.2f,
+                backwardVelocityImpulse: 18.5f);
+        }
+    }
+
+    public sealed class PotholeBlueprint : IObstacleBlueprint
+    {
+        public ObstacleKind Kind => ObstacleKind.Pothole;
+
+        public ObstacleSpec BuildSpec(float defaultHitRadius, float defaultSpeedPenalty, float defaultLateralImpulse)
+        {
+            return new ObstacleSpec(
+                Kind,
+                defaultHitRadius * 1.10f,
+                CoreMath.Clamp(defaultSpeedPenalty, 0.45f, 0.80f),
+                0f,
+                isSurfaceHazard: true);
         }
     }
 
@@ -90,6 +114,7 @@ namespace RacingGame
             Register(new RoadBarrierBlueprint());
             Register(new OilSlickBlueprint());
             Register(new ParkedBusBlueprint());
+            Register(new PotholeBlueprint());
         }
 
         public void Register(IObstacleBlueprint blueprint)

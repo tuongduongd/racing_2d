@@ -294,7 +294,13 @@ namespace RacingGame
         {
             if (this == null || !isActiveAndEnabled) return;
             if (car != _player || obstacle == null) return;
-            ShowFlash("! VA CHẠM CHƯỚNG NGẠI VẬT!", LobbyUiBuilder.DangerRed, 1.0f);
+            bool isHazard = obstacle.IsSurfaceHazard ||
+                            obstacle.Kind == ObstacleKind.Pothole ||
+                            obstacle.Kind == ObstacleKind.OilSlick;
+            string msg = isHazard
+                ? "! VA CHẠM HỐ / MẶT ĐƯỜNG - GIẢM TỐC!"
+                : "! VA CHẠM CHƯỚNG NGẠI VẬT!";
+            ShowFlash(msg, LobbyUiBuilder.DangerRed, isHazard ? 0.75f : 1.0f);
         }
 
         private void HandleLapCompleted(RacerProgress progress)

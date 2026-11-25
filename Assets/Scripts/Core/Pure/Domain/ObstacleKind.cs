@@ -9,6 +9,7 @@ namespace RacingGame
         OilBarrel = 1,
         RoadBarrier = 2,
         OilSlick = 3,
-        ParkedBus = 4
+        ParkedBus = 4,
+        Pothole = 5
     }
 }

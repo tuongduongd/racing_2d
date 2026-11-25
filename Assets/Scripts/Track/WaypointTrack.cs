@@ -351,6 +351,65 @@ namespace RacingGame
             return s;
         }
 
+        public int GetSegmentIndexAtDistance(float s)
+        {
+            EnsureCache();
+            if (waypoints == null || waypoints.Length < 2 || _totalLength <= 0.001f)
+            {
+                return 0;
+            }
+
+            float wrapped = WrapDistance(s);
+            int count = waypoints.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (wrapped >= _cumulativeDistances[i] && wrapped <= _cumulativeDistances[i + 1])
+                {
+                    return i;
+                }
+            }
+            return count - 1;
+        }
+
+        /// <summary>
+        /// Evaluates a smooth continuous world position from continuous Frenet track coordinates
+        /// (distanceAlongTrack, lateralOffset) without snapping across polygonal segment corners.
+        /// </summary>
+        public Vector2 EvaluateWorldPosition(
+            float distanceAlongTrack,
+            float lateralOffset,
+            out int segmentIndex,
+            out Vector2 sampleTangent)
+        {
+            EnsureCache();
+            if (waypoints == null || waypoints.Length < 2 || _totalLength <= 0.001f)
+            {
+                segmentIndex = 0;
+                sampleTangent = Vector2.right;
+                return new Vector2(distanceAlongTrack, -lateralOffset);
+            }
+
+            float wrapped = WrapDistance(distanceAlongTrack);
+            int count = waypoints.Length;
+            int seg = GetSegmentIndexAtDistance(wrapped);
+            float segStart = _cumulativeDistances[seg];
+            float segEnd = _cumulativeDistances[seg + 1];
+            float t = Mathf.Clamp01((wrapped - segStart) / Mathf.Max(0.001f, segEnd - segStart));
+
+            Vector2 basePos = Vector2.Lerp(waypoints[seg], waypoints[(seg + 1) % count], t);
+            Vector2 tan = SampleTangentRaw(wrapped);
+            if (tan.sqrMagnitude < 0.0001f)
+            {
+                tan = GetTrackDirection(seg);
+            }
+            tan.Normalize();
+            Vector2 right = new Vector2(tan.y, -tan.x);
+
+            segmentIndex = seg;
+            sampleTangent = tan;
+            return basePos + right * lateralOffset;
+        }
+
         private float GetOverpassBoostAt(float s)
         {
             if (_featureZones == null || _totalLength <= 0.01f) return 0f;

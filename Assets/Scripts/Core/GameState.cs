@@ -109,11 +109,6 @@ namespace RacingGame
                 gm.StartRace();
                 return;
             }
-
-            if (!gm.IsPaused && input.WasRecoverPressed())
-            {
-                gm.RecoverPlayerToTrack(automatic: false);
-            }
         }
 
         public override void FixedUpdate(GameManager gm, float fixedDt)

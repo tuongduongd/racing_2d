@@ -22,6 +22,11 @@ namespace RacingGame
         /// </summary>
         public virtual bool UsesArcadeAssist => false;
 
+        /// <summary>
+        /// Polymorphic capability hook enabling AI off-road recovery without runtime downcasting.
+        /// </summary>
+        public virtual bool UsesAiOffRoadRecovery => false;
+
         public void SetDriverName(string newName)
         {
             if (!string.IsNullOrWhiteSpace(newName))

@@ -26,6 +26,7 @@ namespace RacingGame
         private float _stuckTimer;
         private bool _chaseActive = true;
 
+        public override bool UsesAiOffRoadRecovery => true;
         public Car TargetPlayer => _targetPlayer;
         public int TargetWaypointIndex => targetWaypoint;
         public bool IsChaseActive

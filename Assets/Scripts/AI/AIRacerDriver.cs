@@ -54,6 +54,7 @@ namespace RacingGame
         private bool _hasSeed;
         private int _seed;
 
+        public override bool UsesAiOffRoadRecovery => true;
         public AINavigationMode NavigationMode => navigationMode;
         public int TargetWaypointIndex => targetWaypoint;
         public AIProfile Profile => profile;

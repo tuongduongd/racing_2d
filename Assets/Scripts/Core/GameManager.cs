@@ -84,7 +84,7 @@ namespace RacingGame
 
         public event Action<Car, Car, Vector2> RacerKicked;
         public event Action<Car, Car, Vector2> RacersCollided;
-        public event Action<Car> PlayerRecoveredToTrack;
+        public event Action<Car> PlayerRecoveredToTrack { add { } remove { } }
 
         public IReadOnlyList<Car> AllCars => _allCars;
         public Car PlayerCar => playerCar;
@@ -869,22 +869,11 @@ namespace RacingGame
         }
 
         /// <summary>
-        /// Immediately repositions the player back onto the nearest road center when requested manually ([F] / [Backspace]).
+        /// Disabled by design: player vehicles must never be automatically or forcibly teleported back onto the track.
         /// </summary>
         public bool RecoverPlayerToTrack(bool automatic = false)
         {
-            if (playerCar == null || track == null || track.WaypointCount < 2)
-            {
-                return false;
-            }
-
-            TrackProjection proj = track.ProjectPosition(playerCar.Physics.Position);
-            float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
-            playerCar.ResetToTrackPoint(proj.closestPoint, trackHeading, track);
-            playerCar.Physics.ApplyVelocityImpulse(proj.tangent * 14f);
-
-            PlayerRecoveredToTrack?.Invoke(playerCar);
-            return true;
+            return false;
         }
 
         public void StepRaceSimulation(float dt)

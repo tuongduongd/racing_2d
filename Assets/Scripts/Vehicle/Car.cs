@@ -49,6 +49,13 @@ namespace RacingGame
         private float _airHeight;
         private float _previousAirHeight;
         private float _verticalVelocity;
+        private bool _hasArcadeFrenetState;
+        private float _arcadeLateralVel;
+        private Vector2 _lastArcadeTangent = Vector2.right;
+        private float _hazardSlowTimer;
+        private float _hazardSpeedCapMultiplier = 1f;
+        private float _obstacleImmunityTimer;
+        private bool _obstacleImmunityTickedThisStep;
 
         public VehicleStatsAsset BaseStatsAsset => baseStatsAsset;
         public VehicleStats BaseStats => baseStatsAsset != null ? baseStatsAsset.Stats : VehicleStats.Default;
@@ -112,6 +119,9 @@ namespace RacingGame
         public float CollisionKnockbackRemaining => _collisionKnockbackTimer;
         public float AngularVelocity => _angularVelocity;
         public float AirHeight => _airHeight;
+        public bool IsObstacleImmune => _obstacleImmunityTimer > 0f;
+        public float ObstacleImmunityRemaining => _obstacleImmunityTimer;
+        public bool IsHazardSlowed => _hazardSlowTimer > 0f;
 
         public float GetInterpolatedAirHeight(float alpha)
         {
@@ -165,6 +175,7 @@ namespace RacingGame
             }
 
             UpdateTrackProjection(track);
+            SyncArcadeFrenetFromTrack(track, physics.Velocity);
             SyncPreviousInterpolationState();
             SyncTransform();
         }
@@ -177,6 +188,7 @@ namespace RacingGame
             _lastInput = default;
             ResetCombatState();
             UpdateTrackProjection(track);
+            SyncArcadeFrenetFromTrack(track, physics.Velocity);
             SyncPreviousInterpolationState();
             SyncTransform();
         }
@@ -190,8 +202,42 @@ namespace RacingGame
             _lastInput = default;
             ResetCombatState();
             UpdateTrackProjection(track);
+            SyncArcadeFrenetFromTrack(track, velocity);
             SyncPreviousInterpolationState();
             SyncTransform();
+        }
+
+        private void SyncArcadeFrenetFromTrack(WaypointTrack track, Vector2 velocity)
+        {
+            if (track == null || track.WaypointCount < 2)
+            {
+                _hasArcadeFrenetState = false;
+                _arcadeLateralVel = 0f;
+                return;
+            }
+
+            Vector2 tan = track.SampleAtDistance(_trackDistance).tangent;
+            if (tan.sqrMagnitude < 0.0001f)
+            {
+                tan = track.GetTrackDirection(_currentWaypointIndex);
+            }
+            _lastArcadeTangent = tan.sqrMagnitude > 0.0001f ? tan.normalized : Vector2.right;
+            Vector2 right = new Vector2(_lastArcadeTangent.y, -_lastArcadeTangent.x);
+            _arcadeLateralVel = Vector2.Dot(velocity, right);
+            _hasArcadeFrenetState = true;
+        }
+
+        public void ConsumeOrTickObstacleImmunity(float dt)
+        {
+            if (_obstacleImmunityTickedThisStep)
+            {
+                _obstacleImmunityTickedThisStep = false;
+                return;
+            }
+            if (_obstacleImmunityTimer > 0f && dt > 0f)
+            {
+                _obstacleImmunityTimer = Mathf.Max(0f, _obstacleImmunityTimer - dt);
+            }
         }
 
         private void SyncPreviousInterpolationState()
@@ -225,7 +271,117 @@ namespace RacingGame
             _hitStaggerTimer = Mathf.Max(_hitStaggerTimer, staggerDuration);
             physics.ApplyVelocityImpulse(lateralImpulse);
             physics.ScaleVelocity(0.84f);
+            if (_hasArcadeFrenetState)
+            {
+                Vector2 lastRight = new Vector2(_lastArcadeTangent.y, -_lastArcadeTangent.x);
+                _arcadeLateralVel = Vector2.Dot(physics.Velocity, lastRight);
+            }
             _leanAngle = Mathf.Clamp((kickDir >= 0 ? 1f : -1f) * 0.9f, -1f, 1f);
+        }
+
+        /// <summary>
+        /// Applies temporary speed loss from surface hazards (potholes, oil slicks)
+        /// without flinging, staggering, teleporting, or pushing the bike backward.
+        /// </summary>
+        public void ApplySurfaceHazardSlowdown(float speedMultiplier, float duration = 0.45f)
+        {
+            if (physics == null) return;
+            float clampedMult = Mathf.Clamp(speedMultiplier, 0.35f, 0.90f);
+            physics.ScaleVelocity(clampedMult);
+            _hazardSlowTimer = Mathf.Max(_hazardSlowTimer, Mathf.Max(0.1f, duration));
+            _hazardSpeedCapMultiplier = Mathf.Min(_hazardSpeedCapMultiplier, clampedMult);
+        }
+
+        /// <summary>
+        /// Applies lateral knockback + stagger + backward track rebound from solid obstacles
+        /// (barriers, barrels, cones, parked buses) with short immunity cooldown to prevent sticky loops.
+        /// </summary>
+        public void ApplySolidObstacleKnockback(
+            int pushSide,
+            WaypointTrack track,
+            float speedMultiplierOnHit,
+            float lateralKnockImpulse,
+            float backwardMeters,
+            float backwardVelocityImpulse,
+            float immunityDuration = 0.55f)
+        {
+            if (physics == null) return;
+
+            int side = pushSide >= 0 ? 1 : -1;
+            float preSpeed = physics.Speed;
+            Vector2 roadTangent = physics.Forward;
+            float currentDist = _trackDistance;
+            float currentLat = _lateralOffset;
+
+            if (track != null && track.WaypointCount >= 2)
+            {
+                if (!_hasArcadeFrenetState)
+                {
+                    TrackProjection proj = track.ProjectPosition(physics.Position);
+                    currentDist = proj.distanceAlongTrack;
+                    currentLat = proj.lateralOffset;
+                }
+
+                TrackSample sample = track.SampleAtDistance(currentDist);
+                if (sample.tangent.sqrMagnitude > 0.0001f)
+                {
+                    roadTangent = sample.tangent.normalized;
+                }
+                else
+                {
+                    roadTangent = track.GetTrackDirection(track.GetSegmentIndexAtDistance(currentDist));
+                }
+            }
+
+            if (roadTangent.sqrMagnitude < 0.0001f)
+            {
+                roadTangent = Vector2.right;
+            }
+            Vector2 roadRight = new Vector2(roadTangent.y, -roadTangent.x);
+
+            float backDist = Mathf.Max(0.5f, backwardMeters);
+            float latShift = side * 0.65f;
+            if (track != null && track.WaypointCount >= 2)
+            {
+                float maxHalfOffRoad = track.MaxOffRoadWidth * 0.5f;
+                float newDist = track.WrapDistance(currentDist - backDist);
+                float newLat = Mathf.Clamp(currentLat + latShift, -maxHalfOffRoad, maxHalfOffRoad);
+                Vector2 newPos = track.EvaluateWorldPosition(newDist, newLat, out _currentWaypointIndex, out Vector2 updatedTangent);
+                physics.SetPosition(newPos);
+                _trackDistance = newDist;
+                _lateralOffset = newLat;
+                _isOnTrack = Mathf.Abs(newLat) <= track.TrackWidth * 0.5f;
+                _lastArcadeTangent = updatedTangent;
+                roadTangent = updatedTangent;
+                roadRight = new Vector2(roadTangent.y, -roadTangent.x);
+            }
+            else
+            {
+                physics.TranslatePosition(-roadTangent * backDist + roadRight * latShift);
+            }
+
+            float clampedMult = Mathf.Clamp(speedMultiplierOnHit, 0.40f, 0.82f);
+            float desiredTotalSpeed = preSpeed >= 2.0f
+                ? Mathf.Clamp(preSpeed * clampedMult, 1.5f, Mathf.Max(1.5f, preSpeed * 0.85f))
+                : Mathf.Max(6.0f, backwardVelocityImpulse * 0.55f);
+
+            float rawBack = Mathf.Max(2.5f, backwardVelocityImpulse * 0.55f);
+            float rawLat = Mathf.Max(2.0f, lateralKnockImpulse * 0.55f);
+            Vector2 impulseDir = (-roadTangent * rawBack + roadRight * (side * rawLat)).normalized;
+            Vector2 reboundVel = impulseDir * desiredTotalSpeed;
+
+            physics.SetVelocity(reboundVel);
+            _arcadeLateralVel = Vector2.Dot(reboundVel, roadRight);
+
+            _kickTimer = 0f;
+            _obstacleImmunityTimer = Mathf.Max(_obstacleImmunityTimer, Mathf.Max(0.2f, immunityDuration));
+            _obstacleImmunityTickedThisStep = false;
+            _hitStaggerTimer = Mathf.Max(_hitStaggerTimer, 0.42f);
+            _collisionKnockbackTimer = Mathf.Max(_collisionKnockbackTimer, 0.38f);
+            _collisionKnockbackDuration = Mathf.Max(_collisionKnockbackDuration, 0.38f);
+            _angularVelocity = Mathf.Clamp(_angularVelocity + side * 4.5f, -7.5f, 7.5f);
+            _leanAngle = Mathf.Clamp(side * 0.95f, -1f, 1f);
+            SyncTransform();
         }
 
         private void ResetCombatState()
@@ -241,6 +397,11 @@ namespace RacingGame
             _airHeight = 0f;
             _previousAirHeight = 0f;
             _verticalVelocity = 0f;
+            _arcadeLateralVel = 0f;
+            _hazardSlowTimer = 0f;
+            _hazardSpeedCapMultiplier = 1f;
+            _obstacleImmunityTimer = 0f;
+            _obstacleImmunityTickedThisStep = false;
         }
 
         public void StepPhysics(float dt, WaypointTrack track)
@@ -251,6 +412,13 @@ namespace RacingGame
             if (_kickCooldownTimer > 0f) _kickCooldownTimer = Mathf.Max(0f, _kickCooldownTimer - dt);
             if (_hitStaggerTimer > 0f) _hitStaggerTimer = Mathf.Max(0f, _hitStaggerTimer - dt);
             if (_collisionKnockbackTimer > 0f) _collisionKnockbackTimer = Mathf.Max(0f, _collisionKnockbackTimer - dt);
+            if (_hazardSlowTimer > 0f)
+            {
+                _hazardSlowTimer = Mathf.Max(0f, _hazardSlowTimer - dt);
+                if (_hazardSlowTimer <= 0f) _hazardSpeedCapMultiplier = 1f;
+            }
+            if (_obstacleImmunityTimer > 0f) _obstacleImmunityTimer = Mathf.Max(0f, _obstacleImmunityTimer - dt);
+            _obstacleImmunityTickedThisStep = true;
 
             _previousPosition = physics.Position;
             SyncPreviousInterpolationState();
@@ -278,6 +446,7 @@ namespace RacingGame
             }
             else
             {
+                _hasArcadeFrenetState = false;
                 physics.ApplySteering(_lastInput.steering);
 
                 if (track != null)
@@ -288,44 +457,53 @@ namespace RacingGame
                     _trackDistance = proj.distanceAlongTrack;
                     _lateralOffset = proj.lateralOffset;
 
+                    float hazardCap = _hazardSlowTimer > 0f ? _hazardSpeedCapMultiplier : 1f;
+                    float hazardDrag = _hazardSlowTimer > 0f ? 1.30f : 1f;
+
                     if (_collisionKnockbackTimer > 0f)
                     {
                         // Low sliding lateral tire grip so struck bikes physically skid sideways across lanes
-                        physics.SetSurfaceModifier(_isOnTrack ? 1.08f : 1.25f, 0.22f, 1.0f);
+                        physics.SetSurfaceModifier((_isOnTrack ? 1.08f : 1.25f) * hazardDrag, 0.22f, _isOnTrack ? hazardCap : Mathf.Min(0.58f, hazardCap));
                     }
                     else if (_isOnTrack)
                     {
-                        physics.SetSurfaceModifier(1f, 1f, 1f);
+                        physics.SetSurfaceModifier(hazardDrag, 1f, hazardCap);
                     }
                     else
                     {
-                        // Mild speed cap off-road while keeping throttle punchy and steering grip responsive for quick recovery
-                        physics.SetSurfaceModifier(1.30f, 0.95f, 0.58f);
-
-                        // Assist turning back onto the track when throttling and steering inward from the shoulder
-                        if (throttle > 0.1f && Mathf.Abs(_lastInput.steering) > 0.1f && Mathf.Abs(_lateralOffset) > 0.1f)
+                        bool aiRecovery = _driver != null && _driver.UsesAiOffRoadRecovery;
+                        if (aiRecovery)
                         {
-                            float sideSign = Mathf.Sign(_lateralOffset);
-                            float inwardSign = -sideSign;
-                            if (Mathf.Sign(_lastInput.steering) == inwardSign)
-                            {
-                                Vector2 segRight = new Vector2(proj.tangent.y, -proj.tangent.x);
-                                physics.ApplyVelocityImpulse(segRight * (inwardSign * 16f * dt));
+                            physics.SetSurfaceModifier(1.30f * hazardDrag, 1.0f, Mathf.Min(0.58f, hazardCap));
 
-                                float outwardFacing = Vector2.Dot(physics.Forward, segRight) * sideSign;
-                                float forwardAlign = Vector2.Dot(physics.Forward, proj.tangent);
-                                if (physics.Speed < 5.5f || outwardFacing > 0.05f || forwardAlign < 0.35f)
+                            if (throttle > 0.1f && Mathf.Abs(_lastInput.steering) > 0.1f && Mathf.Abs(_lateralOffset) > 0.1f)
+                            {
+                                float sideSign = Mathf.Sign(_lateralOffset);
+                                float inwardSign = -sideSign;
+                                if (Mathf.Sign(_lastInput.steering) == inwardSign)
                                 {
-                                    float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
-                                    // Positive offset turns toward -right (left inward from right shoulder) and vice versa
-                                    float recoveryHeading = trackHeading + sideSign * 0.42f;
-                                    physics.AlignHeadingToward(recoveryHeading, 4.5f * dt);
-                                    if (physics.ForwardSpeed < 8f)
+                                    Vector2 segRight = new Vector2(proj.tangent.y, -proj.tangent.x);
+                                    physics.ApplyVelocityImpulse(segRight * (inwardSign * 16f * dt));
+
+                                    float outwardFacing = Vector2.Dot(physics.Forward, segRight) * sideSign;
+                                    float forwardAlign = Vector2.Dot(physics.Forward, proj.tangent);
+                                    if (physics.Speed < 5.5f || outwardFacing > 0.05f || forwardAlign < 0.35f)
                                     {
-                                        physics.ApplyVelocityImpulse(proj.tangent * (10f * dt));
+                                        float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
+                                        float recoveryHeading = trackHeading + sideSign * 0.42f;
+                                        physics.AlignHeadingToward(recoveryHeading, 4.5f * dt);
+                                        if (physics.ForwardSpeed < 8f)
+                                        {
+                                            physics.ApplyVelocityImpulse(proj.tangent * (10f * dt));
+                                        }
                                     }
                                 }
                             }
+                        }
+                        else
+                        {
+                            // Cap top speed to 58% off-road while preserving steering feel and throttle movement (zero inward auto-pull)
+                            physics.SetSurfaceModifier(1.15f * hazardDrag, 0.62f, Mathf.Min(0.58f, hazardCap));
                         }
                     }
                 }
@@ -338,12 +516,12 @@ namespace RacingGame
                     _angularVelocity *= Mathf.Exp(-5.5f * dt);
                     if (Mathf.Abs(_angularVelocity) < 0.005f) _angularVelocity = 0f;
                 }
-            }
 
-            if (track != null)
-            {
-                EnforceOuterBarrier(track, dt);
-                UpdateTrackProjection(track);
+                if (track != null)
+                {
+                    EnforceOuterBarrier(track, dt);
+                    UpdateTrackProjection(track);
+                }
             }
 
             float speedFactor = Mathf.Clamp01(physics.Speed / 18f);
@@ -355,28 +533,33 @@ namespace RacingGame
 
         private void StepRoadRashArcadePhysics(float dt, WaypointTrack track, float throttle)
         {
-            TrackProjection proj = track.ProjectPosition(physics.Position);
-            _isOnTrack = proj.isOnTrack;
-            _currentWaypointIndex = proj.segmentIndex;
-            _trackDistance = proj.distanceAlongTrack;
-            _lateralOffset = proj.lateralOffset;
+            if (!_hasArcadeFrenetState)
+            {
+                UpdateTrackProjection(track);
+                SyncArcadeFrenetFromTrack(track, physics.Velocity);
+            }
+
+            float halfRoadWidth = track.TrackWidth * 0.5f;
+            _isOnTrack = Mathf.Abs(_lateralOffset) <= halfRoadWidth;
 
             TrackSample sample = track.SampleAtDistance(_trackDistance);
-            Vector2 roadTangent = sample.tangent.sqrMagnitude > 0.0001f ? sample.tangent.normalized : proj.tangent;
-            Vector2 roadRight = new Vector2(roadTangent.y, -roadTangent.x);
+            Vector2 roadTangent = sample.tangent.sqrMagnitude > 0.0001f
+                ? sample.tangent.normalized
+                : track.GetTrackDirection(_currentWaypointIndex);
             float roadHeading = Mathf.Atan2(roadTangent.y, roadTangent.x);
 
-            float roadForwardSpeed = Vector2.Dot(physics.Velocity, roadTangent);
-            float roadLateralSpeed = Vector2.Dot(physics.Velocity, roadRight);
+            float roadForwardSpeed = Vector2.Dot(physics.Velocity, _lastArcadeTangent);
 
+            float hazardCap = _hazardSlowTimer > 0f ? _hazardSpeedCapMultiplier : 1f;
+            float hazardDrag = _hazardSlowTimer > 0f ? 1.30f : 1f;
             if (_isOnTrack)
             {
-                physics.SetSurfaceModifier(1f, 1.15f, 1f);
+                physics.SetSurfaceModifier(hazardDrag, 1.15f, hazardCap);
             }
             else
             {
-                // Forgiving Road Rash off-road: keep riding smoothly almost just like on asphalt
-                physics.SetSurfaceModifier(1.06f, 1.05f, 0.88f);
+                // Cap off-road speed at <= 60% MaxSpeed (0.58x) without ever pulling or teleporting toward centerline
+                physics.SetSurfaceModifier(1.15f * hazardDrag, 0.85f, Mathf.Min(0.58f, hazardCap));
             }
 
             float prevHeading = physics.Heading;
@@ -385,6 +568,14 @@ namespace RacingGame
             physics.ApplySteering(0f);
             physics.Update(dt);
             float newForwardSpeed = Vector2.Dot(physics.Velocity, roadTangent);
+
+            if (!_isOnTrack && throttle > 0.05f && _lastInput.brake < 0.05f &&
+                _collisionKnockbackTimer <= 0f && newForwardSpeed < 2.5f)
+            {
+                newForwardSpeed = Mathf.Max(newForwardSpeed, Mathf.Max(0.5f, roadForwardSpeed) + 8.0f * dt);
+            }
+
+            _trackDistance = track.WrapDistance(_trackDistance + newForwardSpeed * dt);
 
             float nextLatVel;
             if (_collisionKnockbackTimer > 0f)
@@ -395,7 +586,7 @@ namespace RacingGame
                 float recoveryProgress = _collisionKnockbackDuration > 0.01f
                     ? 1f - Mathf.Clamp01(_collisionKnockbackTimer / _collisionKnockbackDuration)
                     : 1f;
-                nextLatVel = Mathf.MoveTowards(roadLateralSpeed, 0f, frictionDecel * dt)
+                nextLatVel = Mathf.MoveTowards(_arcadeLateralVel, 0f, frictionDecel * dt)
                              + (_lastInput.steering * 5.0f * recoveryProgress * dt);
             }
             else
@@ -404,20 +595,41 @@ namespace RacingGame
                 float steerSpeedScale = (Mathf.Abs(newForwardSpeed) > 0.25f || throttle > 0.05f)
                     ? Mathf.Clamp01(Mathf.Abs(newForwardSpeed) / 8f + 0.30f)
                     : 0f;
-                float steerLateralVel = _lastInput.steering * (14.5f * gripFactor) * steerSpeedScale;
+                float steerLateralVel = _lastInput.steering * (14.5f * gripFactor) * (_isOnTrack ? 1.0f : 0.85f) * steerSpeedScale;
                 if (_hitStaggerTimer > 0f) steerLateralVel *= 0.45f;
 
-                float speedNorm = Mathf.Clamp01(Mathf.Max(0f, newForwardSpeed) / Mathf.Max(1f, physics.MaxSpeed));
-                // Positive curvature = right turn -> centrifugal pull pushes gently left (-roadRight)
-                float centrifugalLatVel = Mathf.Clamp(-sample.curvature * speedNorm * speedNorm * (140f / gripFactor), -4.5f, 4.5f);
-
-                float targetLatVel = steerLateralVel + centrifugalLatVel;
                 float latBlendRate = _hitStaggerTimer > 0f ? 3.5f : 12.0f;
-                nextLatVel = Mathf.Lerp(roadLateralSpeed, targetLatVel, 1f - Mathf.Exp(-latBlendRate * dt));
+                nextLatVel = Mathf.Lerp(_arcadeLateralVel, steerLateralVel, 1f - Mathf.Exp(-latBlendRate * dt));
+                if (Mathf.Abs(_lastInput.steering) < 0.001f && Mathf.Abs(nextLatVel) < 0.005f)
+                {
+                    nextLatVel = 0f;
+                }
             }
 
-            physics.TranslatePosition(roadRight * (nextLatVel * dt));
-            physics.SetVelocity(roadTangent * newForwardSpeed + roadRight * nextLatVel);
+            _arcadeLateralVel = nextLatVel;
+            _lateralOffset += _arcadeLateralVel * dt;
+
+            // Soft outer boundary clamp only (prevents exiting map void; zero inward pull toward centerline)
+            float maxLateral = track.MaxOffRoadWidth * 0.5f;
+            if (Mathf.Abs(_lateralOffset) > maxLateral)
+            {
+                float sideSign = Mathf.Sign(_lateralOffset);
+                _lateralOffset = sideSign * maxLateral;
+                if (_arcadeLateralVel * sideSign > 0f)
+                {
+                    _arcadeLateralVel = 0f;
+                }
+            }
+
+            Vector2 worldPos = track.EvaluateWorldPosition(_trackDistance, _lateralOffset, out _currentWaypointIndex, out Vector2 updatedTangent);
+            Vector2 updatedRight = new Vector2(updatedTangent.y, -updatedTangent.x);
+            float updatedRoadHeading = Mathf.Atan2(updatedTangent.y, updatedTangent.x);
+
+            _isOnTrack = Mathf.Abs(_lateralOffset) <= halfRoadWidth;
+            _lastArcadeTangent = updatedTangent;
+
+            physics.SetPosition(worldPos);
+            physics.SetVelocity(updatedTangent * newForwardSpeed + updatedRight * _arcadeLateralVel);
 
             if (_collisionKnockbackTimer > 0f || Mathf.Abs(_angularVelocity) > 0.01f || Mathf.Abs(_collisionYawOffset) > 0.002f)
             {
@@ -435,7 +647,7 @@ namespace RacingGame
 
             physics.SetHeading(prevHeading);
             float headingTilt = -_lastInput.steering * 0.12f * Mathf.Clamp01(Mathf.Abs(newForwardSpeed) / 10f);
-            physics.AlignHeadingToward(roadHeading + headingTilt + _collisionYawOffset, (_collisionKnockbackTimer > 0f ? 16f : 10f) * dt);
+            physics.AlignHeadingToward(updatedRoadHeading + headingTilt + _collisionYawOffset, (_collisionKnockbackTimer > 0f ? 16f : 10f) * dt);
         }
 
         public void ApplyPhysicalCollisionImpact(
@@ -446,6 +658,14 @@ namespace RacingGame
         {
             physics.TranslatePosition(worldDeltaPos);
             physics.ApplyVelocityImpulse(worldVelocityDelta);
+
+            if (_hasArcadeFrenetState)
+            {
+                Vector2 lastRight = new Vector2(_lastArcadeTangent.y, -_lastArcadeTangent.x);
+                _trackDistance += Vector2.Dot(worldDeltaPos, _lastArcadeTangent);
+                _lateralOffset += Vector2.Dot(worldDeltaPos, lastRight);
+                _arcadeLateralVel = Vector2.Dot(physics.Velocity, lastRight);
+            }
 
             float impactDeltaSpeed = worldVelocityDelta.magnitude;
             if (impactDeltaSpeed >= 2.2f)
@@ -473,6 +693,13 @@ namespace RacingGame
             physics.TranslatePosition(worldDeltaPos);
             physics.ApplyVelocityImpulse(worldVelocityImpulse);
             physics.ScaleVelocity(0.94f);
+            if (_hasArcadeFrenetState)
+            {
+                Vector2 lastRight = new Vector2(_lastArcadeTangent.y, -_lastArcadeTangent.x);
+                _trackDistance += Vector2.Dot(worldDeltaPos, _lastArcadeTangent);
+                _lateralOffset += Vector2.Dot(worldDeltaPos, lastRight);
+                _arcadeLateralVel = Vector2.Dot(physics.Velocity, lastRight);
+            }
             SyncTransform();
         }
 
@@ -487,43 +714,42 @@ namespace RacingGame
                 Vector2 right = new Vector2(proj.tangent.y, -proj.tangent.x);
                 physics.SetPosition(proj.closestPoint + right * clampedLat);
 
-                if (IsRoadRashArcadeActive)
+                bool aiRecovery = _driver != null && _driver.UsesAiOffRoadRecovery;
+                float outwardSpeed = Vector2.Dot(physics.Velocity, right) * sideSign;
+                if (outwardSpeed > 0f)
                 {
-                    float outwardSpeed = Vector2.Dot(physics.Velocity, right) * sideSign;
-                    if (outwardSpeed > 0f)
+                    physics.ApplyVelocityImpulse(-right * (outwardSpeed * sideSign * (aiRecovery ? 1.12f : 1.0f)));
+                    physics.ScaleVelocity(aiRecovery ? 0.985f : 0.99f);
+                }
+
+                if (aiRecovery)
+                {
+                    bool steeringInward = Mathf.Abs(_lastInput.steering) > 0.1f && Mathf.Sign(_lastInput.steering) == -sideSign;
+                    float outwardFacingAi = Vector2.Dot(physics.Forward, right) * sideSign;
+                    if (outwardFacingAi > 0.04f || steeringInward)
                     {
-                        physics.ApplyVelocityImpulse(-right * (outwardSpeed * sideSign));
-                        physics.ScaleVelocity(0.995f);
+                        float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
+                        float targetHeading = trackHeading + sideSign * (steeringInward ? 0.42f : 0.08f);
+                        physics.AlignHeadingToward(targetHeading, (steeringInward ? 7.0f : 4.5f) * dt);
                     }
-                    float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
-                    physics.AlignHeadingToward(trackHeading, 8f * dt);
+
+                    if (_lastInput.throttle > 0.1f)
+                    {
+                        float tangentSpeed = Vector2.Dot(physics.Velocity, proj.tangent);
+                        if (tangentSpeed < 10f)
+                        {
+                            physics.ApplyVelocityImpulse(proj.tangent * (14f * dt));
+                        }
+                    }
                     return;
                 }
 
-                float nonArcadeOutwardSpeed = Vector2.Dot(physics.Velocity, right) * sideSign;
-                if (nonArcadeOutwardSpeed > 0f)
-                {
-                    physics.ApplyVelocityImpulse(-right * (nonArcadeOutwardSpeed * sideSign * 1.12f));
-                    physics.ScaleVelocity(0.985f);
-                }
-
-                // Wall-slide: smoothly align bike heading off the barrier so steep impacts don't stall at zero speed
-                bool steeringInward = Mathf.Abs(_lastInput.steering) > 0.1f && Mathf.Sign(_lastInput.steering) == -sideSign;
+                // Wall-slide strictly parallel to outer barrier (never turn or pull inward toward track centerline)
                 float outwardFacing = Vector2.Dot(physics.Forward, right) * sideSign;
-                if (outwardFacing > 0.04f || steeringInward)
+                if (outwardFacing > 0.01f)
                 {
                     float trackHeading = Mathf.Atan2(proj.tangent.y, proj.tangent.x);
-                    float targetHeading = trackHeading + sideSign * (steeringInward ? 0.42f : 0.08f);
-                    physics.AlignHeadingToward(targetHeading, (steeringInward ? 7.0f : 4.5f) * dt);
-                }
-
-                if (_lastInput.throttle > 0.1f)
-                {
-                    float tangentSpeed = Vector2.Dot(physics.Velocity, proj.tangent);
-                    if (tangentSpeed < 10f)
-                    {
-                        physics.ApplyVelocityImpulse(proj.tangent * (14f * dt));
-                    }
+                    physics.AlignHeadingToward(trackHeading, 6.0f * dt);
                 }
             }
         }

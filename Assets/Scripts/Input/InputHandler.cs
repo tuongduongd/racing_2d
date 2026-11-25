@@ -16,7 +16,6 @@ namespace RacingGame
         private bool _kickQueued;
         private bool _pauseQueued;
         private bool _restartQueued;
-        private bool _recoverQueued;
         private bool _muteQueued;
 
         private void Update()
@@ -27,7 +26,6 @@ namespace RacingGame
             if (kb.spaceKey.wasPressedThisFrame) _kickQueued = true;
             if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame) _pauseQueued = true;
             if (kb.rKey.wasPressedThisFrame) _restartQueued = true;
-            if (kb.fKey.wasPressedThisFrame || kb.backspaceKey.wasPressedThisFrame) _recoverQueued = true;
             if (kb.mKey.wasPressedThisFrame) _muteQueued = true;
         }
 
@@ -74,10 +72,7 @@ namespace RacingGame
 
         public bool WasRecoverPressed()
         {
-            Keyboard kb = Keyboard.current;
-            bool pressed = _recoverQueued || (kb != null && (kb.fKey.wasPressedThisFrame || kb.backspaceKey.wasPressedThisFrame));
-            _recoverQueued = false;
-            return pressed;
+            return false;
         }
 
         public bool WasMutePressed()
@@ -94,7 +89,6 @@ namespace RacingGame
             _kickQueued = false;
             _pauseQueued = false;
             _restartQueued = false;
-            _recoverQueued = false;
             _muteQueued = false;
         }
     }

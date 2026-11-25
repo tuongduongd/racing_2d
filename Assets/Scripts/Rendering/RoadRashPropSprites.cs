@@ -27,7 +27,8 @@ namespace RacingGame
         HighwaySign,
         BusStop,
         FireHydrant,
-        VendingMachine
+        VendingMachine,
+        Pothole
     }
 
     /// <summary>
@@ -67,6 +68,7 @@ namespace RacingGame
                 RoadsidePropKind.OilBarrel => CreateOilBarrelSprite(),
                 RoadsidePropKind.RoadBarrier => CreateRoadBarrierSprite(),
                 RoadsidePropKind.OilSlick => CreateOilSlickSprite(),
+                RoadsidePropKind.Pothole => CreatePotholeSprite(),
                 RoadsidePropKind.PoliceSirenBeacon => CreatePoliceBeaconSprite(),
                 RoadsidePropKind.SkyscraperTower => CreateSkyscraperSprite(),
                 RoadsidePropKind.TrafficLight => CreateTrafficLightSprite(),
@@ -412,6 +414,43 @@ namespace RacingGame
             }
 
             return FinalizeSprite(tex, 32f, new Vector2(0.5f, 0.25f));
+        }
+
+        private static Sprite CreatePotholeSprite()
+        {
+            const int w = 64;
+            const int h = 32;
+            Texture2D tex = NewPointTex(w, h);
+            Color rimCrack = new Color(0.28f, 0.30f, 0.34f, 0.95f);
+            Color innerWall = new Color(0.11f, 0.12f, 0.16f, 0.98f);
+            Color deepCore = new Color(0.03f, 0.03f, 0.05f, 1.0f);
+            Color grimeTint = new Color(0.18f, 0.15f, 0.12f, 0.92f);
+
+            for (int y = 2; y < h - 2; y++)
+            {
+                for (int x = 4; x < w - 4; x++)
+                {
+                    float nx = (x - 32f) / 24f;
+                    float ny = (y - 16f) / 11f;
+                    float jagged = Mathf.Sin(x * 0.45f) * 0.07f + Mathf.Cos(y * 0.65f) * 0.05f;
+                    float d = nx * nx + ny * ny + jagged;
+                    if (d <= 1.0f)
+                    {
+                        if (d < 0.42f)
+                            tex.SetPixel(x, y, deepCore);
+                        else if (d < 0.78f)
+                            tex.SetPixel(x, y, ((x + y) % 5 == 0) ? grimeTint : innerWall);
+                        else
+                            tex.SetPixel(x, y, rimCrack);
+                    }
+                }
+            }
+
+            // Cracked edges radiating outward slightly inside safe margin
+            for (int x = 10; x < 16; x++) tex.SetPixel(x, 16, rimCrack);
+            for (int x = 48; x < 54; x++) tex.SetPixel(x, 15, rimCrack);
+
+            return FinalizeSprite(tex, 32f);
         }
 
         private static Sprite CreatePoliceBeaconSprite()

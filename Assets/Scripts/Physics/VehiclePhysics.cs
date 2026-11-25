@@ -173,7 +173,7 @@ namespace RacingGame
             float highSpeedStability = Mathf.Lerp(1f, 0.65f, Mathf.Clamp01(absForward / stats.maxSpeed));
             float steerDirection = vForward >= -0.1f ? 1f : -1f;
 
-            heading -= _steeringInput * stats.turnRate * steerSpeedFactor * highSpeedStability * steerDirection * dt;
+            heading -= _steeringInput * stats.turnRate * steerSpeedFactor * highSpeedStability * Mathf.Min(1f, _surfaceGripMultiplier) * steerDirection * dt;
             heading = NormalizeAngle(heading);
 
             fwd = Forward;
@@ -214,6 +214,11 @@ namespace RacingGame
                 {
                     vForward = 0f;
                 }
+                else if (_throttleInput > 0.05f && _brakeInput < 0.05f && vForward > 0f)
+                {
+                    // Holding throttle must never stall forward momentum at zero even on high-drag off-road terrain
+                    vForward = Mathf.Max(0.25f, vForward - totalResist);
+                }
                 else
                 {
                     vForward -= totalResist;
@@ -224,9 +229,17 @@ namespace RacingGame
                 vForward = 0f;
             }
 
-            // Clamp longitudinal speed
+            // Clamp longitudinal speed (smooth bleed-down when crossing onto a slower surface)
             float effectiveMaxSpeed = stats.maxSpeed * _surfaceMaxSpeedMultiplier;
-            vForward = Mathf.Clamp(vForward, -stats.maxReverseSpeed, effectiveMaxSpeed);
+            if (vForward > effectiveMaxSpeed)
+            {
+                float overSpeedDecel = Mathf.Max(28f, stats.maxSpeed * 0.90f);
+                vForward = Mathf.MoveTowards(vForward, effectiveMaxSpeed, overSpeedDecel * dt);
+            }
+            else
+            {
+                vForward = Mathf.Clamp(vForward, -stats.maxReverseSpeed, effectiveMaxSpeed);
+            }
 
             // 4. Lateral tire grip (exponential damping of sideways slip)
             float effectiveGrip = stats.grip * _surfaceGripMultiplier;

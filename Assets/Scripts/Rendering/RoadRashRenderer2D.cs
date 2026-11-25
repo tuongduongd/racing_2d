@@ -58,6 +58,7 @@ namespace RacingGame
 
         private GameManager _gameManager;
         private EnvironmentDecorator _environmentDecorator;
+        private TrackObstacleSystem _boundObstacleSystem;
         private SliceData[] _slices;
         private SliceData _playerSlice;
         private float _horizonScroll;
@@ -221,6 +222,17 @@ namespace RacingGame
                 _gameManager.RacerKicked += HandleRacerKicked;
                 _gameManager.RacersCollided -= HandleRacersCollided;
                 _gameManager.RacersCollided += HandleRacersCollided;
+
+                if (_gameManager.ObstacleSystem != null)
+                {
+                    if (_boundObstacleSystem != null && _boundObstacleSystem != _gameManager.ObstacleSystem)
+                    {
+                        _boundObstacleSystem.ObstacleHit -= HandleObstacleHit;
+                    }
+                    _boundObstacleSystem = _gameManager.ObstacleSystem;
+                    _boundObstacleSystem.ObstacleHit -= HandleObstacleHit;
+                    _boundObstacleSystem.ObstacleHit += HandleObstacleHit;
+                }
             }
         }
 
@@ -230,6 +242,36 @@ namespace RacingGame
             {
                 _gameManager.RacerKicked -= HandleRacerKicked;
                 _gameManager.RacersCollided -= HandleRacersCollided;
+                if (_gameManager.ObstacleSystem != null)
+                {
+                    _gameManager.ObstacleSystem.ObstacleHit -= HandleObstacleHit;
+                }
+            }
+
+            if (_boundObstacleSystem != null)
+            {
+                _boundObstacleSystem.ObstacleHit -= HandleObstacleHit;
+                _boundObstacleSystem = null;
+            }
+        }
+
+        private void HandleObstacleHit(Car car, TrackObstacle obstacle)
+        {
+            if (car == null || car != playerCar || obstacle == null) return;
+            bool isHazard = obstacle.IsSurfaceHazard ||
+                            obstacle.Kind == ObstacleKind.Pothole ||
+                            obstacle.Kind == ObstacleKind.OilSlick;
+            if (isHazard)
+            {
+                AddCameraShake(0.18f);
+            }
+            else
+            {
+                AddCameraShake(0.55f);
+                if (vfxController != null)
+                {
+                    vfxController.EmitImpactSparks(new Vector3(0f, _playerSlice.screenY + 0.8f, -0.3f), 0.9f);
+                }
             }
         }
 

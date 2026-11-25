@@ -229,7 +229,8 @@ namespace RacingGame.Tests
 
             Assert.AreEqual(0, recoveryEvents, "Going off-road must NOT auto-teleport the player back to center.");
             Assert.IsFalse(car.IsOnTrack, "Player should be free to keep riding off-road until steering back.");
-            Assert.Greater(car.Physics.ForwardSpeed, 28f, "Off-road Road Rash riding should feel fast and smooth like on the road.");
+            Assert.Greater(car.Physics.ForwardSpeed, 18f, "Off-road Road Rash riding should stay responsive and never stall.");
+            Assert.LessOrEqual(car.Physics.ForwardSpeed, car.Physics.MaxSpeed * 0.6f, "Off-road top speed must stay capped at <= 60% MaxSpeed.");
 
             Vector2 currentTrackDir = track.SampleAtDistance(car.TrackDistance).tangent;
             Assert.Greater(Vector2.Dot(car.Physics.Forward, currentTrackDir), 0.90f,
@@ -253,12 +254,13 @@ namespace RacingGame.Tests
             Assert.LessOrEqual(timeToReturn, 1.0f, $"Returning to asphalt took too long ({timeToReturn:F2}s).");
             Assert.AreEqual(0, recoveryEvents, "Returning via steering must not fire teleport recovery events.");
 
-            // Manual [F] recovery still works only when explicitly triggered
+            // Manual and automatic teleport recovery are permanently disabled for player freedom
             car.Initialize(driver, offRoadPos, trackHeading + Mathf.PI * 0.5f, track);
             Assert.IsFalse(car.IsOnTrack);
-            Assert.IsTrue(gm.RecoverPlayerToTrack(automatic: false));
-            Assert.AreEqual(1, recoveryEvents);
-            Assert.IsTrue(car.IsOnTrack);
+            Assert.IsFalse(gm.RecoverPlayerToTrack(automatic: false));
+            Assert.IsFalse(gm.RecoverPlayerToTrack(automatic: true));
+            Assert.AreEqual(0, recoveryEvents);
+            Assert.IsFalse(car.IsOnTrack);
         }
 
         [Test]

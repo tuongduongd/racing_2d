@@ -14,6 +14,9 @@ namespace RacingGame
         public float HitRadius;
         public float SpeedMultiplierOnHit;
         public float LateralKnockImpulse;
+        public bool IsSurfaceHazard;
+        public float BackwardKnockbackMeters;
+        public float BackwardVelocityImpulse;
         public float RespawnTimer;
         public Sprite CustomSprite;
 
@@ -27,6 +30,7 @@ namespace RacingGame
             ObstacleKind.RoadBarrier => RoadsidePropKind.RoadBarrier,
             ObstacleKind.OilSlick => RoadsidePropKind.OilSlick,
             ObstacleKind.ParkedBus => RoadsidePropKind.ParkedBus,
+            ObstacleKind.Pothole => RoadsidePropKind.Pothole,
             _ => RoadsidePropKind.TrafficCone
         };
     }
@@ -129,7 +133,8 @@ namespace RacingGame
                     ObstacleKind.TrafficCone,
                     ObstacleKind.OilBarrel,
                     ObstacleKind.RoadBarrier,
-                    ObstacleKind.OilSlick
+                    ObstacleKind.OilSlick,
+                    ObstacleKind.Pothole
                 };
 
             float segmentStep = usableSpan / obstacleCount;
@@ -185,6 +190,9 @@ namespace RacingGame
                     HitRadius = spec.HitRadius,
                     SpeedMultiplierOnHit = spec.SpeedMultiplierOnHit,
                     LateralKnockImpulse = spec.LateralKnockImpulse,
+                    IsSurfaceHazard = spec.IsSurfaceHazard,
+                    BackwardKnockbackMeters = spec.BackwardKnockbackMeters,
+                    BackwardVelocityImpulse = spec.BackwardVelocityImpulse,
                     RespawnTimer = 0f,
                     CustomSprite = customSpr
                 });
@@ -208,6 +216,9 @@ namespace RacingGame
                 HitRadius = hitRadius > 0f ? hitRadius : spec.HitRadius,
                 SpeedMultiplierOnHit = spec.SpeedMultiplierOnHit,
                 LateralKnockImpulse = spec.LateralKnockImpulse,
+                IsSurfaceHazard = spec.IsSurfaceHazard,
+                BackwardKnockbackMeters = spec.BackwardKnockbackMeters,
+                BackwardVelocityImpulse = spec.BackwardVelocityImpulse,
                 RespawnTimer = 0f,
                 CustomSprite = ResolveCustomObstacleSprite(kind)
             };
@@ -233,7 +244,7 @@ namespace RacingGame
                 return customObstacleSprites[index];
             }
 
-            return customObstacleSprites[((index % customObstacleSprites.Length) + customObstacleSprites.Length) % customObstacleSprites.Length];
+            return null;
         }
 
         public void StepObstacles(WaypointTrack track, IReadOnlyList<Car> cars, float dt)
@@ -258,6 +269,9 @@ namespace RacingGame
             {
                 Car car = cars[c];
                 if (car == null) continue;
+
+                car.ConsumeOrTickObstacleImmunity(dt);
+                if (car.IsObstacleImmune) continue;
 
                 for (int i = 0; i < _obstacles.Count; i++)
                 {
@@ -298,18 +312,33 @@ namespace RacingGame
                 ObstacleKind.RoadBarrier => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.RoadBarrier),
                 ObstacleKind.OilSlick => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.OilSlick),
                 ObstacleKind.ParkedBus => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.ParkedBus),
+                ObstacleKind.Pothole => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.Pothole),
                 _ => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.TrafficCone)
             };
         }
 
         private static void ApplyObstacleImpact(Car car, TrackObstacle obs, WaypointTrack track)
         {
-            Vector2 segDir = track.GetTrackDirection(car.CurrentWaypointIndex);
-            Vector2 segRight = new Vector2(segDir.y, -segDir.x);
-            int pushSide = car.LateralOffset >= obs.LateralOffset ? 1 : -1;
+            bool isSurfaceHazard = obs.IsSurfaceHazard ||
+                                   obs.Kind == ObstacleKind.Pothole ||
+                                   obs.Kind == ObstacleKind.OilSlick;
+            if (isSurfaceHazard)
+            {
+                car.ApplySurfaceHazardSlowdown(obs.SpeedMultiplierOnHit, 0.45f);
+                return;
+            }
 
-            car.ReceiveKick(pushSide, segRight * (pushSide * obs.LateralKnockImpulse), 0.32f);
-            car.Physics.ScaleVelocity(obs.SpeedMultiplierOnHit);
+            int pushSide = car.LateralOffset >= obs.LateralOffset ? 1 : -1;
+            float backMeters = obs.BackwardKnockbackMeters > 0f ? obs.BackwardKnockbackMeters : 2.6f;
+            float backImpulse = obs.BackwardVelocityImpulse > 0f ? obs.BackwardVelocityImpulse : 12.0f;
+            car.ApplySolidObstacleKnockback(
+                pushSide,
+                track,
+                obs.SpeedMultiplierOnHit,
+                obs.LateralKnockImpulse,
+                backMeters,
+                backImpulse,
+                0.55f);
         }
     }
 }
