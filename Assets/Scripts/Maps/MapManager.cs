@@ -22,10 +22,14 @@ namespace RacingGame
         private readonly List<Object> _runtimeCreatedAssets = new List<Object>();
         private readonly HashSet<string> _sessionUnlockedIds = new HashSet<string>();
         private CarUpgradeSystem _saveSystem;
+        private ITrackDataProvider _trackDataProvider;
+        private string _jsonDirectoryOverride;
+        private bool _allowExternalJsonOverride = true;
         private int _selectedIndex;
         private bool _initialized;
 
         public CarUpgradeSystem SaveSystem => _saveSystem;
+        public ITrackDataProvider TrackDataProvider => _trackDataProvider;
 
         public IReadOnlyList<TrackDefinition> Maps
         {
@@ -80,15 +84,27 @@ namespace RacingGame
             if (_initialized && _maps.Count > 0) return;
 
             _maps.Clear();
+            var baseAssetById = new Dictionary<string, TrackDefinition>();
+
             if (mapAssets != null)
             {
                 for (int i = 0; i < mapAssets.Length; i++)
                 {
-                    if (mapAssets[i] != null && !_maps.Contains(mapAssets[i]))
+                    TrackDefinition asset = mapAssets[i];
+                    if (asset != null && !_maps.Contains(asset))
                     {
-                        _maps.Add(mapAssets[i]);
+                        _maps.Add(asset);
+                        if (!string.IsNullOrWhiteSpace(asset.MapId))
+                        {
+                            baseAssetById[asset.MapId] = asset;
+                        }
                     }
                 }
+            }
+
+            if (_allowExternalJsonOverride)
+            {
+                TryApplyExternalJsonMaps(baseAssetById);
             }
 
             if (_maps.Count == 0)
@@ -122,6 +138,75 @@ namespace RacingGame
             SyncWithSaveSystem();
         }
 
+        public void SetTrackDataProvider(ITrackDataProvider provider)
+        {
+            _trackDataProvider = provider;
+        }
+
+        public int LoadMapsFromJsonDirectory(string directoryPath)
+        {
+            _jsonDirectoryOverride = directoryPath;
+            _allowExternalJsonOverride = true;
+            _initialized = false;
+            EnsureInitialized();
+            return _maps.Count;
+        }
+
+        private void TryApplyExternalJsonMaps(Dictionary<string, TrackDefinition> baseAssetById)
+        {
+            _trackDataProvider ??= new ExternalJsonTrackLoader();
+            string dir = string.IsNullOrWhiteSpace(_jsonDirectoryOverride)
+                ? ExternalJsonTrackLoader.DefaultMapsDirectory
+                : _jsonDirectoryOverride;
+
+            IReadOnlyList<TrackJsonDto> jsonMaps = _trackDataProvider.LoadTracks(dir);
+            if (jsonMaps == null || jsonMaps.Count == 0)
+            {
+                return;
+            }
+
+            var loadedList = new List<TrackDefinition>(jsonMaps.Count);
+            for (int i = 0; i < jsonMaps.Count; i++)
+            {
+                TrackJsonDto dto = jsonMaps[i];
+                if (dto == null || string.IsNullOrWhiteSpace(dto.mapId)) continue;
+
+                TrackDefinition runtimeDef;
+                if (baseAssetById != null && baseAssetById.TryGetValue(dto.mapId, out TrackDefinition existingAsset) && existingAsset != null)
+                {
+                    // Clone runtime copy so serialized .asset files on disk are never dirtied
+                    runtimeDef = Instantiate(existingAsset);
+                    runtimeDef.ApplyJsonDto(dto);
+                }
+                else
+                {
+                    MapTheme theme = CreateThemeFallbackForMapId(dto.mapId);
+                    _runtimeCreatedAssets.Add(theme);
+                    runtimeDef = TrackDefinition.CreateFromJsonDto(dto, theme);
+                }
+
+                _runtimeCreatedAssets.Add(runtimeDef);
+                loadedList.Add(runtimeDef);
+            }
+
+            if (loadedList.Count > 0)
+            {
+                _maps.Clear();
+                _maps.AddRange(loadedList);
+            }
+        }
+
+        private static MapTheme CreateThemeFallbackForMapId(string mapId)
+        {
+            return mapId switch
+            {
+                "coastal_highway" => MapTheme.CreateCoastalHighwayPreset(),
+                "neon_night" => MapTheme.CreateNeonNightExpressPreset(),
+                "city_district" => MapTheme.CreateCityDistrictPreset(),
+                _ => MapTheme.CreateCityMorningPreset()
+            };
+        }
+
         public void BindSaveSystem(CarUpgradeSystem saveSystem)
         {
             _saveSystem = saveSystem;
@@ -138,6 +223,7 @@ namespace RacingGame
         public void SetMapAssets(TrackDefinition[] definitions)
         {
             mapAssets = definitions;
+            _allowExternalJsonOverride = false;
             _initialized = false;
             EnsureInitialized();
         }

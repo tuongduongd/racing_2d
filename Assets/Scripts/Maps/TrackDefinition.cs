@@ -124,6 +124,110 @@ namespace RacingGame
             };
         }
 
+        public static TrackDefinition CreateFromJsonDto(TrackJsonDto dto, MapTheme mapTheme = null)
+        {
+            if (dto == null)
+            {
+                throw new InvalidTrackConfigurationException("null", "Cannot create TrackDefinition from null TrackJsonDto.");
+            }
+
+            dto.ValidateOrThrow(dto.mapId);
+            TrackDefinition def = CreateInstance<TrackDefinition>();
+            def.theme = mapTheme;
+            def.ApplyJsonDto(dto);
+            return def;
+        }
+
+        public void ApplyJsonDto(TrackJsonDto dto)
+        {
+            if (dto == null)
+            {
+                throw new InvalidTrackConfigurationException(mapId, "Cannot apply null TrackJsonDto.");
+            }
+
+            dto.ValidateOrThrow(dto.mapId);
+
+            mapId = dto.mapId.Trim();
+            displayName = string.IsNullOrWhiteSpace(dto.displayName) ? mapId : dto.displayName.Trim();
+            description = dto.description ?? string.Empty;
+            difficultyStars = Mathf.Clamp(dto.difficultyStars, 1, 5);
+            unlockedByDefault = dto.unlockedByDefault;
+
+            var pts = new Vector2[dto.waypoints.Length];
+            for (int i = 0; i < dto.waypoints.Length; i++)
+            {
+                pts[i] = new Vector2(dto.waypoints[i].x, dto.waypoints[i].y);
+            }
+            waypoints = pts;
+
+            laneCount = Mathf.Clamp(dto.laneCount, 2, 6);
+            laneWidth = Mathf.Max(2.4f, dto.laneWidth);
+            shoulderExtraWidth = Mathf.Max(3.0f, dto.shoulderExtraWidth);
+
+            elevationAmplitude = dto.elevationAmplitude;
+            elevationFrequency = dto.elevationFrequency;
+            elevationSecondaryAmp = dto.elevationSecondaryAmp;
+
+            obstacleCount = Mathf.Clamp(dto.obstacleCount, 0, 60);
+            obstacleMinSpacingMeters = Mathf.Max(15f, dto.obstacleMinSpacingMeters);
+
+            if (dto.allowedObstacles != null && dto.allowedObstacles.Length > 0)
+            {
+                var parsed = new System.Collections.Generic.List<ObstacleKind>(dto.allowedObstacles.Length);
+                for (int i = 0; i < dto.allowedObstacles.Length; i++)
+                {
+                    string raw = dto.allowedObstacles[i];
+                    if (string.IsNullOrWhiteSpace(raw)) continue;
+                    if (Enum.TryParse(raw.Trim(), true, out ObstacleKind kind) && Enum.IsDefined(typeof(ObstacleKind), kind))
+                    {
+                        parsed.Add(kind);
+                    }
+                }
+                if (parsed.Count > 0)
+                {
+                    allowedObstacles = parsed.ToArray();
+                }
+            }
+
+            enablePoliceChase = dto.enablePoliceChase;
+            policeSpeedBonus = dto.policeSpeedBonus;
+            policeWarningRangeMeters = Mathf.Max(10f, dto.policeWarningRangeMeters);
+            aiCornerSpeedMultiplier = Mathf.Clamp(dto.aiCornerSpeedMultiplier, 0.75f, 1.35f);
+            rewardMultiplier = Mathf.Clamp(dto.rewardMultiplier, 1.0f, 3.0f);
+            recommendedLaps = Mathf.Clamp(dto.recommendedLaps, 1, 10);
+
+            if (dto.featureZones != null && dto.featureZones.Length > 0)
+            {
+                var zones = new TrackFeatureZone[dto.featureZones.Length];
+                for (int i = 0; i < dto.featureZones.Length; i++)
+                {
+                    TrackFeatureZoneDto z = dto.featureZones[i];
+                    TrackFeatureKind kind = TrackFeatureKind.None;
+                    if (z != null && !string.IsNullOrWhiteSpace(z.kind))
+                    {
+                        if (!Enum.TryParse(z.kind.Trim(), true, out kind))
+                        {
+                            kind = TrackFeatureKind.None;
+                        }
+                    }
+
+                    zones[i] = new TrackFeatureZone
+                    {
+                        kind = kind,
+                        startNormalized = z != null ? Mathf.Clamp01(z.startNormalized) : 0f,
+                        endNormalized = z != null ? Mathf.Clamp01(z.endNormalized) : 0f,
+                        elevationBoostMeters = z != null ? z.elevationBoostMeters : 0f,
+                        label = z != null ? (z.label ?? string.Empty) : string.Empty
+                    };
+                }
+                featureZones = zones;
+            }
+            else
+            {
+                featureZones = Array.Empty<TrackFeatureZone>();
+            }
+        }
+
         public static TrackDefinition CreateRuntime(
             string id,
             string title,

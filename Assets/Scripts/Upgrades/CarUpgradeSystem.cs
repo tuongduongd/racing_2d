@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -6,133 +5,78 @@ using UnityEngine;
 namespace RacingGame
 {
     /// <summary>
-    /// Serializable DTO persisted to JSON for player money, upgrade levels, race records, and unlocked maps.
-    /// </summary>
-    [Serializable]
-    public class PlayerSaveData
-    {
-        public int money = 200;
-        public int engineLevel;
-        public int brakesLevel;
-        public int gripLevel;
-        public int weightLevel;
-        public int racesPlayed;
-        public int racesWon;
-        public float bestRaceTime;
-        public List<string> unlockedMapIds = new List<string>();
-        public string selectedMapId = string.Empty;
-    }
-
-    /// <summary>
-    /// Manages prize money, progressive vehicle upgrades (exponential pricing),
-    /// applying stats to VehiclePhysics, and saving/loading JSON progress.
-    /// Encapsulates save data and exposes controlled transactions.
+    /// Engine-integrated facade over pure C# ProgressionRuleEngine (DIP + Decorator stats chain).
+    /// Supports both legacy zero-arg/path constructors and full Constructor Injection via ISaveStorage / IJsonCodec.
     /// </summary>
     public class CarUpgradeSystem
     {
-        public const int MaxUpgradeLevel = 5;
+        public const int MaxUpgradeLevel = ProgressionRuleEngine.DefaultMaxUpgradeLevel;
         public const float CostGrowthFactor = 1.5f;
 
-        private readonly string _saveFilePath;
-        private VehicleStats _baseStats;
-        private PlayerSaveData _data = new PlayerSaveData();
+        private readonly ProgressionRuleEngine _engine;
 
-        public int Money => _data.money;
-        public int RacesPlayed => _data.racesPlayed;
-        public int RacesWon => _data.racesWon;
-        public float BestRaceTime => _data.bestRaceTime;
-        public string SaveFilePath => _saveFilePath;
-        public VehicleStats BaseStats => _baseStats;
-        public IReadOnlyList<string> UnlockedMapIds => _data.unlockedMapIds ?? (_data.unlockedMapIds = new List<string>());
-        public string SelectedMapId => _data.selectedMapId ?? string.Empty;
+        public int Money => _engine.Money;
+        public int RacesPlayed => _engine.RacesPlayed;
+        public int RacesWon => _engine.RacesWon;
+        public float BestRaceTime => _engine.BestRaceTime;
+        public string SaveFilePath => _engine.SaveFilePath;
+        public VehicleStats BaseStats => VehicleStats.FromPure(_engine.BaseStats);
+        public GameBalanceConfig BalanceConfig => _engine.BalanceConfig;
+        public IReadOnlyList<string> UnlockedMapIds => _engine.UnlockedMapIds;
+        public string SelectedMapId => _engine.SelectedMapId;
+        public IReadOnlyList<HighScoreEntry> AllHighScores => _engine.AllHighScores;
+        public ProgressionRuleEngine Engine => _engine;
 
-        public CarUpgradeSystem() : this(Path.Combine(Application.persistentDataPath, "racing2d_save.json"), VehicleStats.Default)
+        public CarUpgradeSystem()
+            : this(Path.Combine(Application.persistentDataPath, "racing2d_save.json"), VehicleStats.Default)
         {
         }
 
-        public CarUpgradeSystem(string customSavePath) : this(customSavePath, VehicleStats.Default)
+        public CarUpgradeSystem(string customSavePath)
+            : this(customSavePath, VehicleStats.Default)
         {
         }
 
         public CarUpgradeSystem(string customSavePath, VehicleStats baseStats)
+            : this(new FileSaveStorageAdapter(), new UnityJsonCodec(), customSavePath, baseStats, null)
         {
-            _saveFilePath = customSavePath;
-            _baseStats = baseStats.Sanitize();
-            _data = new PlayerSaveData();
+        }
+
+        public CarUpgradeSystem(
+            ISaveStorage storage,
+            IJsonCodec jsonCodec,
+            string customSavePath,
+            VehicleStats baseStats,
+            GameBalanceConfig balanceConfig = null)
+        {
+            _engine = new ProgressionRuleEngine(
+                storage,
+                jsonCodec,
+                customSavePath,
+                baseStats.ToPure(),
+                balanceConfig,
+                Debug.LogWarning);
         }
 
         public void SetBaseStats(in VehicleStats baseStats)
         {
-            _baseStats = baseStats.Sanitize();
+            _engine.SetBaseStats(baseStats.ToPure());
         }
 
-        public int GetLevel(UpgradeType type)
+        public void ApplyBalanceConfig(GameBalanceConfig config)
         {
-            return type switch
-            {
-                UpgradeType.Engine => _data.engineLevel,
-                UpgradeType.Brakes => _data.brakesLevel,
-                UpgradeType.Grip => _data.gripLevel,
-                UpgradeType.WeightReduction => _data.weightLevel,
-                _ => 0
-            };
+            _engine.ApplyBalanceConfig(config);
         }
 
-        public bool IsMaxLevel(UpgradeType type)
-        {
-            return GetLevel(type) >= MaxUpgradeLevel;
-        }
+        public int GetLevel(UpgradeType type) => _engine.GetLevel(type);
+        public bool IsMaxLevel(UpgradeType type) => _engine.IsMaxLevel(type);
+        public int GetBaseCost(UpgradeType type) => _engine.GetBaseCost(type);
+        public int GetUpgradeCost(UpgradeType type) => _engine.GetUpgradeCost(type);
+        public bool CanAfford(UpgradeType type) => _engine.CanAfford(type);
+        public bool BuyUpgrade(UpgradeType type) => _engine.BuyUpgrade(type);
+        public void BuyUpgradeStrict(UpgradeType type) => _engine.BuyUpgradeStrict(type);
+        public void AddMoney(int amount) => _engine.AddMoney(amount);
 
-        public int GetBaseCost(UpgradeType type)
-        {
-            return type switch
-            {
-                UpgradeType.Engine => 150,
-                UpgradeType.Brakes => 120,
-                UpgradeType.Grip => 130,
-                UpgradeType.WeightReduction => 140,
-                _ => 150
-            };
-        }
-
-        /// <summary>
-        /// Exponential cost per level: baseCost * 1.5^level.
-        /// Returns 0 if already at MaxUpgradeLevel.
-        /// </summary>
-        public int GetUpgradeCost(UpgradeType type)
-        {
-            int level = GetLevel(type);
-            if (level >= MaxUpgradeLevel) return 0;
-            return Mathf.RoundToInt(GetBaseCost(type) * Mathf.Pow(CostGrowthFactor, level));
-        }
-
-        public bool CanAfford(UpgradeType type)
-        {
-            return !IsMaxLevel(type) && _data.money >= GetUpgradeCost(type);
-        }
-
-        public bool BuyUpgrade(UpgradeType type)
-        {
-            if (IsMaxLevel(type)) return false;
-
-            int cost = GetUpgradeCost(type);
-            if (_data.money < cost) return false;
-
-            _data.money -= cost;
-            SetLevel(type, GetLevel(type) + 1);
-            Save();
-            return true;
-        }
-
-        public void AddMoney(int amount)
-        {
-            if (amount <= 0) return;
-            _data.money += amount;
-        }
-
-        /// <summary>
-        /// Computes prize reward based on finishing position (1-based).
-        /// </summary>
         public static int CalculatePrizeMoney(int finishPosition)
         {
             return finishPosition switch
@@ -145,175 +89,86 @@ namespace RacingGame
             };
         }
 
-        /// <summary>
-        /// Awards race prize money and updates player statistics, then persists to JSON.
-        /// </summary>
         public int AwardRaceResult(int finishPosition, float raceTime)
         {
-            return AwardRaceResult(finishPosition, raceTime, 1.0f);
+            return _engine.AwardRaceResult(finishPosition, raceTime, 1.0f);
         }
 
-        /// <summary>
-        /// Awards race prize money scaled by the map's reward multiplier, then persists to JSON.
-        /// </summary>
         public int AwardRaceResult(int finishPosition, float raceTime, float rewardMultiplier)
         {
-            float safeMult = Mathf.Clamp(rewardMultiplier, 1.0f, 3.0f);
-            int prize = Mathf.RoundToInt(CalculatePrizeMoney(finishPosition) * safeMult);
-            _data.money += prize;
-            _data.racesPlayed++;
-            if (finishPosition == 1)
-            {
-                _data.racesWon++;
-            }
-            if (raceTime > 0f && (_data.bestRaceTime <= 0f || raceTime < _data.bestRaceTime))
-            {
-                _data.bestRaceTime = raceTime;
-            }
-            Save();
-            return prize;
+            return _engine.AwardRaceResult(finishPosition, raceTime, rewardMultiplier);
         }
 
-        /// <summary>
-        /// Computes vehicle stats from baseline VehicleStats and current upgrade levels.
-        /// </summary>
+        public void RecordHighScore(string mapId, string racerName, float finishTime, int totalLaps, DifficultyLevel difficulty)
+        {
+            _engine.RecordHighScore(mapId, racerName, finishTime, totalLaps, difficulty);
+        }
+
+        public IReadOnlyList<HighScoreEntry> GetHighScores(string mapId = null)
+        {
+            return _engine.GetHighScores(mapId);
+        }
+
         public VehicleStats ComputeUpgradedStats()
         {
-            int engineLv = GetLevel(UpgradeType.Engine);
-            int brakesLv = GetLevel(UpgradeType.Brakes);
-            int gripLv = GetLevel(UpgradeType.Grip);
-            int weightLv = GetLevel(UpgradeType.WeightReduction);
-
-            VehicleStats upgraded = _baseStats;
-            upgraded.mass = _baseStats.mass - weightLv * 14f;
-            upgraded.enginePower = _baseStats.enginePower + engineLv * 750f;
-            upgraded.brakePower = _baseStats.brakePower + brakesLv * 1400f;
-            upgraded.grip = _baseStats.grip + gripLv * 1.3f;
-            upgraded.maxSpeed = _baseStats.maxSpeed + engineLv * 3.5f;
-            return upgraded.Sanitize();
+            return VehicleStats.FromPure(_engine.ComputeUpgradedStats());
         }
 
-        /// <summary>
-        /// Applies all current upgrade levels idempotently onto VehiclePhysics from baseline stats.
-        /// </summary>
         public void ApplyToCar(VehiclePhysics physics)
         {
             if (physics == null) return;
             physics.ConfigureStats(ComputeUpgradedStats());
         }
 
-        public string GetUpgradeDisplayName(UpgradeType type)
-        {
-            return type switch
-            {
-                UpgradeType.Engine => "Động cơ (Engine)",
-                UpgradeType.Brakes => "Phanh (Brakes)",
-                UpgradeType.Grip => "Độ bám (Grip)",
-                UpgradeType.WeightReduction => "Nhẹ xe (Weight)",
-                _ => type.ToString()
-            };
-        }
-
-        public string GetUpgradeEffectText(UpgradeType type)
-        {
-            return type switch
-            {
-                UpgradeType.Engine => "+750 Power, +3.5 MaxSpeed/cấp",
-                UpgradeType.Brakes => "+1400 Lực phanh/cấp",
-                UpgradeType.Grip => "+1.3 Độ bám đường/cấp",
-                UpgradeType.WeightReduction => "-14 kg Trọng lượng/cấp",
-                _ => string.Empty
-            };
-        }
-
-        public bool IsMapUnlocked(string mapId)
-        {
-            if (string.IsNullOrWhiteSpace(mapId) || _data.unlockedMapIds == null) return false;
-            return _data.unlockedMapIds.Contains(mapId.Trim());
-        }
-
-        public bool UnlockMap(string mapId, bool saveImmediately = true)
-        {
-            if (string.IsNullOrWhiteSpace(mapId)) return false;
-
-            string cleanId = mapId.Trim();
-            _data.unlockedMapIds ??= new List<string>();
-            if (_data.unlockedMapIds.Contains(cleanId)) return false;
-
-            _data.unlockedMapIds.Add(cleanId);
-            if (saveImmediately)
-            {
-                Save();
-            }
-            return true;
-        }
-
-        public bool TryPurchaseMapUnlock(string mapId, int cost)
-        {
-            if (string.IsNullOrWhiteSpace(mapId) || IsMapUnlocked(mapId)) return false;
-
-            int safeCost = Mathf.Max(0, cost);
-            if (_data.money < safeCost) return false;
-
-            _data.money -= safeCost;
-            _data.unlockedMapIds ??= new List<string>();
-            _data.unlockedMapIds.Add(mapId.Trim());
-            Save();
-            return true;
-        }
-
-        public void SetSelectedMapId(string mapId, bool saveImmediately = true)
-        {
-            _data.selectedMapId = string.IsNullOrWhiteSpace(mapId) ? string.Empty : mapId.Trim();
-            if (saveImmediately)
-            {
-                Save();
-            }
-        }
+        public string GetUpgradeDisplayName(UpgradeType type) => _engine.GetUpgradeDisplayName(type);
+        public string GetUpgradeEffectText(UpgradeType type) => _engine.GetUpgradeEffectText(type);
+        public bool IsMapUnlocked(string mapId) => _engine.IsMapUnlocked(mapId);
+        public bool UnlockMap(string mapId, bool saveImmediately = true) => _engine.UnlockMap(mapId, saveImmediately);
+        public bool TryPurchaseMapUnlock(string mapId, int cost) => _engine.TryPurchaseMapUnlock(mapId, cost);
+        public void SetSelectedMapId(string mapId, bool saveImmediately = true) => _engine.SetSelectedMapId(mapId, saveImmediately);
 
         public bool EnsureDefaultUnlockedMaps(IReadOnlyList<TrackDefinition> definitions, bool saveIfChanged = false)
         {
             if (definitions == null) return false;
-
-            _data.unlockedMapIds ??= new List<string>();
-            bool changed = false;
+            var defaultIds = new List<string>(definitions.Count);
             for (int i = 0; i < definitions.Count; i++)
             {
                 TrackDefinition def = definitions[i];
                 if (def != null && def.UnlockedByDefault && !string.IsNullOrWhiteSpace(def.MapId))
                 {
-                    string cleanId = def.MapId.Trim();
-                    if (!_data.unlockedMapIds.Contains(cleanId))
-                    {
-                        _data.unlockedMapIds.Add(cleanId);
-                        changed = true;
-                    }
+                    defaultIds.Add(def.MapId.Trim());
                 }
             }
-
-            if (changed && saveIfChanged)
-            {
-                Save();
-            }
-            return changed;
+            return _engine.EnsureDefaultUnlockedMaps(defaultIds, saveIfChanged);
         }
 
         public void ResetMapProgress(IReadOnlyList<TrackDefinition> definitions = null, bool saveImmediately = true)
         {
-            _data.unlockedMapIds = new List<string>();
-            _data.selectedMapId = string.Empty;
-
-            if (definitions != null)
+            if (definitions == null)
             {
-                EnsureDefaultUnlockedMaps(definitions, saveIfChanged: false);
-                for (int i = 0; i < definitions.Count; i++)
+                _engine.ResetMapProgress(null, saveImmediately);
+                return;
+            }
+
+            var defaultIds = new List<string>(definitions.Count);
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackDefinition def = definitions[i];
+                if (def != null && def.UnlockedByDefault && !string.IsNullOrWhiteSpace(def.MapId))
                 {
-                    TrackDefinition def = definitions[i];
-                    if (def != null && !string.IsNullOrWhiteSpace(def.MapId) && IsMapUnlocked(def.MapId))
-                    {
-                        _data.selectedMapId = def.MapId.Trim();
-                        break;
-                    }
+                    defaultIds.Add(def.MapId.Trim());
+                }
+            }
+
+            _engine.ResetMapProgress(defaultIds, saveImmediately: false);
+
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                TrackDefinition def = definitions[i];
+                if (def != null && !string.IsNullOrWhiteSpace(def.MapId) && IsMapUnlocked(def.MapId))
+                {
+                    _engine.SetSelectedMapId(def.MapId.Trim(), saveImmediately: false);
+                    break;
                 }
             }
 
@@ -323,100 +178,9 @@ namespace RacingGame
             }
         }
 
-        public void Save()
-        {
-            if (string.IsNullOrEmpty(_saveFilePath)) return;
-
-            string dir = Path.GetDirectoryName(_saveFilePath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            string json = JsonUtility.ToJson(_data, true);
-            File.WriteAllText(_saveFilePath, json);
-        }
-
-        public bool Load()
-        {
-            if (string.IsNullOrEmpty(_saveFilePath) || !File.Exists(_saveFilePath))
-            {
-                _data = new PlayerSaveData();
-                return false;
-            }
-
-            try
-            {
-                string json = File.ReadAllText(_saveFilePath);
-                PlayerSaveData loaded = JsonUtility.FromJson<PlayerSaveData>(json);
-                if (loaded != null)
-                {
-                    _data = loaded;
-                    ClampLoadedLevels();
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[CarUpgradeSystem] Failed to load save file: {ex.Message}");
-            }
-
-            _data = new PlayerSaveData();
-            return false;
-        }
-
-        public void ResetProgress()
-        {
-            _data = new PlayerSaveData();
-            Save();
-        }
-
-        private void SetLevel(UpgradeType type, int level)
-        {
-            int clamped = Mathf.Clamp(level, 0, MaxUpgradeLevel);
-            switch (type)
-            {
-                case UpgradeType.Engine: _data.engineLevel = clamped; break;
-                case UpgradeType.Brakes: _data.brakesLevel = clamped; break;
-                case UpgradeType.Grip: _data.gripLevel = clamped; break;
-                case UpgradeType.WeightReduction: _data.weightLevel = clamped; break;
-            }
-        }
-
-        private void ClampLoadedLevels()
-        {
-            _data.money = Mathf.Max(0, _data.money);
-            _data.engineLevel = Mathf.Clamp(_data.engineLevel, 0, MaxUpgradeLevel);
-            _data.brakesLevel = Mathf.Clamp(_data.brakesLevel, 0, MaxUpgradeLevel);
-            _data.gripLevel = Mathf.Clamp(_data.gripLevel, 0, MaxUpgradeLevel);
-            _data.weightLevel = Mathf.Clamp(_data.weightLevel, 0, MaxUpgradeLevel);
-            _data.racesPlayed = Mathf.Max(0, _data.racesPlayed);
-            _data.racesWon = Mathf.Max(0, _data.racesWon);
-            _data.bestRaceTime = Mathf.Max(0f, _data.bestRaceTime);
-
-            if (_data.unlockedMapIds == null)
-            {
-                _data.unlockedMapIds = new List<string>();
-            }
-            else
-            {
-                var cleaned = new List<string>(_data.unlockedMapIds.Count);
-                for (int i = 0; i < _data.unlockedMapIds.Count; i++)
-                {
-                    string id = _data.unlockedMapIds[i];
-                    if (string.IsNullOrWhiteSpace(id)) continue;
-                    string trimmed = id.Trim();
-                    if (!cleaned.Contains(trimmed))
-                    {
-                        cleaned.Add(trimmed);
-                    }
-                }
-                _data.unlockedMapIds = cleaned;
-            }
-
-            _data.selectedMapId = string.IsNullOrWhiteSpace(_data.selectedMapId)
-                ? string.Empty
-                : _data.selectedMapId.Trim();
-        }
+        public void Save() => _engine.Save();
+        public bool Load() => _engine.Load();
+        public bool LoadStrict() => _engine.LoadStrict();
+        public void ResetProgress() => _engine.ResetProgress();
     }
 }

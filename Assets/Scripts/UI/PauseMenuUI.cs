@@ -57,6 +57,9 @@ namespace RacingGame
         private Button _crtToggleButton;
         private Image _crtToggleBtnImg;
         private TMP_Text _crtToggleLabel;
+        private Button _saveRaceButton;
+        private Image _saveRaceBtnImg;
+        private TMP_Text _saveRaceLabel;
         private Button _controlsGuideButton;
         private Button _closeControlsModalButton;
 
@@ -68,6 +71,7 @@ namespace RacingGame
         public Button LobbyButton => _lobbyButton;
         public Button QuitButton => _quitButton;
         public Button CrtToggleButton => _crtToggleButton;
+        public Button SaveRaceButton => _saveRaceButton;
         public Button ControlsGuideButton => _controlsGuideButton;
         public Button CloseControlsModalButton => _closeControlsModalButton;
         public bool IsShowing => _pauseRoot != null && _pauseRoot.activeSelf;
@@ -140,6 +144,10 @@ namespace RacingGame
                 if (!shouldShow)
                 {
                     CloseControlsModal();
+                }
+                else
+                {
+                    ResetSaveRaceButtonVisual();
                 }
             }
 
@@ -326,16 +334,24 @@ namespace RacingGame
 
             _crtToggleButton = LobbyUiBuilder.CreateCyberButton(
                 utilRow.transform, "CrtToggleBtn", "CRT SCANLINE: TẮT",
-                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextMuted, 12f);
-            EnableButtonLabelAutoSize(_crtToggleButton, 9.5f, 12.5f);
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextMuted, 11.5f);
+            EnableButtonLabelAutoSize(_crtToggleButton, 8.5f, 12f);
             _crtToggleBtnImg = _crtToggleButton.GetComponent<Image>();
             _crtToggleLabel = LobbyUiBuilder.GetPrimaryLabel(_crtToggleButton);
             _crtToggleButton.onClick.AddListener(() => ToggleCrtFromPause());
 
+            _saveRaceButton = LobbyUiBuilder.CreateCyberButton(
+                utilRow.transform, "SaveRaceBtn", "LƯU VÁN ĐUA",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.SafetyAmber, 11.5f);
+            EnableButtonLabelAutoSize(_saveRaceButton, 8.5f, 12f);
+            _saveRaceBtnImg = _saveRaceButton.GetComponent<Image>();
+            _saveRaceLabel = LobbyUiBuilder.GetPrimaryLabel(_saveRaceButton);
+            _saveRaceButton.onClick.AddListener(OnSaveMidRaceClicked);
+
             _controlsGuideButton = LobbyUiBuilder.CreateCyberButton(
-                utilRow.transform, "ControlsGuideBtn", "⌨   HƯỚNG DẪN PHÍM (CONTROLS)",
-                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.ElectricCyan, 12f);
-            EnableButtonLabelAutoSize(_controlsGuideButton, 9.5f, 12.5f);
+                utilRow.transform, "ControlsGuideBtn", "⌨  HƯỚNG DẪN PHÍM",
+                LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.ElectricCyan, 11.5f);
+            EnableButtonLabelAutoSize(_controlsGuideButton, 8.5f, 12f);
             _controlsGuideButton.onClick.AddListener(OpenControlsModal);
 
             // Core 4 Action Buttons Stack (TC-44 required)
@@ -584,6 +600,34 @@ namespace RacingGame
                 lbl.enableAutoSizing = true;
                 lbl.fontSizeMin = minSize;
                 lbl.fontSizeMax = maxSize;
+            }
+        }
+
+        private void OnSaveMidRaceClicked()
+        {
+            if (_gameManager == null) return;
+            bool saved = _gameManager.SaveMidRaceState();
+            if (_saveRaceLabel != null)
+            {
+                _saveRaceLabel.text = saved ? "✓ ĐÃ LƯU VÁN" : "KHÔNG LƯU ĐƯỢC";
+                _saveRaceLabel.color = saved ? LobbyUiBuilder.SuccessGreen : LobbyUiBuilder.DangerRed;
+            }
+            if (_saveRaceBtnImg != null)
+            {
+                _saveRaceBtnImg.color = saved ? new Color(0.08f, 0.28f, 0.18f, 1f) : new Color(0.36f, 0.14f, 0.14f, 1f);
+            }
+        }
+
+        private void ResetSaveRaceButtonVisual()
+        {
+            if (_saveRaceLabel != null)
+            {
+                _saveRaceLabel.text = "LƯU VÁN ĐUA";
+                _saveRaceLabel.color = LobbyUiBuilder.SafetyAmber;
+            }
+            if (_saveRaceBtnImg != null)
+            {
+                _saveRaceBtnImg.color = LobbyUiBuilder.SurfaceHigh;
             }
         }
     }

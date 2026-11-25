@@ -1,24 +1,16 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace RacingGame
 {
-    public enum GameFlowState
-    {
-        MainMenu,
-        Countdown,
-        Racing,
-        Finished,
-        UpgradeShop
-    }
-
     /// <summary>
     /// Abstract State base class implementing the OOP State Pattern for game flow:
     /// MainMenu -> Countdown -> Racing -> Finished -> UpgradeShop -> MainMenu.
+    /// Reads player triggers strictly through IInputProvider (zero Keyboard.current coupling).
     /// </summary>
     public abstract class RaceStateBase
     {
         public abstract GameFlowState StateType { get; }
+        public virtual float RemainingCountdown => 0f;
 
         public virtual void Enter(GameManager gm) { }
         public virtual void Update(GameManager gm, float dt) { }
@@ -34,6 +26,7 @@ namespace RacingGame
         {
             gm.ResetRaceGrid();
             gm.SetEngineSoundActive(false);
+            gm.SetBgmActive(true);
         }
     }
 
@@ -44,6 +37,7 @@ namespace RacingGame
         private int _lastWholeSecond;
 
         public float RemainingSeconds => _remaining;
+        public override float RemainingCountdown => _remaining;
         public override GameFlowState StateType => GameFlowState.Countdown;
 
         public CountdownState(float durationSeconds = 3.0f)
@@ -53,14 +47,25 @@ namespace RacingGame
 
         public override void Enter(GameManager gm)
         {
-            gm.ResetRaceGrid();
+            if (!gm.ConsumeSkipNextGridResetOnEnter())
+            {
+                gm.ResetRaceGrid();
+            }
             _remaining = _duration;
             _lastWholeSecond = Mathf.CeilToInt(_remaining) + 1;
             gm.SetEngineSoundActive(true);
+            gm.SetBgmActive(true);
         }
 
         public override void Update(GameManager gm, float dt)
         {
+            IInputProvider input = gm.InputProvider;
+            if (input != null && input.WasPausePressed())
+            {
+                gm.TogglePause();
+                return;
+            }
+
             _remaining -= dt;
 
             int whole = Mathf.CeilToInt(_remaining);
@@ -85,23 +90,29 @@ namespace RacingGame
         public override void Enter(GameManager gm)
         {
             gm.SetEngineSoundActive(true);
+            gm.SetBgmActive(true);
         }
 
         public override void Update(GameManager gm, float dt)
         {
-            Keyboard kb = Keyboard.current;
-            if (kb != null)
+            IInputProvider input = gm.InputProvider;
+            if (input == null) return;
+
+            if (input.WasPausePressed())
             {
-                if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame)
-                {
-                    gm.TogglePause();
-                    return;
-                }
-                if (!gm.IsPaused && kb.rKey.wasPressedThisFrame)
-                {
-                    gm.StartRace();
-                    return;
-                }
+                gm.TogglePause();
+                return;
+            }
+
+            if (!gm.IsPaused && input.WasRestartPressed())
+            {
+                gm.StartRace();
+                return;
+            }
+
+            if (!gm.IsPaused && input.WasRecoverPressed())
+            {
+                gm.RecoverPlayerToTrack(automatic: false);
             }
         }
 
@@ -128,17 +139,16 @@ namespace RacingGame
 
         public override void Update(GameManager gm, float dt)
         {
-            Keyboard kb = Keyboard.current;
-            if (kb != null)
+            IInputProvider input = gm.InputProvider;
+            if (input == null) return;
+
+            if (input.WasRestartPressed())
             {
-                if (kb.rKey.wasPressedThisFrame)
-                {
-                    gm.StartRace();
-                }
-                else if (kb.escapeKey.wasPressedThisFrame)
-                {
-                    gm.TransitionTo(GameFlowState.MainMenu);
-                }
+                gm.StartRace();
+            }
+            else if (input.WasPausePressed())
+            {
+                gm.TransitionTo(GameFlowState.MainMenu);
             }
         }
 

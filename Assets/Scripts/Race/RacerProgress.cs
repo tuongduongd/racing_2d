@@ -79,9 +79,26 @@ namespace RacingGame
             DistanceToNextCheckpoint = Mathf.Max(0f, distance);
         }
 
+        internal float LapStartTime => _lapStartTime;
+
         internal void SetWrongWay(bool wrongWay)
         {
             IsWrongWay = wrongWay;
+        }
+
+        internal void RestoreFromSnapshot(RacerMidRaceSnapshot snap, float raceTime)
+        {
+            if (snap == null) return;
+            CompletedLaps = CoreMath.Max(0, snap.completedLaps);
+            NextCheckpointIndex = CoreMath.Max(0, snap.nextCheckpointIndex);
+            TotalCheckpointsPassed = CoreMath.Max(0, snap.totalCheckpointsPassed);
+            IsFinished = snap.isFinished;
+            FinishPosition = CoreMath.Max(0, snap.finishPosition);
+            FinishTime = CoreMath.Max(0f, snap.finishTime);
+            LastLapTime = CoreMath.Max(0f, snap.lastLapTime);
+            BestLapTime = CoreMath.Max(0f, snap.bestLapTime);
+            IsWrongWay = false;
+            _lapStartTime = CoreMath.Max(0f, raceTime);
         }
     }
 

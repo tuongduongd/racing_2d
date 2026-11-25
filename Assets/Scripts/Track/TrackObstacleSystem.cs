@@ -4,15 +4,6 @@ using UnityEngine;
 
 namespace RacingGame
 {
-    public enum ObstacleKind
-    {
-        TrafficCone = 0,
-        OilBarrel = 1,
-        RoadBarrier = 2,
-        OilSlick = 3,
-        ParkedBus = 4
-    }
-
     [Serializable]
     public class TrackObstacle
     {
@@ -41,8 +32,8 @@ namespace RacingGame
     }
 
     /// <summary>
-    /// Hệ thống sinh chướng ngại vật ngẫu nhiên trên mặt đường đua (chóp nón, thùng phuy,
-    /// rào chắn công trường, vũng dầu) và xử lý va chạm làm giảm tốc / lệch hướng xe.
+    /// Hệ thống sinh chướng ngại vật ngẫu nhiên trên mặt đường đua sử dụng IObstacleFactory (GoF Creational Factory + OCP)
+    /// và xử lý va chạm làm giảm tốc / lệch hướng xe.
     /// </summary>
     public class TrackObstacleSystem : MonoBehaviour
     {
@@ -71,8 +62,11 @@ namespace RacingGame
 
         private readonly List<TrackObstacle> _obstacles = new List<TrackObstacle>();
         private ObstacleKind[] _allowedKindsOverride;
+        private IObstacleFactory _obstacleFactory = new TrackObstacleFactory();
 
         public event Action<Car, TrackObstacle> ObstacleHit;
+
+        public IObstacleFactory ObstacleFactory => _obstacleFactory;
 
         public bool EnableObstacles
         {
@@ -87,6 +81,11 @@ namespace RacingGame
         }
 
         public IReadOnlyList<TrackObstacle> Obstacles => _obstacles;
+
+        public void SetObstacleFactory(IObstacleFactory factory)
+        {
+            _obstacleFactory = factory ?? new TrackObstacleFactory();
+        }
 
         public void ApplyMapSettings(TrackDefinition def)
         {
@@ -111,6 +110,7 @@ namespace RacingGame
                 return;
             }
 
+            _obstacleFactory ??= new TrackObstacleFactory();
             int seedToUse = overrideSeed ?? (useFixedSeed ? fixedSeed : Environment.TickCount);
             var rng = new System.Random(seedToUse);
 
@@ -149,15 +149,18 @@ namespace RacingGame
                 lastPlacedS = s;
 
                 ObstacleKind kind = allKinds[rng.Next(0, allKinds.Length)];
+                ObstacleSpec spec = _obstacleFactory.CreateSpec(kind, defaultHitRadius, defaultSpeedPenalty, defaultLateralImpulse);
+
                 bool inFeature = track.TryGetFeatureAtDistance(s, out TrackFeatureKind featureKind, out _);
-                if (kind == ObstacleKind.ParkedBus && inFeature && (featureKind == TrackFeatureKind.Tunnel || featureKind == TrackFeatureKind.Overpass))
+                if (spec.AvoidTunnelAndOverpass && inFeature && (featureKind == TrackFeatureKind.Tunnel || featureKind == TrackFeatureKind.Overpass))
                 {
-                    // Không đặt xe buýt đỗ chắn trong hầm hẹp hoặc trên mặt cầu vượt
+                    // Không đặt vật cản cỡ lớn chắn trong hầm hẹp hoặc trên mặt cầu vượt
                     kind = ObstacleKind.TrafficCone;
+                    spec = _obstacleFactory.CreateSpec(kind, defaultHitRadius, defaultSpeedPenalty, defaultLateralImpulse);
                 }
 
                 float lateral;
-                if (kind == ObstacleKind.ParkedBus)
+                if (spec.OuterLaneOnly)
                 {
                     int outerLaneIdx = rng.Next(0, 2) == 0 ? 0 : (laneCount - 1);
                     float edgePush = (outerLaneIdx == 0 ? -1f : 1f) * (track.LaneWidth * 0.12f);
@@ -171,8 +174,6 @@ namespace RacingGame
                     lateral = Mathf.Clamp(laneCenter + jitterUnit * maxLaneJitter, -maxBound, maxBound);
                 }
 
-                GetKindParameters(kind, out float radius, out float speedMult, out float knockImpulse);
-
                 Sprite customSpr = ResolveCustomObstacleSprite(kind);
 
                 _obstacles.Add(new TrackObstacle
@@ -181,9 +182,9 @@ namespace RacingGame
                     Kind = kind,
                     TrackDistance = s,
                     LateralOffset = lateral,
-                    HitRadius = radius,
-                    SpeedMultiplierOnHit = speedMult,
-                    LateralKnockImpulse = knockImpulse,
+                    HitRadius = spec.HitRadius,
+                    SpeedMultiplierOnHit = spec.SpeedMultiplierOnHit,
+                    LateralKnockImpulse = spec.LateralKnockImpulse,
                     RespawnTimer = 0f,
                     CustomSprite = customSpr
                 });
@@ -196,16 +197,17 @@ namespace RacingGame
             float lateralOffset,
             float hitRadius = -1f)
         {
-            GetKindParameters(kind, out float defaultRad, out float speedMult, out float knockImpulse);
+            _obstacleFactory ??= new TrackObstacleFactory();
+            ObstacleSpec spec = _obstacleFactory.CreateSpec(kind, defaultHitRadius, defaultSpeedPenalty, defaultLateralImpulse);
             var obs = new TrackObstacle
             {
                 Id = _obstacles.Count,
                 Kind = kind,
                 TrackDistance = trackDistance,
                 LateralOffset = lateralOffset,
-                HitRadius = hitRadius > 0f ? hitRadius : defaultRad,
-                SpeedMultiplierOnHit = speedMult,
-                LateralKnockImpulse = knockImpulse,
+                HitRadius = hitRadius > 0f ? hitRadius : spec.HitRadius,
+                SpeedMultiplierOnHit = spec.SpeedMultiplierOnHit,
+                LateralKnockImpulse = spec.LateralKnockImpulse,
                 RespawnTimer = 0f,
                 CustomSprite = ResolveCustomObstacleSprite(kind)
             };
@@ -298,38 +300,6 @@ namespace RacingGame
                 ObstacleKind.ParkedBus => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.ParkedBus),
                 _ => RoadRashPropSprites.GetPropSprite(RoadsidePropKind.TrafficCone)
             };
-        }
-
-        private void GetKindParameters(ObstacleKind kind, out float radius, out float speedMult, out float knockImpulse)
-        {
-            switch (kind)
-            {
-                case ObstacleKind.TrafficCone:
-                    radius = defaultHitRadius * 0.90f;
-                    speedMult = Mathf.Clamp(defaultSpeedPenalty + 0.14f, 0.4f, 0.9f);
-                    knockImpulse = defaultLateralImpulse * 0.65f;
-                    break;
-                case ObstacleKind.OilBarrel:
-                    radius = defaultHitRadius * 1.05f;
-                    speedMult = defaultSpeedPenalty;
-                    knockImpulse = defaultLateralImpulse * 1.15f;
-                    break;
-                case ObstacleKind.RoadBarrier:
-                    radius = defaultHitRadius * 1.25f;
-                    speedMult = Mathf.Clamp(defaultSpeedPenalty - 0.08f, 0.35f, 0.85f);
-                    knockImpulse = defaultLateralImpulse * 1.25f;
-                    break;
-                case ObstacleKind.ParkedBus:
-                    radius = defaultHitRadius * 1.32f;
-                    speedMult = Mathf.Clamp(defaultSpeedPenalty - 0.18f, 0.32f, 0.72f);
-                    knockImpulse = defaultLateralImpulse * 1.35f;
-                    break;
-                default: // OilSlick
-                    radius = defaultHitRadius * 1.15f;
-                    speedMult = Mathf.Clamp(defaultSpeedPenalty + 0.08f, 0.4f, 0.9f);
-                    knockImpulse = defaultLateralImpulse * 1.30f;
-                    break;
-            }
         }
 
         private static void ApplyObstacleImpact(Car car, TrackObstacle obs, WaypointTrack track)

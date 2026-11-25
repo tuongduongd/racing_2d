@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -588,6 +589,47 @@ namespace RacingGame.Editor
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
+        }
+
+        [MenuItem("RacingGame/Build Windows Standalone")]
+        public static void BuildWindowsRelease()
+        {
+            RegisterScenesInBuildSettings();
+
+            var enabledScenes = new List<string>();
+            foreach (EditorBuildSettingsScene scene in EditorBuildSettings.scenes)
+            {
+                if (scene != null && scene.enabled && File.Exists(scene.path))
+                {
+                    enabledScenes.Add(scene.path);
+                }
+            }
+
+            if (enabledScenes.Count == 0)
+            {
+                throw new System.InvalidOperationException("[RoadRashSceneSetup] No enabled scenes found in EditorBuildSettings for Windows build.");
+            }
+
+            string buildDir = Path.GetFullPath("Builds/RoadRash2D");
+            Directory.CreateDirectory(buildDir);
+            string exePath = Path.Combine(buildDir, "RoadRash2D.exe");
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = enabledScenes.ToArray(),
+                locationPathName = exePath,
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.None
+            };
+
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            BuildSummary summary = report.summary;
+            if (summary.result != BuildResult.Succeeded)
+            {
+                throw new System.Exception($"[RoadRashSceneSetup] Windows Standalone build failed: {summary.result} (errors: {summary.totalErrors}).");
+            }
+
+            Debug.Log($"[RoadRashSceneSetup] Windows Standalone build succeeded: {exePath} ({summary.totalSize / (1024f * 1024f):F2} MB)");
         }
 
         private static void EnsureLobbyBackgroundConfigured(GameMenuUI menuUi)

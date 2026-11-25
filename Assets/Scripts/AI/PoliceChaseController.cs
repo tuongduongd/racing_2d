@@ -89,12 +89,10 @@ namespace RacingGame
                 policeCar.SetBaseStatsAsset(defaultStats);
             }
 
-            // Tăng nhẹ tốc độ tối đa và gia tốc cho xe đặc chủng cảnh sát
-            VehicleStats policeStats = policeCar.BaseStats;
-            policeStats.maxSpeed += policeSpeedBonus;
-            policeStats.enginePower += 450f;
-            policeStats.grip += 0.8f;
-            policeCar.Physics.ConfigureStats(policeStats);
+            // Tăng nhẹ tốc độ tối đa, gia tốc và bám đường cho xe đặc chủng cảnh sát qua Structural Decorator
+            IVehicleStatsProvider baseProvider = new BaseVehicleStatsProvider(policeCar.BaseStats.ToPure());
+            IVehicleStatsProvider interceptorProvider = new PoliceInterceptorDecorator(baseProvider, policeSpeedBonus);
+            policeCar.Physics.ConfigureStats(VehicleStats.FromPure(interceptorProvider.GetStats()));
 
             policeCar.ConfigureIdentity(false, PoliceBikeBlue);
             policeDriver.ConfigurePolice(playerCar, "CẢNH SÁT");

@@ -59,7 +59,7 @@ namespace RacingGame
         public float PreviousLateralOffset => _previousLateralOffset;
         public Driver Driver => _driver;
         public bool IsPlayer => isPlayer;
-        public bool IsRoadRashArcadeActive => enableRoadRashPlayerHandling && isPlayer && _driver is PlayerDriver;
+        public bool IsRoadRashArcadeActive => enableRoadRashPlayerHandling && isPlayer && _driver != null && _driver.UsesArcadeAssist;
         public Color BikeColor => bikeColor;
         public BikeSkinData ActiveSkin => activeSkin;
         public string RacerName => _driver != null ? _driver.DriverName : gameObject.name;
@@ -172,6 +172,19 @@ namespace RacingGame
         public void ResetToTrackPoint(Vector2 pos, float headingRad, WaypointTrack track)
         {
             physics.Reset(pos, headingRad);
+            _previousPosition = pos;
+            _leanAngle = 0f;
+            _lastInput = default;
+            ResetCombatState();
+            UpdateTrackProjection(track);
+            SyncPreviousInterpolationState();
+            SyncTransform();
+        }
+
+        public void RestoreRuntimeState(Vector2 pos, Vector2 velocity, float headingRad, WaypointTrack track)
+        {
+            physics.Reset(pos, headingRad);
+            physics.SetVelocity(velocity);
             _previousPosition = pos;
             _leanAngle = 0f;
             _lastInput = default;

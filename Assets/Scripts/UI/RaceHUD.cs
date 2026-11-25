@@ -838,20 +838,26 @@ namespace RacingGame
                 bar.transform, "MenuBtn", "Pause [Esc]",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 11f);
             EnableButtonLabelAutoSize(menuBtn, 9f, 11.5f);
-            menuBtn.onClick.AddListener(() => _gameManager?.TogglePause());
+            menuBtn.onClick.AddListener(() => { if (_gameManager != null) _gameManager.TogglePause(); });
 
             Button restartBtn = LobbyUiBuilder.CreateCyberButton(
                 bar.transform, "RestartBtn", "Đua lại [R]",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 11f);
             EnableButtonLabelAutoSize(restartBtn, 9f, 11.5f);
-            restartBtn.onClick.AddListener(() => _gameManager?.StartRace());
+            restartBtn.onClick.AddListener(() => { if (_gameManager != null) _gameManager.StartRace(); });
 
             Button muteBtn = LobbyUiBuilder.CreateCyberButton(
                 bar.transform, "MuteBtn", "Âm: BẬT [M]",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.SafetyAmber, 11f);
             EnableButtonLabelAutoSize(muteBtn, 9f, 11.5f);
             _muteBtnLabel = LobbyUiBuilder.GetPrimaryLabel(muteBtn);
-            muteBtn.onClick.AddListener(() => _gameManager?.AudioController?.ToggleMute());
+            muteBtn.onClick.AddListener(() =>
+            {
+                if (_gameManager != null && _gameManager.AudioService != null)
+                {
+                    _gameManager.AudioService.ToggleMute();
+                }
+            });
 
             // Live Standings Box
             Image bg = LobbyUiBuilder.CreateCyberPanel(
@@ -1277,21 +1283,21 @@ namespace RacingGame
                 LobbyUiBuilder.ElectricCyan, LobbyUiBuilder.OnCyan, 14f);
             EnableButtonLabelAutoSize(_resultsRetryBtn, 11f, 15f);
             SetAnchoredCenterBottom(_resultsRetryBtn.GetComponent<RectTransform>(), -208f, 18f, 192f, 42f);
-            _resultsRetryBtn.onClick.AddListener(() => _gameManager?.StartRace());
+            _resultsRetryBtn.onClick.AddListener(() => { if (_gameManager != null) _gameManager.StartRace(); });
 
             _resultsGarageBtn = LobbyUiBuilder.CreateCyberButton(
                 _resultsPanel.transform, "GarageBtn", "⚙  Nâng cấp xe",
                 LobbyUiBuilder.SafetyAmber, LobbyUiBuilder.OnAmber, 14f);
             EnableButtonLabelAutoSize(_resultsGarageBtn, 11f, 15f);
             SetAnchoredCenterBottom(_resultsGarageBtn.GetComponent<RectTransform>(), 0f, 18f, 192f, 42f);
-            _resultsGarageBtn.onClick.AddListener(() => _gameManager?.OpenGarage());
+            _resultsGarageBtn.onClick.AddListener(() => { if (_gameManager != null) _gameManager.OpenGarage(); });
 
             _resultsMenuBtn = LobbyUiBuilder.CreateCyberButton(
                 _resultsPanel.transform, "ResultMenuBtn", "⌂  Về Menu [Esc]",
                 LobbyUiBuilder.SurfaceHigh, LobbyUiBuilder.TextPrimary, 14f);
             EnableButtonLabelAutoSize(_resultsMenuBtn, 11f, 15f);
             SetAnchoredCenterBottom(_resultsMenuBtn.GetComponent<RectTransform>(), 208f, 18f, 192f, 42f);
-            _resultsMenuBtn.onClick.AddListener(() => _gameManager?.OpenMenu());
+            _resultsMenuBtn.onClick.AddListener(() => { if (_gameManager != null) _gameManager.OpenMenu(); });
 
             _resultsPanel.SetActive(false);
         }

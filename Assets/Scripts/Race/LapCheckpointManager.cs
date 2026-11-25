@@ -183,6 +183,59 @@ namespace RacingGame
             return _racers.Count > 0 && _finishedCount >= _racers.Count;
         }
 
+        public void RestoreRaceSnapshot(float raceTime, int finishedCount, IReadOnlyList<RacerMidRaceSnapshot> snapshots)
+        {
+            _raceTime = Mathf.Max(0f, raceTime);
+            _finishedCount = Mathf.Max(0, finishedCount);
+
+            if (snapshots != null)
+            {
+                for (int i = 0; i < snapshots.Count; i++)
+                {
+                    RacerMidRaceSnapshot snap = snapshots[i];
+                    if (snap == null) continue;
+
+                    RacerProgress target = FindProgressForSnapshot(snap, i);
+                    if (target == null) continue;
+
+                    target.RestoreFromSnapshot(snap, _raceTime);
+                    if (_checkpoints.Count > 0 && target.NextCheckpointIndex >= _checkpoints.Count)
+                    {
+                        target.RestoreFromSnapshot(new RacerMidRaceSnapshot
+                        {
+                            completedLaps = snap.completedLaps,
+                            nextCheckpointIndex = snap.nextCheckpointIndex % _checkpoints.Count,
+                            totalCheckpointsPassed = snap.totalCheckpointsPassed,
+                            isFinished = snap.isFinished,
+                            finishPosition = snap.finishPosition,
+                            finishTime = snap.finishTime,
+                            lastLapTime = snap.lastLapTime,
+                            bestLapTime = snap.bestLapTime
+                        }, _raceTime);
+                    }
+                }
+            }
+
+            UpdateDistances();
+            UpdateRanking();
+        }
+
+        private RacerProgress FindProgressForSnapshot(RacerMidRaceSnapshot snap, int fallbackIndex)
+        {
+            for (int i = 0; i < _racers.Count; i++)
+            {
+                RacerProgress p = _racers[i];
+                if (p == null || p.Car == null) continue;
+                if (snap.isPlayer && p.Car.IsPlayer) return p;
+                if (!snap.isPlayer && !p.Car.IsPlayer && string.Equals(p.RacerName, snap.racerName, StringComparison.Ordinal))
+                {
+                    return p;
+                }
+            }
+
+            return fallbackIndex >= 0 && fallbackIndex < _racers.Count ? _racers[fallbackIndex] : null;
+        }
+
         private void OnCheckpointPassed(RacerProgress progress, Checkpoint checkpoint)
         {
             progress.AdvanceCheckpoint(_checkpoints.Count);

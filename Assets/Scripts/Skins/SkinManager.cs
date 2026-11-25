@@ -25,6 +25,18 @@ namespace RacingGame
         /// </summary>
         public static bool AutoStartRaceOnGameplayLoad { get; set; }
 
+        /// <summary>
+        /// Cờ chuyển tiếp khi bấm TIẾP TỤC VÁN ĐÃ LƯU từ LobbyScene sang SampleScene.
+        /// </summary>
+        public static bool AutoResumeSavedRaceOnGameplayLoad { get; set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticTransitionFlags()
+        {
+            AutoStartRaceOnGameplayLoad = false;
+            AutoResumeSavedRaceOnGameplayLoad = false;
+        }
+
         [Header("Danh sách Data Skin (Gắn 4 ScriptableObject BikeSkinData tại đây)")]
         [SerializeField] private BikeSkinData[] skinAssets = new BikeSkinData[4];
 

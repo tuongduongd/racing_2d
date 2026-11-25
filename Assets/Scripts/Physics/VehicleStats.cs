@@ -39,16 +39,48 @@ namespace RacingGame
         public VehicleStats Sanitize()
         {
             VehicleStats safe = this;
-            safe.mass = Mathf.Max(50f, safe.mass);
-            safe.enginePower = Mathf.Max(500f, safe.enginePower);
-            safe.brakePower = Mathf.Max(500f, safe.brakePower);
-            safe.grip = Mathf.Max(1f, safe.grip);
-            safe.drag = Mathf.Max(0.05f, safe.drag);
-            safe.rollingResistance = Mathf.Max(0f, safe.rollingResistance);
-            safe.maxSpeed = Mathf.Max(10f, safe.maxSpeed);
-            safe.maxReverseSpeed = Mathf.Max(1f, safe.maxReverseSpeed);
-            safe.turnRate = Mathf.Max(0.5f, safe.turnRate);
+            safe.mass = CoreMath.Max(50f, safe.mass);
+            safe.enginePower = CoreMath.Max(500f, safe.enginePower);
+            safe.brakePower = CoreMath.Max(500f, safe.brakePower);
+            safe.grip = CoreMath.Max(1f, safe.grip);
+            safe.drag = CoreMath.Max(0.05f, safe.drag);
+            safe.rollingResistance = CoreMath.Max(0f, safe.rollingResistance);
+            safe.maxSpeed = CoreMath.Max(10f, safe.maxSpeed);
+            safe.maxReverseSpeed = CoreMath.Max(1f, safe.maxReverseSpeed);
+            safe.turnRate = CoreMath.Max(0.5f, safe.turnRate);
             return safe;
+        }
+
+        public PureVehicleStats ToPure()
+        {
+            return new PureVehicleStats
+            {
+                mass = mass,
+                enginePower = enginePower,
+                brakePower = brakePower,
+                grip = grip,
+                drag = drag,
+                rollingResistance = rollingResistance,
+                maxSpeed = maxSpeed,
+                maxReverseSpeed = maxReverseSpeed,
+                turnRate = turnRate
+            }.Sanitize();
+        }
+
+        public static VehicleStats FromPure(in PureVehicleStats pure)
+        {
+            return new VehicleStats
+            {
+                mass = pure.mass,
+                enginePower = pure.enginePower,
+                brakePower = pure.brakePower,
+                grip = pure.grip,
+                drag = pure.drag,
+                rollingResistance = pure.rollingResistance,
+                maxSpeed = pure.maxSpeed,
+                maxReverseSpeed = pure.maxReverseSpeed,
+                turnRate = pure.turnRate
+            }.Sanitize();
         }
     }
 }

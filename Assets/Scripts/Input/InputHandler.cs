@@ -4,25 +4,31 @@ using UnityEngine.InputSystem;
 namespace RacingGame
 {
     /// <summary>
-    /// Reads keyboard input via Unity's InputSystem and converts it into VehicleInput.
-    /// Buffers Spacebar kick presses between Update and FixedUpdate so taps are never dropped.
-    /// Used by PlayerDriver (composition).
+    /// Unity InputSystem adapter implementing IInputProvider.
+    /// Buffers discrete key presses between Update and FixedUpdate so taps are never dropped.
     /// </summary>
-    public class InputHandler : MonoBehaviour
+    public class InputHandler : MonoBehaviour, IInputProvider
     {
         [Header("Steering Smoothing")]
         [SerializeField] private float steerResponseSpeed = 13f;
 
         private float _smoothedSteer;
         private bool _kickQueued;
+        private bool _pauseQueued;
+        private bool _restartQueued;
+        private bool _recoverQueued;
+        private bool _muteQueued;
 
         private void Update()
         {
             Keyboard kb = Keyboard.current;
-            if (kb != null && kb.spaceKey.wasPressedThisFrame)
-            {
-                _kickQueued = true;
-            }
+            if (kb == null) return;
+
+            if (kb.spaceKey.wasPressedThisFrame) _kickQueued = true;
+            if (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame) _pauseQueued = true;
+            if (kb.rKey.wasPressedThisFrame) _restartQueued = true;
+            if (kb.fKey.wasPressedThisFrame || kb.backspaceKey.wasPressedThisFrame) _recoverQueued = true;
+            if (kb.mKey.wasPressedThisFrame) _muteQueued = true;
         }
 
         public VehicleInput ReadInput()
@@ -50,10 +56,46 @@ namespace RacingGame
             return new VehicleInput(throttle, brake, _smoothedSteer, kick);
         }
 
+        public bool WasPausePressed()
+        {
+            Keyboard kb = Keyboard.current;
+            bool pressed = _pauseQueued || (kb != null && (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame));
+            _pauseQueued = false;
+            return pressed;
+        }
+
+        public bool WasRestartPressed()
+        {
+            Keyboard kb = Keyboard.current;
+            bool pressed = _restartQueued || (kb != null && kb.rKey.wasPressedThisFrame);
+            _restartQueued = false;
+            return pressed;
+        }
+
+        public bool WasRecoverPressed()
+        {
+            Keyboard kb = Keyboard.current;
+            bool pressed = _recoverQueued || (kb != null && (kb.fKey.wasPressedThisFrame || kb.backspaceKey.wasPressedThisFrame));
+            _recoverQueued = false;
+            return pressed;
+        }
+
+        public bool WasMutePressed()
+        {
+            Keyboard kb = Keyboard.current;
+            bool pressed = _muteQueued || (kb != null && kb.mKey.wasPressedThisFrame);
+            _muteQueued = false;
+            return pressed;
+        }
+
         public void ResetState()
         {
             _smoothedSteer = 0f;
             _kickQueued = false;
+            _pauseQueued = false;
+            _restartQueued = false;
+            _recoverQueued = false;
+            _muteQueued = false;
         }
     }
 }

@@ -41,28 +41,16 @@ namespace RacingGame
         /// <summary>
         /// Returns true if moving from <paramref name="from"/> to <paramref name="to"/> crosses
         /// the gate line in the forward (race) direction. Reverse crossings are rejected.
+        /// Delegates to pure C# CheckpointGateMath.
         /// </summary>
         public bool IsCrossedForward(Vector2 from, Vector2 to)
         {
-            Vector2 move = to - from;
-            if (move.sqrMagnitude < 0.000001f) return false;
-            if (Vector2.Dot(move, _forward) <= 0f) return false;
-
-            Vector2 a = GateStart;
-            Vector2 gate = GateEnd - a;
-
-            float denom = Cross(move, gate);
-            if (Mathf.Abs(denom) < 0.000001f) return false;
-
-            Vector2 diff = a - from;
-            float t = Cross(diff, gate) / denom;  // along movement
-            float u = Cross(diff, move) / denom;  // along gate
-            return t >= 0f && t <= 1f && u >= 0f && u <= 1f;
-        }
-
-        private static float Cross(Vector2 a, Vector2 b)
-        {
-            return a.x * b.y - a.y * b.x;
+            return CheckpointGateMath.IsSegmentCrossingGateForward(
+                from.x, from.y,
+                to.x, to.y,
+                _position.x, _position.y,
+                _forward.x, _forward.y,
+                _halfWidth);
         }
     }
 }

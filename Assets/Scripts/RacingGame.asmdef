@@ -2,6 +2,7 @@
   "name": "RacingGame",
   "rootNamespace": "RacingGame",
   "references": [
+    "RacingGame.Core",
     "Unity.InputSystem",
     "Unity.RenderPipelines.Core.Runtime",
     "Unity.RenderPipelines.Universal.Runtime",

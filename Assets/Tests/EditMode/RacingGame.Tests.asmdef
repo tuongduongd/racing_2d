@@ -2,6 +2,7 @@
   "name": "RacingGame.Tests",
   "rootNamespace": "RacingGame.Tests",
   "references": [
+    "RacingGame.Core",
     "RacingGame",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",

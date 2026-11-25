@@ -4,31 +4,45 @@ namespace RacingGame
 {
     /// <summary>
     /// Concrete Driver implementation for the human player.
-    /// Inherits from abstract Driver and delegates input reading to InputHandler.
+    /// Inherits from abstract Driver and delegates input reading to IInputProvider (DIP).
     /// </summary>
     public class PlayerDriver : Driver
     {
         [SerializeField] private InputHandler inputHandler;
 
+        private IInputProvider _inputProvider;
+
+        public override bool UsesArcadeAssist => true;
+
+        private IInputProvider ActiveProvider => _inputProvider ?? inputHandler;
+
         public void SetInputHandler(InputHandler handler)
         {
             inputHandler = handler;
+            _inputProvider = handler;
+        }
+
+        public void SetInputProvider(IInputProvider provider)
+        {
+            _inputProvider = provider;
         }
 
         public override VehicleInput DecideInput(Car car, WaypointTrack track)
         {
-            if (inputHandler == null)
+            IInputProvider provider = ActiveProvider;
+            if (provider == null)
             {
                 return default;
             }
-            return inputHandler.ReadInput();
+            return provider.ReadInput();
         }
 
         public override void OnReset()
         {
-            if (inputHandler != null)
+            IInputProvider provider = ActiveProvider;
+            if (provider != null)
             {
-                inputHandler.ResetState();
+                provider.ResetState();
             }
         }
     }

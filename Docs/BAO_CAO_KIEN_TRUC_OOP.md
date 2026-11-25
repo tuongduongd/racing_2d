@@ -2,14 +2,14 @@
 
 ## 1. Giới thiệu & Phạm vi
 - **Tên dự án:** *Road Rash 2D: Đại Chiến Shipper* (`newbie`)
-- **Thể loại:** Đua xe mô tô 2D góc nhìn từ sau xe (Pseudo-3D kiểu *Road Rash*) dựng trên mô hình vật lý 2D phẳng `(x, y)` và đường đua vòng kín `WaypointTrack` (hỗ trợ 2–6 làn xe, địa hình nhấp nhô, cầu vượt, hầm chui và vạch qua đường).
-- **Mục tiêu:** Điều khiển xe qua các góc cua, né chướng ngại vật (`TrackObstacleSystem`), cạnh tranh với tối đa 4 đối thủ AI tự hành (`AIRacerDriver`) và né đòn ép làn của Cảnh sát truy đuổi (`PoliceRacerDriver`), sử dụng đòn đá (`Kick`) để cản đối thủ, hoàn thành đủ số vòng qua đúng thứ tự checkpoint để giành thứ hạng cao, kiếm tiền thưởng nâng cấp xe trong Garage, mở khóa map mới và chọn skin thương hiệu shipper (`Xanh SM`, `Shopee Food`, `Grab`, `Ahamove`).
-- **Công cụ & Công nghệ:** Unity 6 (`6000.6.9f1`), C#, Unity Input System (`1.20.1`), Universal Render Pipeline — URP (`17.6.0`), uGUI (`2.6.0`), Unity Test Framework (`1.8.0`), Git/GitHub.
-- **Ngoài phạm vi:** Không chơi mạng online (multiplayer), không sử dụng mô hình 3D nặng hay vật lý 3D PhysX.
+- **Thể loại:** Đua xe mô tô 2D góc nhìn từ sau xe (Pseudo-3D kiểu *Road Rash*) dựng trên mô hình vật lý 2D phẳng `(x, y)` kết hợp va chạm đàn hồi Newton (`CollisionSolverMath`) và đường đua vòng kín `WaypointTrack` (2–6 làn xe, cầu vượt, hầm chui, vạch qua đường).
+- **Mục tiêu:** Điều khiển xe qua các góc cua, né 5 loại chướng ngại vật (`TrackObstacleSystem` + `TrackObstacleFactory`), cạnh tranh với tối đa 4 đối thủ AI tự hành (`AIRacerDriver`) và né đòn ép làn của Cảnh sát truy đuổi (`PoliceRacerDriver`), tung đòn đá (`RaceCombatSystem`), hoàn thành đủ vòng qua đúng thứ tự `Checkpoint`, kiếm thưởng nâng cấp trong Garage, mở khóa map ngoài JSON, chọn 4 skin thương hiệu (`Xanh SM`, `Shopee Food`, `Grab`, `Ahamove`), lưu/nạp trạng thái giữa trận (`MidRaceSaveService`) và ghi bảng kỷ lục `HighScores`.
+- **Công cụ & Công nghệ:** Unity 6 (`6000.6.9f1`), C#, Unity Input System (`1.20.1`), Universal Render Pipeline — URP (`17.6.0`), uGUI (`2.6.0`) + TextMeshPro, Unity Test Framework (`1.8.0`), Git/GitHub.
+- **Ngoài phạm vi:** Không chơi mạng online (multiplayer), không sử dụng vật lý 3D PhysX.
 
 ---
 
-## 2. Sơ đồ Use Case & Danh sách Yêu cầu
+## 2. Sơ đồ Use Case, Yêu cầu & Bảng Thông số Cân bằng
 
 ### 2.1 Sơ đồ Use Case
 
@@ -17,16 +17,16 @@
 flowchart LR
     Player(["Người chơi (Player)"])
     AI(["Hệ thống AI & Cảnh sát"])
-    Storage(["Lưu trữ JSON / PlayerPrefs"])
+    Storage(["Lưu trữ JSON / StreamingAssets"])
 
     subgraph Sys["Hệ thống Game Đua Xe Road Rash 2D"]
         UC1(["UC-01: Chọn Skin thương hiệu"])
-        UC2(["UC-02: Chọn / Mở khóa Map đua"])
+        UC2(["UC-02: Chọn / Mở khóa Map JSON"])
         UC3(["UC-03: Cấu hình Độ khó & Số vòng"])
         UC4(["UC-04: Nâng cấp xe tại Garage"])
-        UC5(["UC-05: Điều khiển đua xe & Đá đối thủ"])
-        UC6(["UC-06: Đếm vòng, Xếp hạng & Trao thưởng"])
-        UC7(["UC-07: Tạm dừng / Chơi lại / Về Lobby"])
+        UC5(["UC-05: Đua xe, Va chạm Newton & Đá đối thủ"])
+        UC6(["UC-06: Đếm vòng, Xếp hạng, Thưởng & HighScore"])
+        UC7(["UC-07: Tạm dừng, Lưu/Nạp giữa trận & Về Lobby"])
         UC8(["UC-08: Lưu & Xóa dữ liệu tiến trình"])
         UC9(["UC-09: AI đua tự hành & Cảnh sát truy đuổi"])
     end
@@ -47,6 +47,7 @@ flowchart LR
     UC2 -.->|"«include»"| UC8
     UC4 -.->|"«include»"| UC8
     UC6 -.->|"«include»"| UC8
+    UC7 -.->|"«include»"| UC8
     UC8 --> Storage
 ```
 
@@ -54,355 +55,431 @@ flowchart LR
 
 | Mã | Tên yêu cầu | Mô tả chi tiết | Thành phần cài đặt chính |
 | :--- | :--- | :--- | :--- |
-| **FR-01** | Sảnh chờ khởi động (Lobby) | Hiển thị backdrop Sài Gòn đêm, thống kê tiền/kỷ lục, modal chọn 4 skin thương hiệu (`Xanh SM`, `Shopee Food`, `Grab`, `Ahamove`), carousel chọn 4 map kèm banner ảnh và nút mở khóa, chọn độ khó và số vòng (đồng bộ `PlayerPrefs` giữa `LobbyScene` và `SampleScene`), bật/tắt CRT Scanline, nút `PLAY`, `GARAGE`, `X` thoát game. | `GameMenuUI`, `LobbyUiBuilder`, `SkinManager`, `MapManager` |
-| **FR-02** | Hệ thống Skin thương hiệu & Palette Swap | Quản lý 4 `BikeSkinData` nhiều pose (Upright, LeanLeft1/2, LeanRight1/2, KickLeft, HitStagger), dùng `BikePaletteSwapper` ánh xạ màu HSV có cache (`Dictionary`) từ bộ sprite gốc sang 4 thương hiệu + Cảnh sát (0 alloc/frame), fallback procedural an toàn khi thiếu sprite. | `SkinManager`, `BikeSkinData`, `BikePaletteSwapper`, `RoadRashBikeSprites` |
-| **FR-03** | Hệ thống Map đa dạng (2–6 làn) | Quản lý danh sách `TrackDefinition` & `MapTheme` (Phố Sáng Ban Mai, Đại Lộ Ven Biển, Cao Tốc Đêm Neon, Thành Phố Đêm Neon); hỗ trợ mở khóa bằng tiền thưởng, lưu kỷ lục từng map và cấu trúc đặc biệt (`Overpass`, `Tunnel`, `Crosswalk`). | `MapManager`, `TrackDefinition`, `MapTheme`, `WaypointTrack` |
-| **FR-04** | Mô phỏng vật lý xe 2D | Mô phỏng lực kéo động cơ, phanh, lực cản khí động, lực ma sát lăn, độ bám ngang theo lốp, lái phụ thuộc tốc độ, phạt tốc độ ngoài đường (`IsOnTrack == false`) và rào chắn biên ngoài (`MaxOffRoadWidth`). | `VehiclePhysics`, `VehicleStats`, `VehicleStatsAsset`, `Car` |
-| **FR-05** | Điều khiển người chơi & Chiến đấu | Đọc phím `W/A/S/D` hoặc phím mũi tên (ga, phanh, lái mượt) và `Space` (đá trái/phải tự động hướng về đối thủ gần nhất trong tầm, gây choáng và đẩy ngang kèm cooldown). | `InputHandler`, `PlayerDriver`, `GameManager` |
-| **FR-06** | Đối thủ AI tự hành theo độ khó | Tối đa 4 xe AI sử dụng `AIProfile` (`Easy`, `Normal`, `Hard`), hỗ trợ 3 chế độ dẫn đường (`SmoothedSplinePath`, `SpeedAdaptiveWaypoint`, `LegacyFixed`), né xe phía trước, giữ làn, chống kẹt sau 2.5s và hỗ trợ seed cố định (deterministic). | `AIRacerDriver`, `AIProfile` |
-| **FR-07** | Cảnh sát truy đuổi | Xe Cảnh sát (`PoliceCar_Unit01`) bám theo xe người chơi, tự tăng tốc bắt kịp khi tụt lại, ép làn ngang khi áp sát, tung đòn đá cản và bật đèn còi xanh-đỏ cảnh báo trên HUD khi vào tầm. | `PoliceChaseController`, `PoliceRacerDriver` |
-| **FR-08** | Chướng ngại vật & Cảnh quan | Sinh chướng ngại vật ngẫu nhiên trên làn (`TrafficCone`, `OilBarrel`, `RoadBarrier`, `OilSlick`, `ParkedBus`), xử lý va chạm giảm tốc/đẩy ngang và hồi phục sau cooldown; sinh prop hai bên đường theo vùng của `MapTheme`. | `TrackObstacleSystem`, `EnvironmentDecorator`, `RoadRashPropSprites` |
-| **FR-09** | Đếm vòng, Chống đi tắt & Xếp hạng | Kiểm tra cắt cổng `Checkpoint` theo đúng thứ tự và đúng chiều xuôi, phát hiện đi ngược chiều (`IsWrongWay`), tính thời gian từng vòng / kỷ lục và xếp hạng thời gian thực. | `LapCheckpointManager`, `Checkpoint`, `RacerProgress`, `RacerRankingComparer` |
-| **FR-10** | Tạm dừng (Pause) & Hướng dẫn | Nhấn `Esc` hoặc `P` trong `Countdown` hoặc `Racing` để đóng băng thời gian (`Time.timeScale = 0`), mở Pause Overlay (`sortingOrder = 30`, uGUI + TMP) gồm telemetry, nút Resume/Restart/Lobby/Quit, bật/tắt CRT Scanline và modal Hướng dẫn phím đồng bộ 100% với phím thật. | `PauseMenuUI`, `GameManager`, `GameState`, `CrtScanlineController` |
-| **FR-11** | Garage nâng cấp & Lưu tiến trình | Giao diện Workshop Tuning (`GarageUiBuilder`) hiển thị 4 thanh chỉ số (`MAX SPD`, `POWER`, `BRAKE`, `GRIP`), nâng cấp 4 hạng mục (`Engine`, `Brakes`, `Grip`, `WeightReduction`) tối đa 5 cấp kèm 5 LED pip; View kiểm tra qua `CanAfford`/`IsMaxLevel` và lưu JSON tự động. | `GarageUiBuilder`, `CarUpgradeSystem`, `PlayerSaveData`, `UpgradeType` |
-| **FR-12** | Đồ họa Pseudo-3D, VFX, CRT & HUD | Dựng mặt đường phối cảnh theo lát cắt (`sliceCount = 104`), đồng bộ sprite 2D nhiều pose (`Assets/Art/`), hiệu ứng URP Bloom cân chỉnh cho đêm neon (`DefaultVolumeProfile.asset`), CRT Scanline shader bật/tắt (`CrtScanlineOverlay.shader`), HUD 4 góc Cyber Arcade (`RaceHUD`), và 11 SFX procedural (`M` tắt/bật). | `RoadRashRenderer2D`, `RaceVfxController`, `CrtScanlineController`, `RaceHUD`, `RaceAudioController` |
+| **FR-01** | Sảnh chờ khởi động (Lobby) | Hiển thị backdrop Sài Gòn đêm, thống kê tiền/kỷ lục, modal chọn 4 skin, carousel chọn 4 map JSON, chọn độ khó/số vòng (`PlayerPrefs`), bật/tắt CRT Scanline, nút `PLAY`, nút `TIẾP TỤC VÁN` (khi có save giữa trận), `GARAGE`, `X` thoát game. | `GameMenuUI`, `LobbyUiBuilder`, `SkinManager`, `MapManager` |
+| **FR-02** | Hệ thống Skin thương hiệu & Palette Swap | Quản lý 4 `BikeSkinData` nhiều pose (Upright, LeanLeft1/2, LeanRight1/2, KickLeft, HitStagger), `BikePaletteSwapper` ánh xạ màu HSV có cache `Dictionary` (0 alloc/frame), fallback procedural khi thiếu sprite. | `SkinManager`, `BikeSkinData`, `BikePaletteSwapper`, `RoadRashBikeSprites` |
+| **FR-03** | Hệ thống Map JSON ngoài (`StreamingAssets`) | Đọc động 4 bản đồ từ `Assets/StreamingAssets/Maps/*.json` qua `ITrackDataProvider` (`ExternalJsonTrackLoader`), kiểm tra ràng buộc bằng `TrackJsonDto.ValidateOrThrow()`, lưu kỷ lục từng map và hỗ trợ cầu vượt/hầm chui/ngã tư. | `ExternalJsonTrackLoader`, `TrackJsonDto`, `MapManager`, `TrackDefinition`, `WaypointTrack` |
+| **FR-04** | Mô phỏng vật lý xe 2D & Va chạm Newton | Lực kéo, phanh, cản khí động, bám ngang, trượt tường (`wall-slide`) rào chắn biên ngoài `MaxOffRoadWidth`, nội suy render mượt và bộ giải va chạm cứng Newton 2D (`CollisionSolverMath`). | `VehiclePhysics`, `CollisionSolverMath`, `VehicleCollisionPhysics`, `Car` |
+| **FR-05** | Điều khiển qua `IInputProvider` & Chiến đấu | Toàn bộ phím (`W/A/S/D`, mũi tên, `Space`, `F`, `Esc/P`, `R`, `M`) đi duy nhất qua `InputHandler : IInputProvider`; `RaceCombatSystem` xử lý đòn đá tự chọn bên đối thủ gần nhất. | `IInputProvider`, `InputHandler`, `PlayerDriver`, `RaceCombatSystem` |
+| **FR-06** | Đối thủ AI tự hành theo độ khó | Tối đa 4 xe AI dùng `AIProfile` (`Easy`, `Normal`, `Hard`), dẫn đường `SmoothedSplinePath`, né xe phía trước, chống kẹt sau `2.5s` và tái lập theo `seed`. | `AIRacerDriver`, `AIProfile` |
+| **FR-07** | Cảnh sát truy đuổi | Xe Cảnh sát (`PoliceCar_Unit01`) tăng tốc qua `PoliceInterceptorDecorator`, bám đuổi người chơi, ép làn, tung đòn đá và bật đèn còi xanh-đỏ cảnh báo HUD. | `PoliceChaseController`, `PoliceRacerDriver`, `PoliceInterceptorDecorator` |
+| **FR-08** | Chướng ngại vật (`IObstacleFactory`) & Cảnh quan | `TrackObstacleFactory` tạo 5 spec (`TrafficCone`, `OilBarrel`, `RoadBarrier`, `OilSlick`, `ParkedBus`), `ParkedBus` chỉ ở làn ngoài & tránh hầm/cầu vượt; `EnvironmentDecorator` rải prop theo vùng `MapTheme`. | `TrackObstacleFactory`, `IObstacleBlueprint`, `TrackObstacleSystem`, `EnvironmentDecorator` |
+| **FR-09** | Đếm vòng, Chống đi tắt, Xếp hạng & HighScores | `CheckpointGateMath` cắt cổng 1 chiều, chặn đi tắt, báo ngược chiều (`IsWrongWay`), xếp hạng qua `RacerRankingComparer` và lưu Top HighScores. | `CheckpointGateMath`, `LapCheckpointManager`, `Checkpoint`, `RacerProgress` |
+| **FR-10** | Tạm dừng (Pause), Guard & Hướng dẫn | Guard `RaceStateTransitionRules.CanPause` chỉ cho Pause ở `Countdown`/`Racing`; Pause Overlay (`sortingOrder = 30`) có Telemetry, nút **`LƯU VÁN ĐUA`**, CRT Scanline và modal 7 phím thật. | `PauseMenuUI`, `RaceStateTransitionRules`, `GameManager`, `GameState` |
+| **FR-11** | Garage nâng cấp, Save/Load giữa trận & JSON ngoài | Nâng cấp 4 hạng mục × 5 cấp áp bằng chuỗi Decorator (`VehicleStatsDecorator`), cấu hình ngoài `game_balance.json`, lưu tiến trình `racing2d_save.json` và lưu/khôi phục giữa trận `midrace_save.json` (`MidRaceSaveService`). | `GarageUiBuilder`, `ProgressionRuleEngine`, `CarUpgradeSystem`, `MidRaceSaveService`, `ExternalBalanceConfigLoader` |
+| **FR-12** | Đồ họa Pseudo-3D, VFX, CRT & BGM + SFX | Mặt đường phối cảnh `104` lát cắt, URP Bloom, `CrtScanlineOverlay.shader`, HUD 4 góc Cyber Arcade (`RaceHUD`), và `RaceAudioController : IAudioService` phát **BGM Synthwave procedural (120 BPM)** + 11 SFX lưu âm lượng bền vững. | `RoadRashRenderer2D`, `RaceVfxController`, `CrtScanlineController`, `RaceHUD`, `RaceAudioController` |
 
 ### 2.3 Danh sách Yêu cầu Phi chức năng (Non-Functional Requirements)
 
 | Mã | Nhóm | Yêu cầu cụ thể | Cách đáp ứng trong hệ thống |
 | :--- | :--- | :--- | :--- |
-| **NFR-01** | Hiệu năng & Ổn định | Bước mô phỏng vật lý chạy ổn định ở tần số cố định (`FixedUpdate` ~50 Hz), không cấp phát rác thừa trong vòng lặp render/HUD. | Dùng object pool cho sprite đối thủ (`_opponentPool`), prop (`_propPool`), danh sách vertex/triangle tái sử dụng trong `RoadRashRenderer2D`. |
-| **NFR-02** | Tính xác định (Determinism) | Hành vi AI với cùng `seed`, cấu hình và bản đồ phải tái lập chính xác tuyệt đối để phục vụ debug và benchmark. | `AIRacerDriver` dùng `_simulationTime` nội bộ và `System.Random(seed)` tách biệt khỏi `UnityEngine.Random` toàn cục. |
-| **NFR-03** | Bảo trì & Mở rộng | Dễ dàng thêm map, theme, skin, chỉ số xe hoặc độ khó AI mới mà không sửa code lõi. | Tách dữ liệu thành `ScriptableObject` (`TrackDefinition`, `MapTheme`, `BikeSkinData`, `AIProfile`, `VehicleStatsAsset`) và phân chia `asmdef` (`RacingGame`, `RacingGame.Editor`, `RacingGame.Tests`). |
-| **NFR-04** | An toàn & Chịu lỗi (Robustness) | Không crash khi thiếu asset gán tay hoặc khi file save JSON bị sửa sai biên. | Mọi thành phần đều có runtime fallback (`AIProfile.CreateDefault`, `BikeSkinData.CreateDefault`, `MapManager` preset mặc định, `VehicleStats.Sanitize()`, `ClampLoadedLevels()` trong `CarUpgradeSystem`). |
-| **NFR-05** | Không phụ thuộc tài nguyên ngoài | Dự án phải chạy ngay sau khi clone mà không lỗi thiếu file hình ảnh/âm thanh rời. | Toàn bộ sprite xe, prop, UI, hiệu ứng hạt và AudioClip được sinh bằng thuật toán (procedural) khi không có override asset. |
-| **NFR-06** | Khả năng kiểm thử (Testability) | Các module vật lý, AI, checkpoint, nâng cấp, map, skin, pause phải tách khỏi phụ thuộc scene phức tạp để kiểm thử tự động nhanh. | Toàn bộ logic lõi kiểm thử được qua NUnit EditMode Tests (`Assets/Tests/EditMode/`). |
+| **NFR-01** | Hiệu năng & Ổn định | Bước vật lý cố định `50 Hz` (`FixedUpdate`), render nội suy 60 FPS ổn định, 0 cấp phát rác trong vòng lặp render/HUD. | Object pool (`_opponentPool`, `_propPool`), tái sử dụng vertex/triangle, dirty-check HUD, `BikePaletteSwapper` cache `Dictionary`. |
+| **NFR-02** | Kiến trúc phân tầng | Lõi Pure OOP tách khỏi Unity Engine để chạy Unit Test không cần Scene/Form và dễ bảo trì. | Assembly **`RacingGame.Core`** đặt `"noEngineReferences": true` (`25` tệp C# thuần, **`0 using UnityEngine`**), giao tiếp qua 8 Interface DIP. |
+| **NFR-03** | Dữ liệu hóa & Mở rộng | Thay đổi đường đua và thông số cân bằng mà không biên dịch lại code; thêm biến thể không sửa lớp cũ (OCP). | 4 Map JSON + `game_balance.json` trong `StreamingAssets/`, mở rộng bằng `IObstacleBlueprint` (Factory) & `VehicleStatsDecorator` (Decorator). |
+| **NFR-04** | An toàn & Ngoại lệ | Không crash khi tệp Save/Config hỏng hoặc ngoài biên; cây ngoại lệ rõ ràng. | Cây `GameDomainException` (`SaveDataCorruptedException`, `InvalidTrackConfigurationException`, `InvalidUpgradeTransactionException`, `InvalidRaceStateTransitionException`), 0 `catch {}` rỗng, chế độ safe-load tự kẹp biên & fallback. |
+| **NFR-05** | Đóng gói Clean-room | Không phụ thuộc tài nguyên ngoài hệ thống, chạy ngay bản build độc lập `≤ 3 phút`. | Xuất bản sạch `Builds/RoadRash2D/RoadRash2D.exe` kèm toàn bộ `StreamingAssets/`; audio & sprite đều có procedural generator dự phòng. |
+
+### 2.4 Bảng Thông Số Cân Bằng (Balancing Table — Đồng bộ 1-1 `game_balance.json` & `Maps/*.json`)
+
+#### A. Bảng Cân bằng Nâng cấp Xe & Kinh tế (`Assets/StreamingAssets/Config/game_balance.json`)
+- **Thông số xe gốc (`defaultVehicleStats`):** `mass = 220 kg`, `enginePower = 4800`, `brakePower = 7800`, `grip = 9.2`, `drag = 0.48`, `rollingResistance = 0.8`, `maxSpeed = 48 m/s (~172.8 km/h)`, `maxReverseSpeed = 8 m/s`, `turnRate = 2.4 rad/s`.
+- **Công thức giá cấp $L \in \{0..4\}$:** $\text{Cost}(L) = \text{RoundToInt}(\text{BaseCost} \times 1.5^L)$, trần `maxUpgradeLevel = 5`.
+
+| Hạng mục (`UpgradeType`) | Giá gốc (`Lv0→1`) | `Lv1→2` | `Lv2→3` | `Lv3→4` | `Lv4→5` | Tác động mỗi cấp (qua `VehicleStatsDecorator`) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Engine** | `150` | `225` | `338` | `506` | `759` | `+750` EnginePower, `+3.5 m/s` MaxSpeed |
+| **Brakes** | `120` | `180` | `270` | `405` | `608` | `+1400` BrakePower |
+| **Grip** | `130` | `195` | `293` | `439` | `658` | `+1.3` Tire Grip |
+| **WeightReduction** | `140` | `210` | `315` | `473` | `709` | `-14 kg` Mass (giảm quán tính khi tăng tốc & va chạm) |
+
+#### B. Bảng Thưởng Thứ Hạng & Đường Cong Độ Khó 4 Bản Đồ (`Assets/StreamingAssets/Maps/*.json`)
+- **Thưởng gốc (`x1.0`):** Hạng 1 = `500`, Hạng 2 = `320`, Hạng 3 = `200`, Hạng 4 = `120`, Hạng 5+ = `75`. Tổng thưởng nhận = $\text{RoundToInt}(\text{BasePrize} \times \text{rewardMultiplier})$.
+
+| Map JSON (`StreamingAssets/Maps/`) | Độ khó | Làn × Rộng | Chiều dài / Vật cản | Cảnh sát Speed Bonus | Hệ số AI cua | Hệ số thưởng | Khả thắng (3 vòng) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `01_city_morning.json` (*Phố Sáng Ban Mai*) | `2★` | `4 × 6.0 m` (`24.0 m`) | `~1530 m` / `10` | `+3.8 m/s` | `0.96` | `x1.0` (H1: `500`) | `100%` |
+| `02_coastal_highway.json` (*Đại Lộ Ven Biển*) | `3★` | `6 × 5.4 m` (`32.4 m`) | `~2020 m` / `14` | `+4.8 m/s` | `1.05` | `x1.3` (H1: `650`) | `100%` |
+| `04_city_district.json` (*Thành Phố Đêm Neon*) | `4★` | `4 × 6.0 m` (`24.0 m`) | `~1836 m` / `18` | `+5.4 m/s` | `1.04` | `x1.7` (H1: `850`) | `100%` |
+| `03_neon_night.json` (*Cao Tốc Đêm Neon*) | `5★` | `5 × 5.6 m` (`28.0 m`) | `~1680 m` / `20` | `+6.2 m/s` | `1.12` | `x2.0` (H1: `1000`) | `100%` |
+
+#### C. Bảng Cân bằng 3 Mức AI (`AIProfile`) & 5 Loại Vật Cản (`TrackObstacleFactory`)
+- **`AIProfile` (`Easy` / `Normal` / `Hard`):** `skillLevel` = `0.62 / 0.82 / 0.96`; `topSpeedFactor` = `0.78 / 0.90 / 0.99`; `minCornerSpeed` = `16 / 22 / 28 m/s`; `cornerBrakeAggression` = `1.15 / 0.92 / 0.75`; `throttleScale` = `0.82 / 0.94 / 1.00`.
+- **5 Spec Vật cản (`defaultHitRadius=1.65`, `defaultSpeedPenalty=0.62`, `defaultLateralImpulse=8.5`):**
+  - `TrafficCone`: bán kính `0.90x`, giữ tốc độ `0.76x`, đẩy ngang `0.65x`.
+  - `OilBarrel`: bán kính `1.05x`, giữ tốc độ `0.62x`, đẩy ngang `1.15x`.
+  - `RoadBarrier`: bán kính `1.25x`, giữ tốc độ `0.54x`, đẩy ngang `1.25x`.
+  - `OilSlick`: bán kính `1.15x`, giữ tốc độ `0.70x`, đẩy ngang `1.30x`.
+  - `ParkedBus`: bán kính `1.32x`, giữ tốc độ `0.44x`, đẩy ngang `1.35x`, `OuterLaneOnly = true`, `AvoidTunnelAndOverpass = true`.
 
 ---
 
-## 3. Tuân thủ 4 tính chất Lập trình Hướng đối tượng (OOP)
+## 3. Tuân thủ 4 tính chất OOP, SOLID & Cây CustomException
 
-| Tính chất OOP | Cách áp dụng thực tế trong code |
+| Tính chất / Nguyên lý | Cách áp dụng thực tế trong code |
 | :--- | :--- |
-| **Trừu tượng hóa (Abstraction)** | Lớp cha trừu tượng `Driver` (`Assets/Scripts/Core/Driver.cs`) khai báo `abstract VehicleInput DecideInput(Car, WaypointTrack)`; lớp `RaceStateBase` (`Assets/Scripts/Core/GameState.cs`) trừu tượng hóa vòng đời trạng thái (`Enter`, `Update`, `FixedUpdate`, `Exit`); lớp `Checkpoint` ẩn toàn bộ phép toán giao cắt đoạn thẳng; struct `VehicleStats` gom chuẩn chỉ số vật lý dùng chung cho xe và nâng cấp. |
-| **Kế thừa (Inheritance)** | `PlayerDriver : Driver`, `AIRacerDriver : Driver`, `PoliceRacerDriver : Driver`; 5 lớp trạng thái (`MainMenuState`, `CountdownState`, `RacingState`, `FinishedState`, `UpgradeShopState`) kế thừa `RaceStateBase`; các asset dữ liệu (`AIProfile`, `VehicleStatsAsset`, `TrackDefinition`, `MapTheme`, `BikeSkinData`) kế thừa `ScriptableObject`. |
-| **Đa hình (Polymorphism)** | `Car` chỉ giữ tham chiếu kiểu lớp cha `Driver` và gọi `_driver.DecideInput(this, track)` — `VehiclePhysics` và `Car` không cần biết người chơi, AI thường hay Cảnh sát đang điều khiển. `GameManager` điều phối luồng game qua `_currentState.Update(...)` / `FixedUpdate(...)`. `RacerRankingComparer` cài đặt `IComparer<RacerProgress>` để hoán đổi quy tắc xếp hạng. |
-| **Đóng gói (Encapsulation)** | Trạng thái nội bộ của `VehiclePhysics`, `Car`, `WaypointTrack`, `AIRacerDriver`, `PoliceRacerDriver`, `Checkpoint`, `RacerProgress`, `CarUpgradeSystem`, `SkinManager`, `MapManager`, `TrackObstacleSystem` được đặt `private` / `[SerializeField] private`, chỉ đọc qua property (`Position`, `IsOnTrack`, `Money`, `SelectedSkin`, `SelectedMap`, `Obstacles`...) và thay đổi qua phương thức kiểm soát có ràng buộc (`Sanitize`, `ClampValues`, `ClampLoadedLevels`, `BuyUpgrade`, `SelectMap`, `SelectSkin`, `StepPhysics`). |
+| **Trừu tượng hóa (Abstraction)** | Lớp trừu tượng `Driver`, `RaceStateBase`, `VehicleStatsDecorator`, `GameDomainException` và 8 Interface gọn (`IInputProvider`, `ISaveStorage`, `IJsonCodec`, `IAudioService`, `ITrackDataProvider`, `IObstacleFactory`, `IObstacleBlueprint`, `IVehicleStatsProvider`, `IRaceCombatService`). |
+| **Kế thừa (Inheritance)** | `PlayerDriver / AIRacerDriver / PoliceRacerDriver : Driver`; 5 state con kế thừa `RaceStateBase`; 5 Decorator nâng cấp/cảnh sát kế thừa `VehicleStatsDecorator`; 4 lớp ngoại lệ miền kế thừa `GameDomainException`. |
+| **Đa hình (Polymorphism)** | `Car` gọi `_driver.DecideInput(...)` và `_driver.UsesArcadeAssist`; `GameManager` ủy thác `_currentState.Update/FixedUpdate` & `_currentState.RemainingCountdown` (**0 `is/as` downcast**); `TrackObstacleFactory` gọi `blueprint.BuildSpec(...)`; `RacerRankingComparer : IComparer<RacerProgress>`. |
+| **Đóng gói & Bất biến (Encapsulation)** | Mọi trạng thái lõi đặt `private` / `readonly` (`VehicleStats.Sanitize()`, `PureVehicleStats.Sanitize()`, `ProgressionRuleEngine.ClampLoadedLevels()`, `TrackJsonDto.ValidateOrThrow()`, `RaceStateTransitionRules.ValidateTransitionOrThrow()`). |
+| **SOLID (SRP, OCP, LSP, ISP, DIP)** | **SRP:** tách `RaceCombatSystem`, `ProgressionRuleEngine`, `MidRaceSaveService`, `LobbyUiBuilder`, `GarageUiBuilder` khỏi `GameManager`. **OCP:** đăng ký `IObstacleBlueprint` mới vào `TrackObstacleFactory` hoặc bọc thêm `VehicleStatsDecorator` mà không sửa lớp cũ. **ISP/DIP:** `GameManager.ConfigureServices(...)`, `ProgressionRuleEngine(...)`, `MidRaceSaveService(...)` nhận interface qua Constructor Injection. |
 
 ---
 
-## 4. Sơ đồ lớp (Class Diagram)
+## 4. Kiến trúc UML, Package 3 Tầng & Design Patterns GoF
+
+### 4.1 Sơ đồ Lớp Tổng Thể (UML Class Diagram — Đủ 6/6 Quan Hệ UML)
 
 ```mermaid
 classDiagram
-    class ScriptableObject {
-        <<UnityEngine>>
+    class IInputProvider {
+        <<interface>>
+        +ReadInput() VehicleInput
+        +WasPausePressed() bool
+        +WasRestartPressed() bool
+        +WasRecoverPressed() bool
+        +WasMutePressed() bool
+        +ResetState() void
+    }
+    class ISaveStorage {
+        <<interface>>
+        +Exists(string) bool
+        +ReadAllText(string) string
+        +WriteAllText(string, string) void
+        +Delete(string) void
+    }
+    class IJsonCodec {
+        <<interface>>
+        +Serialize~T~(T, bool) string
+        +Deserialize~T~(string) T
+    }
+    class IAudioService {
+        <<interface>>
+        +bool IsMuted
+        +ToggleMute() void
+        +SetBgmActive(bool) void
+        +PlayKick(bool) void
+    }
+    class ITrackDataProvider {
+        <<interface>>
+        +LoadTracks(string) IReadOnlyList~TrackJsonDto~
+        +LoadTrackFile(string) TrackJsonDto
+    }
+    class IObstacleBlueprint {
+        <<interface>>
+        +ObstacleKind Kind
+        +BuildSpec(float, float, float) ObstacleSpec
+    }
+    class IObstacleFactory {
+        <<interface>>
+        +Register(IObstacleBlueprint) void
+        +CreateSpec(ObstacleKind, float, float, float) ObstacleSpec
+    }
+    class IVehicleStatsProvider {
+        <<interface>>
+        +GetStats() PureVehicleStats
+    }
+    class IRaceCombatService {
+        <<interface>>
+        +ResolveVehicleCollisions(...) void
+        +ResolveKickAttacks(...) void
+    }
+    class IComparer~RacerProgress~ {
+        <<interface>>
+        +Compare(RacerProgress, RacerProgress) int
+    }
+
+    class GameDomainException {
+        <<abstract>>
+        +string ErrorCode
+    }
+    class SaveDataCorruptedException {
+        +string FilePath
+    }
+    class InvalidTrackConfigurationException {
+        +string ConfigIdentifier
+    }
+    class InvalidUpgradeTransactionException {
+        +UpgradeType Upgrade
+    }
+    class InvalidRaceStateTransitionException {
+        +GameFlowState FromState
+        +GameFlowState TargetState
     }
 
     class Driver {
         <<abstract>>
         -string driverName
-        +string DriverName
-        +SetDriverName(string) void
-        +DecideInput(Car car, WaypointTrack track)* VehicleInput
+        +bool UsesArcadeAssist
+        +DecideInput(Car, WaypointTrack)* VehicleInput
         +OnReset() void
     }
-
     class PlayerDriver {
-        -InputHandler inputHandler
-        +SetInputHandler(InputHandler) void
-        +DecideInput(Car car, WaypointTrack track) VehicleInput
-        +OnReset() void
+        -IInputProvider _inputProvider
+        +bool UsesArcadeAssist
+        +SetInputProvider(IInputProvider) void
+        +DecideInput(Car, WaypointTrack) VehicleInput
     }
-
     class AIRacerDriver {
-        -AINavigationMode navigationMode
         -AIProfile profile
         -int targetWaypoint
-        -float skillLevel
-        -float preferredLateralOffset
-        -float _mapCornerSpeedMultiplier
         +Configure(string, AIProfile, float, float) void
-        +SetAllCars(IReadOnlyList~Car~) void
-        +DecideInput(Car car, WaypointTrack track) VehicleInput
+        +DecideInput(Car, WaypointTrack) VehicleInput
     }
-
     class PoliceRacerDriver {
         -Car _targetPlayer
-        -int targetWaypoint
-        -bool _chaseActive
         +ConfigurePolice(Car, string) void
-        +SetTargetPlayer(Car) void
-        +DecideInput(Car car, WaypointTrack track) VehicleInput
-    }
-
-    class AIProfile {
-        -DifficultyLevel difficulty
-        -float skillLevel
-        -float topSpeedFactor
-        -float minCornerSpeed
-        -float cornerBrakeAggression
-        -float throttleScale
-        -float noiseAmplitude
-        -float noiseFrequency
-        +CreateDefault(DifficultyLevel)$ AIProfile
-        +ConfigureValues(DifficultyLevel, float, float, float, float, float, float, float) void
+        +DecideInput(Car, WaypointTrack) VehicleInput
     }
 
     class InputHandler {
         -float steerResponseSpeed
-        -bool _kickQueued
         +ReadInput() VehicleInput
-        +ResetState() void
+        +WasPausePressed() bool
+    }
+    class RaceAudioController {
+        -AudioSource _bgmSource
+        -AudioSource _sfxSource
+        +SetBgmActive(bool) void
+        +ToggleMute() void
+    }
+    class FileSaveStorageAdapter
+    class UnityJsonCodec
+    class ExternalJsonTrackLoader {
+        -ISaveStorage _storage
+        -IJsonCodec _jsonCodec
+        +LoadTracks(string) IReadOnlyList~TrackJsonDto~
+    }
+    class RaceCombatSystem {
+        +ResolveVehicleCollisions(...) void
+        +ResolveKickAttacks(...) void
     }
 
-    class VehicleStats {
-        <<struct>>
-        +float mass
-        +float enginePower
-        +float brakePower
-        +float grip
-        +float drag
-        +float rollingResistance
-        +float maxSpeed
-        +float maxReverseSpeed
-        +float turnRate
-        +Default()$ VehicleStats
-        +Sanitize() VehicleStats
+    class VehicleStatsDecorator {
+        <<abstract>>
+        #IVehicleStatsProvider Inner
+        +GetStats() PureVehicleStats
+        #ModifyStats(PureVehicleStats)* PureVehicleStats
+    }
+    class BaseVehicleStatsProvider {
+        -PureVehicleStats _baseStats
+        +GetStats() PureVehicleStats
+    }
+    class EngineUpgradeDecorator
+    class PoliceInterceptorDecorator
+
+    class TrackObstacleFactory {
+        -Dictionary~ObstacleKind, IObstacleBlueprint~ _blueprints
+        +Register(IObstacleBlueprint) void
+        +CreateSpec(...) ObstacleSpec
+    }
+    class TrackObstacleSystem {
+        -IObstacleFactory _obstacleFactory
+        -List~TrackObstacle~ _obstacles
+        +SetObstacleFactory(IObstacleFactory) void
+        +SpawnObstacles(WaypointTrack, Nullable~int~) void
     }
 
-    class VehicleStatsAsset {
-        -VehicleStats stats
-        +VehicleStats Stats
-        +SetStats(VehicleStats) void
+    class ProgressionRuleEngine {
+        -ISaveStorage _storage
+        -IJsonCodec _jsonCodec
+        -PlayerSaveData _data
+        +BuyUpgrade(UpgradeType) bool
+        +BuyUpgradeStrict(UpgradeType) void
+        +BuildStatsProviderChain() IVehicleStatsProvider
+        +LoadStrict() bool
+    }
+    class CarUpgradeSystem {
+        -ProgressionRuleEngine _engine
+        +BuyUpgrade(UpgradeType) bool
+        +ComputeUpgradedStats() VehicleStats
+    }
+    class MidRaceSaveService {
+        -ISaveStorage _storage
+        -IJsonCodec _jsonCodec
+        +SaveSnapshot(MidRaceSaveData) void
+        +LoadSnapshotStrict() MidRaceSaveData
     }
 
     class VehiclePhysics {
         -Vector2 position
         -Vector2 velocity
-        -float heading
         -VehicleStats stats
-        +ConfigureStats(VehicleStats) void
-        +ApplyThrottle(float) void
-        +ApplyBrake(float) void
-        +ApplySteering(float) void
         +Update(float dt) void
     }
-
+    class VehicleCollisionPhysics {
+        +Resolve(...)$ VehicleCollisionResult
+    }
     class Car {
-        -VehicleStatsAsset baseStatsAsset
         -VehiclePhysics physics
         -Driver _driver
-        -BikeSkinData activeSkin
-        -bool _isOnTrack
-        +Initialize(Driver, Vector2, float, WaypointTrack) void
-        +ApplySkin(BikeSkinData) void
-        +TryStartKick(int, float, float) bool
-        +ReceiveKick(int, Vector2, float) void
         +StepPhysics(float dt, WaypointTrack) void
+        +RestoreRuntimeState(Vector2, Vector2, float, WaypointTrack) void
     }
 
-    class BikeSkinData {
-        -DriverBrandSkin skinId
-        -string displayName
-        -Color primaryColor
-        -Color secondaryColor
-        -Material customMaterial
-        -Texture2D customTexture
-        -Sprite customSprite
-        +CreateDefault(DriverBrandSkin)$ BikeSkinData
-        +GetOverrideSprite() Sprite
+    class Checkpoint {
+        -Vector2 _position
+        -Vector2 _forward
+        +IsCrossedForward(Vector2, Vector2) bool
     }
-
-    class SkinManager {
-        -BikeSkinData[] skinAssets
-        -DriverBrandSkin selectedBrand
-        -List~BikeSkinData~ _resolvedSkins
-        +EnsureInitialized() void
-        +SelectSkin(DriverBrandSkin, Car) bool
-        +ApplyToCar(Car) void
+    class RacerProgress {
+        +int CompletedLaps
+        +int NextCheckpointIndex
+        +bool IsFinished
     }
-
-    class MapTheme {
-        -string themeId
-        -string themeName
-        -HorizonSilhouetteStyle horizonStyle
-        -Color skyTop
-        -Color asphaltLight
-        -MapZonePropConfig[] zones
-        +CreateValleyPreset()$ MapTheme
-        +CreateCityDistrictPreset()$ MapTheme
-        +CreateCoastalHighwayPreset()$ MapTheme
+    class RacerRankingComparer {
+        +Compare(RacerProgress, RacerProgress) int
     }
-
-    class TrackDefinition {
-        -string mapId
-        -string displayName
-        -Vector2[] waypoints
-        -int laneCount
-        -float laneWidth
-        -int obstacleCount
-        -bool enablePoliceChase
-        -float rewardMultiplier
-        -MapTheme theme
-        -TrackFeatureZone[] featureZones
-        +CreateCityMorningPreset(MapTheme)$ TrackDefinition
-        +CreateCityDistrictPreset(MapTheme)$ TrackDefinition
-    }
-
-    class MapManager {
-        -TrackDefinition[] mapAssets
-        -List~TrackDefinition~ _maps
-        -CarUpgradeSystem _saveSystem
-        -int _selectedIndex
-        +BindSaveSystem(CarUpgradeSystem) void
-        +SelectMap(string, WaypointTrack, EnvironmentDecorator) bool
-        +TryPurchaseMapUnlock(string) bool
-    }
-
-    class WaypointTrack {
-        -TrackDefinition trackDefinition
-        -Vector2[] waypoints
-        -int laneCount
-        -float laneWidth
-        -float trackWidth
-        +ApplyTrackDefinition(TrackDefinition) void
-        +GetLaneCenterOffset(int) float
-        +ProjectPosition(Vector2) TrackProjection
-        +SampleAtDistance(float) TrackSample
-    }
-
-    class TrackObstacleSystem {
-        -bool enableObstacles
-        -int obstacleCount
-        -float minSpacingMeters
-        -List~TrackObstacle~ _obstacles
-        +ApplyMapSettings(TrackDefinition) void
-        +SpawnObstacles(WaypointTrack, Nullable~int~) void
-        +StepObstacles(WaypointTrack, IReadOnlyList~Car~, float) void
-    }
-
-    class EnvironmentDecorator {
-        -float slotIntervalMeters
-        -float propDensity
-        -List~RoadsideDecoration~ _decorations
-        +RebuildEnvironment(WaypointTrack, MapTheme, Nullable~int~) void
-    }
-
-    class PoliceChaseController {
-        -bool enablePoliceChase
-        -Car policeCar
-        -PoliceRacerDriver policeDriver
-        +ApplyMapSettings(TrackDefinition) void
-        +EnsurePoliceUnit(Car, WaypointTrack, VehicleStatsAsset) Car
-        +ResetPoliceOnGrid(Car, WaypointTrack) void
-        +TickPursuit(float dt) void
-    }
-
     class LapCheckpointManager {
         -List~Checkpoint~ _checkpoints
         -List~RacerProgress~ _racers
-        -int totalLaps
-        +Initialize(WaypointTrack, IReadOnlyList~Car~, int) void
+        -IComparer~RacerProgress~ _rankingComparer
         +Tick(float dt) void
-        +GetRanking() IReadOnlyList~RacerProgress~
-    }
-
-    class CarUpgradeSystem {
-        -PlayerSaveData _data
-        -VehicleStats _baseStats
-        +int Money
-        +BuyUpgrade(UpgradeType) bool
-        +TryPurchaseMapUnlock(string, int) bool
-        +ApplyToCar(VehiclePhysics) void
-        +Save() void
-        +Load() bool
+        +RestoreRaceSnapshot(float, int, IReadOnlyList~RacerMidRaceSnapshot~) void
     }
 
     class RaceStateBase {
         <<abstract>>
         +GameFlowState StateType*
+        +float RemainingCountdown
         +Enter(GameManager) void
         +Update(GameManager, float) void
         +FixedUpdate(GameManager, float) void
-        +Exit(GameManager) void
     }
+    class MainMenuState
+    class CountdownState
+    class RacingState
+    class FinishedState
+    class UpgradeShopState
 
-    class PauseMenuUI {
-        -GameManager _gameManager
-        -GameObject _pauseRoot
-        +bool IsShowing
-        +Bind(GameManager) void
-        +RefreshState() void
-    }
-
-    class GameMenuUI {
-        -GameManager _gameManager
-        -SkinManager _skinManager
-        -MapManager _mapManager
-        +Bind(GameManager) void
-        +InitializeStandaloneLobby() void
-        +SelectSkinFromLobby(DriverBrandSkin) bool
+    class MapManager {
+        -ITrackDataProvider _trackDataProvider
+        -List~TrackDefinition~ _maps
+        +LoadMapsFromJsonDirectory(string) int
+        +SelectMap(string, WaypointTrack, EnvironmentDecorator) bool
     }
 
     class GameManager {
-        -List~Car~ _allCars
+        -Dictionary~GameFlowState, RaceStateBase~ _states
+        -IRaceCombatService _combatService
         -CarUpgradeSystem _upgradeSystem
-        -RaceStateBase _currentState
-        -bool _isPaused
+        -MidRaceSaveService _midRaceSaveService
+        -List~Car~ _allCars
+        +ConfigureServices(...) void
         +TransitionTo(GameFlowState) void
-        +PauseGame() void
-        +ResumeGame() void
-        +StepRaceSimulation(float dt) void
+        +SaveMidRaceState() bool
+        +LoadMidRaceState() bool
     }
 
-    ScriptableObject <|-- AIProfile
-    ScriptableObject <|-- VehicleStatsAsset
-    ScriptableObject <|-- BikeSkinData
-    ScriptableObject <|-- MapTheme
-    ScriptableObject <|-- TrackDefinition
+    GameDomainException <|-- SaveDataCorruptedException
+    GameDomainException <|-- InvalidTrackConfigurationException
+    GameDomainException <|-- InvalidUpgradeTransactionException
+    GameDomainException <|-- InvalidRaceStateTransitionException
+
+    IInputProvider <|.. InputHandler
+    ISaveStorage <|.. FileSaveStorageAdapter
+    IJsonCodec <|.. UnityJsonCodec
+    IAudioService <|.. RaceAudioController
+    ITrackDataProvider <|.. ExternalJsonTrackLoader
+    IObstacleFactory <|.. TrackObstacleFactory
+    IVehicleStatsProvider <|.. BaseVehicleStatsProvider
+    IVehicleStatsProvider <|.. VehicleStatsDecorator
+    IRaceCombatService <|.. RaceCombatSystem
+    IComparer~RacerProgress~ <|.. RacerRankingComparer
+
+    VehicleStatsDecorator <|-- EngineUpgradeDecorator
+    VehicleStatsDecorator <|-- PoliceInterceptorDecorator
+    VehicleStatsDecorator o-- IVehicleStatsProvider : wraps
 
     Driver <|-- PlayerDriver
     Driver <|-- AIRacerDriver
     Driver <|-- PoliceRacerDriver
+    PlayerDriver o-- IInputProvider : reads
 
-    PlayerDriver --> InputHandler : uses
-    AIRacerDriver o-- AIProfile : uses tuning
-    PoliceChaseController o-- PoliceRacerDriver : controls
-    PoliceChaseController o-- Car : manages policeCar
+    RaceStateBase <|-- MainMenuState
+    RaceStateBase <|-- CountdownState
+    RaceStateBase <|-- RacingState
+    RaceStateBase <|-- FinishedState
+    RaceStateBase <|-- UpgradeShopState
 
-    VehicleStatsAsset *-- VehicleStats : wraps
-    VehiclePhysics *-- VehicleStats : uses
     Car *-- VehiclePhysics : composition
-    Car o-- VehicleStatsAsset : base stats
-    Car o-- Driver : polymorphic driver
-    Car o-- BikeSkinData : active skin
+    Car o-- Driver : polymorphic
+    LapCheckpointManager *-- "*" Checkpoint : owns
+    LapCheckpointManager *-- "*" RacerProgress : owns
+    LapCheckpointManager o-- IComparer~RacerProgress~ : ranking strategy
 
-    SkinManager "1" o-- "*" BikeSkinData : manages
-    TrackDefinition o-- MapTheme : theme
-    MapManager "1" o-- "*" TrackDefinition : manages
-    MapManager --> CarUpgradeSystem : syncs unlocks
-    WaypointTrack o-- TrackDefinition : applies
-    TrackObstacleSystem ..> TrackDefinition : reads settings
-    TrackObstacleSystem ..> WaypointTrack : spawns on
-    EnvironmentDecorator ..> MapTheme : reads zones
+    CarUpgradeSystem *-- ProgressionRuleEngine : delegates
+    ProgressionRuleEngine o-- ISaveStorage : injects
+    ProgressionRuleEngine o-- IJsonCodec : injects
+    ProgressionRuleEngine ..> VehicleStatsDecorators : builds chain
+    MidRaceSaveService o-- ISaveStorage : injects
+    MidRaceSaveService o-- IJsonCodec : injects
 
+    TrackObstacleSystem o-- IObstacleFactory : creates specs
+    MapManager o-- ITrackDataProvider : loads JSON
+    RaceCombatSystem ..> VehicleCollisionPhysics : resolves Newton impact
+
+    GameManager *-- "*" RaceStateBase : owns states
     GameManager *-- CarUpgradeSystem : owns
-    GameManager o-- LapCheckpointManager : uses
-    GameManager o-- WaypointTrack : uses
-    GameManager o-- RaceStateBase : current state
-    GameManager o-- SkinManager : uses
-    GameManager o-- MapManager : uses
-    GameManager o-- TrackObstacleSystem : uses
-    GameManager o-- PoliceChaseController : uses
-    GameManager o-- PauseMenuUI : toggles
-    GameManager o-- GameMenuUI : binds
+    GameManager *-- MidRaceSaveService : owns
+    GameManager o-- IRaceCombatService : delegates combat
+    GameManager o-- IInputProvider : reads input
+    GameManager o-- IAudioService : plays audio
     GameManager "1" --> "*" Car : manages
 ```
 
+### 4.2 Sơ đồ Kiến trúc Phân tầng (Package Diagram 3 Tầng)
+
+```mermaid
+flowchart TB
+    subgraph T1["Tầng 3 — Presentation, Input & Unity Infrastructure (RacingGame.asmdef)"]
+        UI["UI (uGUI + TMP)\nGameMenuUI, LobbyUiBuilder,\nGarageUiBuilder, RaceHUD, PauseMenuUI"]
+        RENDER["Rendering & Audio\nRoadRashRenderer2D, RaceVfxController,\nCrtScanlineController, RaceAudioController"]
+        INPUT["Input & Unity Adapters\nInputHandler (IInputProvider),\nFileSaveStorageAdapter, UnityJsonCodec,\nExternalJsonTrackLoader, RaceCombatSystem"]
+        SCENE["MonoBehaviour / ScriptableObject\nGameManager, Car, WaypointTrack,\nMapManager, TrackObstacleSystem, PoliceChaseController"]
+    end
+
+    subgraph T2["Tầng 1 — Core Pure C# Domain (RacingGame.Core.asmdef | noEngineReferences: true)"]
+        CONTRACTS["Contracts (ISP / DIP)\nIInputProvider, ISaveStorage, IJsonCodec,\nIAudioService, ITrackDataProvider,\nIObstacleFactory, IObstacleBlueprint, IVehicleStatsProvider"]
+        DOMAIN["Pure Domain, Math & GoF\nProgressionRuleEngine, MidRaceSaveService,\nTrackObstacleFactory, VehicleStatsDecorators,\nCheckpointGateMath, CollisionSolverMath, RaceStateTransitionRules"]
+        EX["Custom Exceptions & DTOs\nGameDomainException (4 subclasses),\nPlayerSaveData, MidRaceSaveData, TrackJsonDto, GameBalanceConfig"]
+    end
+
+    subgraph T3["Tầng Kiểm thử & Editor Tools"]
+        ED["RacingGame.Editor (3 files)\nRoadRashSceneSetup, Stage2ArtWiringEditor, ArtAssetImportPostprocessor"]
+        TESTS["RacingGame.Tests (20 files, 109 Tests)\nPure Headless + Stub/Fake + Integration"]
+    end
+
+    UI --> SCENE
+    RENDER --> SCENE
+    INPUT --> CONTRACTS
+    SCENE --> CONTRACTS
+    SCENE --> DOMAIN
+    SCENE --> EX
+    ED --> SCENE
+    TESTS --> DOMAIN
+    TESTS --> CONTRACTS
+    TESTS --> SCENE
+```
+
+- **Kiểm chứng tách lõi (`4.3`):** Toàn bộ `25` tệp trong `Assets/Scripts/Core/Pure/` biên dịch dưới `"noEngineReferences": true` với **`0` lệnh `using UnityEngine`**, **`0` Circular Dependency**, kiểm thử bởi `TC-91`.
+
+### 4.3 Tổng hợp 6 Mẫu GoF (Đủ 3/3 Nhóm) & Phân tích Đánh đổi Thiết kế (W)
+
+| Nhóm GoF | Mẫu Pattern | Role chuẩn GoF trong mã nguồn | Chỗ gọi thật qua Call Stack | Kịch bản mở rộng Live OCP (0 sửa lớp cũ) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Creational** | **Factory** (`Registry Factory Method`) | Product: `ObstacleSpec`; Creator Interface: `IObstacleFactory`; ConcreteCreator: `TrackObstacleFactory`; ConcreteBlueprints: `IObstacleBlueprint` (5 lớp) | `TrackObstacleSystem.SpawnObstacles` → `_obstacleFactory.CreateSpec(...)` | Tạo lớp mới `SpikeStripBlueprint : IObstacleBlueprint` và gọi `factory.Register(...)` (`TC-96`). |
+| **Structural** | **Decorator** | Component: `IVehicleStatsProvider`; ConcreteComponent: `BaseVehicleStatsProvider`; Decorator: `VehicleStatsDecorator`; ConcreteDecorators: `Engine/Brakes/Grip/WeightReduction/PoliceInterceptorDecorator` | `ProgressionRuleEngine.BuildStatsProviderChain` & `PoliceChaseController.EnsurePoliceUnit` | Tạo lớp `NitroUpgradeDecorator : VehicleStatsDecorator` bọc thêm vào chuỗi (`TC-95`). |
+| **Structural** | **Adapter** | Target: `ISaveStorage`, `IJsonCodec`, `IInputProvider`; Adapters: `FileSaveStorageAdapter`, `UnityJsonCodec`, `InputHandler` | `CarUpgradeSystem` / `MidRaceSaveService` / `PlayerDriver` / `RacingState` | Tráo `InMemorySaveStorage` hoặc `FakeInputProvider` tại `GameManager.ConfigureServices(...)`. |
+| **Behavioral** | **State** | Context: `GameManager`; State: `RaceStateBase`; ConcreteStates: `MainMenu`, `Countdown`, `Racing`, `Finished`, `UpgradeShop` | `GameManager.Update` / `FixedUpdate` → `_currentState.Update/FixedUpdate` | Tạo `TimeTrialState : RaceStateBase` đăng ký vào `_states`. |
+| **Behavioral** | **Strategy** | Context: `Car` / `LapCheckpointManager`; Strategy: `Driver` / `IComparer<RacerProgress>`; ConcreteStrategies: `PlayerDriver`, `AIRacerDriver`, `PoliceRacerDriver`, `RacerRankingComparer` | `Car.StepPhysics` → `_driver.DecideInput`; `LapCheckpointManager.UpdateRanking` | Tạo `AggressiveAiDriver : Driver` hoặc `TimeAttackRankingComparer : IComparer<RacerProgress>`. |
+| **Behavioral** | **Observer** | Subject: `LapCheckpointManager`, `TrackObstacleSystem`, `GameManager`, `PoliceChaseController`, `SkinManager`; Observer: `RaceHUD`, `GameManager` | `ObstacleHit += HandleObstacleHit`; `OnDisable/OnDestroy` gọi `-=` (`TC-82`, `TC-109`) | Đăng ký thêm `TelemetryLogger` vào sự kiện `RacerKicked`. |
+
+**Phản biện Đánh đổi Thiết kế (W):**
+1. *Nếu viết thẳng luật vào `MonoBehaviour.Update()`:* Các phép tính tiền thưởng, nâng cấp, kẹp biên JSON, va chạm Newton (`CollisionSolverMath`), cắt cổng (`CheckpointGateMath`) và guard chuyển trạng thái sẽ phụ thuộc `Time.deltaTime`, `MonoBehaviour`, `Scene` → không thể chạy Unit Test độc lập hay hoán đổi `InMemorySaveStorage`/`FakeInputProvider`.
+2. *3 nhược điểm thực tế của Pattern đang dùng:* (a) Tăng số lượng file/interface (`8` interface + `5` decorator) làm tăng độ phức tạp điều hướng với dự án nhỏ; (b) Chuỗi Decorator nếu tạo mới mỗi frame trong `FixedUpdate` sẽ gây rác GC, nên chỉ dựng khi nâng cấp/setup xe; (c) Observer bằng C# `event` dễ gây memory leak hoặc `MissingReferenceException` nếu quên cặp `-=` trong `OnDisable()`/`OnDestroy()`.
+
 ---
 
-## 5. Sơ đồ tuần tự (Sequence Diagrams)
+## 5. Sơ đồ Tuần tự (Sequence Diagrams)
 
 ### 5.1 Luồng mỗi bước vật lý (`FixedUpdate`)
 ```mermaid
@@ -412,6 +489,7 @@ sequenceDiagram
     participant Car as Car
     participant Drv as Driver
     participant Phys as VehiclePhysics
+    participant Combat as RaceCombatSystem
     participant Obs as TrackObstacleSystem
     participant Pol as PoliceChaseController
     participant Lap as LapCheckpointManager
@@ -422,254 +500,116 @@ sequenceDiagram
         GM->>Car: StepPhysics(dt, track)
         Car->>Drv: DecideInput(car, track)
         Drv-->>Car: VehicleInput
-        Car->>Phys: ApplyThrottle / ApplyBrake / ApplySteering
-        Car->>Phys: Update(dt)
+        Car->>Phys: ApplyThrottle / ApplyBrake / Update(dt)
     end
-    GM->>GM: ResolveKickAttacks & ResolveVehicleCollisions
+    GM->>Combat: ResolveKickAttacks & ResolveVehicleCollisions
+    Combat->>Combat: CollisionSolverMath.ResolveCircleImpact(...)
     GM->>Obs: StepObstacles(track, _allCars, dt)
     GM->>Pol: TickPursuit(dt)
     GM->>Lap: Tick(dt)
-    Lap->>Lap: ProcessRacerMovement & UpdateRanking
+    Lap->>Lap: CheckpointGateMath & UpdateRanking
 ```
 
-### 5.2 Luồng nâng cấp xe & mở khóa Map
+### 5.2 Luồng Lưu & Khôi phục Trạng thái Giữa Trận (`MidRaceSaveService`)
 ```mermaid
 sequenceDiagram
     participant Player as Người chơi
-    participant UI as GameMenuUI
+    participant Pause as PauseMenuUI
     participant GM as GameManager
-    participant Upg as CarUpgradeSystem
-    participant Map as MapManager
-    participant Phys as VehiclePhysics
+    participant Mid as MidRaceSaveService
+    participant Store as ISaveStorage
+    participant Lap as LapCheckpointManager
 
-    alt Nâng cấp thông số xe tại Garage
-        Player->>UI: Bấm Nâng cấp (Engine/Brakes/Grip/Weight)
-        UI->>GM: TryBuyUpgrade(type)
-        GM->>Upg: BuyUpgrade(type)
-        alt Đủ tiền và chưa Max Level
-            Upg->>Upg: Trừ tiền, tăng cấp, Save() JSON
-            Upg-->>GM: true
-            GM->>Upg: ApplyToCar(playerCar.Physics)
-            Upg->>Phys: ConfigureStats(ComputeUpgradedStats())
-        else Không đủ tiền hoặc đã Max
-            Upg-->>GM: false
-        end
-    else Mở khóa Map mới tại Sảnh chờ
-        Player->>UI: Bấm MỞ KHÓA Map
-        UI->>GM: TryUnlockPlayerMap(mapId)
-        GM->>Map: TryPurchaseMapUnlock(mapId)
-        Map->>Upg: TryPurchaseMapUnlock(mapId, cost)
-        Upg-->>Map: true/false (Save JSON)
-        Map-->>GM: true/false
-    end
+    Player->>Pause: Bấm "LƯU VÁN ĐUA"
+    Pause->>GM: SaveMidRaceState()
+    GM->>Mid: SaveSnapshot(MidRaceSaveData)
+    Mid->>Store: WriteAllText("midrace_save.json", json)
+    Note over Player,Store: Tắt hoàn toàn game và mở lại ở phiên mới
+    Player->>GM: Bấm "TIẾP TỤC VÁN"
+    GM->>Mid: TryLoadSnapshot(out snapshot)
+    Mid->>Store: ReadAllText("midrace_save.json")
+    GM->>GM: Car.RestoreRuntimeState(pos, vel, heading)
+    GM->>Lap: RestoreRaceSnapshot(raceTime, finishedCount, racers)
+    GM->>GM: TransitionTo(GameFlowState.Racing)
 ```
 
 ---
 
-## 6. Sơ đồ trạng thái (State Diagram)
-
-Sơ đồ trạng thái phản ánh đầy đủ cả luồng khởi động từ **Lobby** (`LobbyScene` độc lập hoặc `MainMenu` trong `SampleScene`) và trạng thái tạm dừng **Pause** (`_isPaused = true`, `Time.timeScale = 0f`, hiển thị `PauseMenuUI`) khi đang ở `Countdown` hoặc `Racing`.
+## 6. Sơ đồ Trạng thái có Guard (State Diagram)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Lobby : Khoi dong game (LobbyScene)
-    Lobby --> Countdown : Bam PLAY (Nap SampleScene / AutoStart)
-    Lobby --> MainMenu : Vao truc tiep SampleScene
-    Lobby --> [*] : Bam nut X / Thoat game
+    Lobby --> Countdown : Bam PLAY [Map unlocked] / AutoStartRace = true
+    Lobby --> Racing : Bam TIEP TUC VAN [HasSavedMidRace == true] / LoadMidRaceState()
+    Lobby --> MainMenu : Mo truc tiep SampleScene
+    Lobby --> [*] : Bam [X] Thoat game
 
-    MainMenu --> Countdown : Bam PLAY (Bat dau dua)
-    MainMenu --> UpgradeShop : Bam GARAGE (Nang cap xe)
-    MainMenu --> [*] : Bam X / Thoat game
+    MainMenu --> Countdown : Bam PLAY [Map unlocked] / ResetRaceGrid()
+    MainMenu --> Racing : Bam TIEP TUC VAN [HasSavedMidRace == true] / LoadMidRaceState()
+    MainMenu --> UpgradeShop : Bam GARAGE / ApplyPlayerUpgrades()
+    MainMenu --> [*] : Bam [X] Thoat game
 
-    UpgradeShop --> MainMenu : Bam Quay lai sanh cho
-    UpgradeShop --> Countdown : Bam PLAY (Dua ngay)
+    UpgradeShop --> MainMenu : Bam Quay lai / Save()
+    UpgradeShop --> Countdown : Bam PLAY [Map unlocked] / ResetRaceGrid()
 
-    Countdown --> Racing : Dem nguoc 3..2..1..GO xong
-    Countdown --> Pause : Nhan Esc hoac P
+    Countdown --> Racing : Timer <= 0 [Remaining <= 0] / PlayCountdownBeep(true)
+    Countdown --> Pause : Nhan Esc hoac P [CanPause == true] / timeScale = 0
 
-    Racing --> Pause : Nhan Esc hoac P
-    Racing --> Countdown : Nhan R (Dua lai)
-    Racing --> Finished : Nguoi choi hoan thanh du vong
+    Racing --> Pause : Nhan Esc hoac P [CanPause == true] / timeScale = 0
+    Racing --> Countdown : Nhan R [!IsPaused] / StartRace()
+    Racing --> Finished : Qua du vong [CompletedLaps >= TotalLaps] / RecordPlayerRaceFinish()
 
-    Pause --> Racing : Bam Resume hoac Esc/P (tu Racing)
-    Pause --> Countdown : Bam Resume (tu Countdown) / Restart
-    Pause --> MainMenu : Bam Ve sanh cho (Lobby)
-    Pause --> [*] : Bam Thoat game (Quit)
+    Pause --> Racing : Resume [Previous == Racing] / timeScale = 1
+    Pause --> Countdown : Resume [Previous == Countdown] / timeScale = 1
+    Pause --> Countdown : Bam Restart / StartRace()
+    Pause --> MainMenu : Bam Ve Lobby / OpenMenu()
+    Pause --> [*] : Bam Quit / Application.Quit()
 
-    Finished --> Countdown : Nhan R / Dua lai
-    Finished --> UpgradeShop : Vao Garage nang cap
-    Finished --> MainMenu : Nhan Esc / Ve Menu
+    Finished --> Countdown : Nhan R / StartRace()
+    Finished --> UpgradeShop : Bam Garage / OpenGarage()
+    Finished --> MainMenu : Nhan Esc / OpenMenu()
 ```
 
 ---
 
-## 7. Lưu đồ thuật toán AI, Cảnh sát & Đếm vòng
+## 7. Phân Tích Độ Phức Tạp `O(·)` & Ca Biên Các Thuật Toán Lõi
 
-### 7.1 AI bám đường đua (`AIRacerDriver` — `SmoothedSplinePath`)
-```mermaid
-flowchart TD
-    A["Bắt đầu DecideInput"] --> B{"Speed < 2.5 quá 2.5s?"}
-    B -->|"Có"| C["ResetToTrackPoint về waypoint gần nhất"]
-    B -->|"Không"| D["Tính né xe phía trước (ComputeAvoidanceOffset)"]
-    D --> E["Cập nhật targetWaypoint theo hướng đi"]
-    E --> F["Quét đa điểm Corridor Smooth Path phía trước"]
-    F --> G["Tính độ gắt góc cua gần & toàn tầm phanh"]
-    G --> H["Xác định aimPoint & cornerTargetSpeed"]
-    H --> I["Tính góc lệch -> steer (+ wobble theo skill & seed)"]
-    I --> J{"currentSpeed > cornerTargetSpeed?"}
-    J -->|"Vượt nhiều (> +5)"| K["Nhả ga + Phanh tỷ lệ"]
-    J -->|"Vượt nhẹ"| L["Giảm ga giữ đà"]
-    J -->|"Thấp hơn"| M["Tăng ga theo profile.ThrottleScale"]
-```
-
-### 7.2 Cảnh sát truy đuổi (`PoliceRacerDriver`)
-```mermaid
-flowchart TD
-    A["Bắt đầu DecideInput (Police)"] --> B{"Đang truy đuổi (_chaseActive)?"}
-    B -->|"Không"| Z["Trả VehicleInput mặc định (đứng yên)"]
-    B -->|"Có"| C{"Speed < 2.5 quá 2.0s?"}
-    C -->|"Có"| D["ResetToTrackPoint về đường đua"]
-    C -->|"Không"| E["Tính khoảng cách dọc dzToPlayer tới người chơi"]
-    E --> F{"abs(dzToPlayer) <= 28m?"}
-    F -->|"Có"| G["Ép làn sang cạnh người chơi theo độ rộng làn"]
-    G --> H{"Trong tầm đá (abs(dz)<=3.2m, dLat<=scaled) & CanKick?"}
-    H -->|"Có"| I["Bật cờ kick = true"]
-    H -->|"Không"| J["Giữ bám cạnh"]
-    F -->|"Không"| K["Chạy theo tâm đường & tăng catchUpFactor (1.08x) nếu tụt sau"]
-    I --> L["Tính steer, ga/phanh theo góc cua và trả VehicleInput"]
-    J --> L
-    K --> L
-```
-
-### 7.3 Đếm vòng chống gian lận (`LapCheckpointManager`)
-```mermaid
-flowchart TD
-    A["Xe di chuyển từ PreviousPosition -> Position"] --> B["Lấy Checkpoint kỳ vọng tiếp theo"]
-    B --> C{"Đoạn di chuyển cắt cổng đúng hướng xuôi?"}
-    C -->|"Không (đi tắt / ngược chiều)"| D["Bỏ qua cổng, cập nhật Distance & kiểm tra IsWrongWay"]
-    C -->|"Có"| E["Tăng NextCheckpointIndex (mod N)"]
-    E --> F{"Có phải vạch đích Checkpoint 0?"}
-    F -->|"Không"| G["Phát sự kiện CheckpointPassed"]
-    F -->|"Có"| H["CompletedLaps++, lưu LastLapTime & BestLapTime"]
-    H --> I{"CompletedLaps >= TotalLaps?"}
-    I -->|"Có"| J["Đánh dấu IsFinished & gán FinishPosition"]
-    I -->|"Không"| K["Tiếp tục vòng mới"]
-```
+| TT | Thuật toán & Vị trí cài đặt | Độ phức tạp Thời gian / Không gian | Ca biên cực đoan & Dòng chặn an toàn |
+| :-: | :--- | :--- | :--- |
+| 1 | **Vật lý xe 2D & Trượt tường** (`VehiclePhysics.Update`, `Car.EnforceOuterBarrier`) | `O(1)` mỗi xe / bước (`FixedUpdate 50 Hz`); `O(N)` theo số waypoint khi chiếu `ProjectPosition` (`N <= 26`) | Tốc độ bằng `0` không cho phép quay hướng; kẹp tốc độ tối thiểu & chống `NaN` bằng `VehicleStats.Sanitize()`; va vào biên ngoài ở góc `70°` kích hoạt wall-slide giữ đà tiến (`TC-85`). |
+| 2 | **Va chạm cứng Newton 2D** (`CollisionSolverMath.ResolveCircleImpact`) | `O(1)` mỗi cặp xe; toàn bộ vòng lặp `O(K^2)` với `K <= 6` xe | Khi `dist <= 0.0001f` fallback vector pháp tuyến `(1, 0)` tránh chia cho 0; `vn >= 0` bỏ qua xung lực khi hai xe đang tách rời; kẹp `jt` trong nón ma sát Coulomb `[-mu*jn, mu*jn]` (`TC-89`, `TC-99`). |
+| 3 | **AI bám spline & né xe** (`AIRacerDriver.DecideInput`) | `O(M + K)` mỗi tick với `M` điểm lấy mẫu spline nhìn trước (`M <= 8`) và `K` xe | Đứng yên `Speed < 2.5 m/s` quá `2.5s` tự phục hồi về waypoint gần nhất đúng chiều; bỏ qua xe ngoài tầm nhìn dọc `> 20m` hoặc ngang `> 3.5m`; dùng `System.Random(seed)` tách biệt (`TC-09..13`, `TC-34`). |
+| 4 | **Cảnh sát truy đuổi & ép làn** (`PoliceRacerDriver.DecideInput`) | `O(1)` mỗi tick (`SignedTrackDelta` + góc cua) | Khi chưa `_chaseActive` trả `default`; kẹt `> 2.0s` tự phục hồi về đường; kiểm tra `trackLength <= 0.01f` trước phép modulo quãng đường. |
+| 5 | **Cắt cổng 1 chiều & Xếp hạng** (`CheckpointGateMath`, `LapCheckpointManager`) | Cắt cổng `O(1)` mỗi xe; xếp hạng `O(K log K)` (`K <= 6`) | Kiểm tra `move.sqrMagnitude < 1e-6`, `dotForward <= 0` (chặn đi lùi) và `abs(denom) < 1e-6` (chặn chạy song song); bỏ qua cổng không đúng `NextCheckpointIndex` chống đi tắt (`TC-14..18`, `TC-98`). |
 
 ---
 
-## 8. Chương Cài đặt (Implementation)
+## 8. Chương Cài Đặt & Tổ Chức Assembly
 
-### 8.1 Tổ chức Assembly, Thư mục Art và Module
-Mã nguồn được tách rõ thành 3 Assembly Definition (`.asmdef`) gồm **40 script runtime** và **3 script Editor**, cùng thư mục tài nguyên đồ họa chuẩn hóa dưới `Assets/Art/`:
-1. **`RacingGame`** (`Assets/Scripts/RacingGame.asmdef`): Toàn bộ logic gameplay, vật lý, AI, bản đồ, skin/palette swap, giao diện uGUI + TextMeshPro, đồ họa, VFX/CRT, âm thanh và lưu trữ dữ liệu; tham chiếu `Unity.InputSystem`, `Unity.RenderPipelines.Core.Runtime`, `Unity.RenderPipelines.Universal.Runtime`, `UnityEngine.UI`, `Unity.TextMeshPro`.
-2. **`RacingGame.Editor`** (`Assets/Scripts/Editor/RacingGame.Editor.asmdef`): Gồm `RoadRashSceneSetup`, `ArtAssetImportPostprocessor` (tự cấu hình Sprite/PPU/Pivot/Compression cho `Assets/Art/`) và `Stage2ArtWiringEditor` (tự gắn sprite nhiều pose, prop override, banner map, preview skin vào các `.asset`).
-3. **`RacingGame.Tests`** (`Assets/Tests/EditMode/RacingGame.Tests.asmdef`): Chứa **18 bộ test EditMode** tham chiếu `RacingGame`, `UnityEngine.TestRunner`, `UnityEditor.TestRunner`, `Unity.TextMeshPro` và `nunit.framework.dll`.
+Mã nguồn được tổ chức thành **4 Assembly Definition (`.asmdef`)** gồm **`71` tệp runtime** (`25` Pure Core + `46` `RacingGame`) và **`3` tệp Editor**:
 
-```text
-Assets/
-├── Art/
-│   ├── Maps/                       # Banner_Map01_CityMorning .. Banner_Map04_CityNightDistrict (1376x768)
-│   ├── Previews/                   # Preview_XanhSM, Preview_ShopeeFood, Preview_Grab, Preview_Ahamove (1376x768)
-│   ├── Sprites/
-│   │   ├── Bikes/                  # 6 pose rear-view XanhSM RGBA (Upright, LeanLeft/Right Light/Deep, KickLeft)
-│   │   └── Props/                  # 10 sprite prop & vật cản RGBA (RoadBarrier, Cone, Barrel, ParkedBus, Palm, Tree, Lamp, NeonSign, HighwaySign)
-│   └── UI/                         # Bg_Lobby_SaigonNight.png
-├── Shaders/
-│   └── CrtScanlineOverlay.shader   # Shader CRT scanline + vignette tương thích URP
-└── Scripts/
-    ├── Editor/                     # ArtAssetImportPostprocessor.cs, RoadRashSceneSetup.cs, Stage2ArtWiringEditor.cs
-    ├── Rendering/                  # RoadRashRenderer2D.cs, RaceVfxController.cs, CrtScanlineController.cs, ...
-    ├── Skins/                      # BikePaletteSwapper.cs, BikeSkinData.cs, SkinManager.cs
-    └── UI/                         # GameMenuUI.cs, LobbyUiBuilder.cs, GarageUiBuilder.cs, RaceHUD.cs, PauseMenuUI.cs, RoadRashUiSprites.cs
-```
-
-### 8.2 Chi tiết cài đặt các phân hệ chính
-- **Vật lý xe & Chỉ số chuẩn (`VehiclePhysics`, `VehicleStats`, `VehicleStatsAsset`, `Car`):**
-  - `VehicleStats` là struct giá trị chuẩn (`mass = 220`, `enginePower = 4800`, `brakePower = 7800`, `grip = 9.2`, `drag = 0.48`, `rollingResistance = 0.8`, `maxSpeed = 48`, `maxReverseSpeed = 8`, `turnRate = 2.4`) kèm `Sanitize()` chặn ngưỡng tối thiểu an toàn.
-  - `Car` kết hợp `VehiclePhysics` (composition) với `Driver` (polymorphism), xử lý trạng thái off-road (giảm tốc tối đa còn 58%, giữ lực kéo và hỗ trợ lực đẩy quay lại mặt đường khi đánh lái vào trong), giới hạn biên ngoài `MaxOffRoadWidth`, nghiêng thân xe (`_leanAngle`) và trạng thái chiến đấu (`TryStartKick`, `ReceiveKick`, stagger & cooldown).
-- **Hệ thống Đường đua, Map & Theme (`WaypointTrack`, `TrackDefinition`, `MapTheme`, `MapManager`):**
-  - `WaypointTrack` hỗ trợ 2–6 làn xe động (`LaneCount`, `LaneWidth`, `GetLaneCenterOffset`), nội suy Catmull-Rom (`SampleAtDistance`) tính độ cong, cao độ sóng sin và vùng đặc biệt (`Overpass` nâng cao độ cầu vượt, `Tunnel` ngắt prop ngoài trời, `Crosswalk` đặt đèn giao thông).
-  - `MapManager` quản lý 4 map mặc định (`city_morning`, `coastal_highway`, `neon_night`, `city_district`), lưu map đang chọn (`RacingGame_SelectedMap_v1`), kỷ lục thời gian từng map trong `PlayerPrefs` và đồng bộ mở khóa map với `CarUpgradeSystem`.
-- **AI & Cảnh sát truy đuổi (`AIProfile`, `AIRacerDriver`, `PoliceChaseController`, `PoliceRacerDriver`):**
-  - `AIRacerDriver` hỗ trợ 3 thuật toán dẫn đường: `SmoothedSplinePath` (mặc định — quét đa điểm theo đường cong mượt tránh cắt góc 90°), `SpeedAdaptiveWaypoint` và `LegacyFixed`; có seed cố định (`SetSeed`) bảo đảm determinism.
-  - `PoliceChaseController` khởi tạo đơn vị cảnh sát `PoliceCar_Unit01` gắn `PoliceRacerDriver`, tăng nhẹ `maxSpeed` theo `policeSpeedBonus` của map, điều khiển nháy đèn xanh-đỏ và cập nhật khoảng cách cảnh báo cho `RaceHUD`.
-- **Chướng ngại vật & Cảnh quan (`TrackObstacleSystem`, `EnvironmentDecorator`):**
-  - `TrackObstacleSystem` sinh ngẫu nhiên (hoặc theo seed) 5 loại vật cản (`TrafficCone`, `OilBarrel`, `RoadBarrier`, `OilSlick`, `ParkedBus`), đảm bảo `ParkedBus` chỉ đỗ ở làn ngoài cùng và không chắn trong `Tunnel` hoặc trên `Overpass`; va chạm đẩy ngang xe, giảm tốc và đưa vật cản vào thời gian hồi sinh (`respawnCooldownSeconds = 4.5f`).
-  - `EnvironmentDecorator` đọc động danh sách `MapZonePropConfig[]` và hệ số mật độ `propDensityMultiplier` từ `MapTheme` để rải prop hai bên đường.
-- **Skin, Palette Swap, VFX/CRT & Giao diện Cyber Arcade (`SkinManager`, `BikeSkinData`, `BikePaletteSwapper`, `RaceVfxController`, `CrtScanlineController`, `LobbyUiBuilder`, `GarageUiBuilder`, `GameMenuUI`, `RaceHUD`, `PauseMenuUI`):**
-  - `BikeSkinData` mở rộng hỗ trợ bộ sprite 7 pose (`Upright`, `LeanLeft1/2`, `LeanRight1/2`, `KickLeft`, `HitStagger`) đồng thời giữ nguyên trường cũ (`customTexture`, `customMaterial`, `customSprite`); `BikePaletteSwapper` ánh xạ màu HSV từ bộ `Xanh SM` sang 4 thương hiệu + Cảnh sát và cache duy nhất 1 lần trong `Dictionary` (0 cấp phát rác trong `Update`/`FixedUpdate`, tự fallback procedural khi sprite nguồn null hoặc non-readable).
-  - `RaceVfxController` giữ nguyên cơ chế hạt va chạm `EmitImpactSparks(...)` và tinh chỉnh URP Bloom trên `DefaultVolumeProfile.asset`; `CrtScanlineController` (độc lập, lưu trạng thái qua `PlayerPrefs`) điều khiển shader `Assets/Shaders/CrtScanlineOverlay.shader` qua API công khai `IsEnabled` / `ToggleCrt()` / `SetEnabled(bool)` và tự giải phóng Material trong `OnDestroy()`.
-  - `LobbyUiBuilder` và `GarageUiBuilder` tách riêng phần dựng layout uGUI + TextMeshPro theo nguyên tắc SRP (`View != Logic`), áp dụng ảnh nền/preview/banner từ `Assets/Art/` và nạp font TMP tiếng Việt đầy đủ tổ hợp dấu qua `LobbyUiBuilder.GetTmpFont(...)`.
-  - `GameMenuUI` hỗ trợ chọn 4 Skin, carousel 4 Map, Garage 4 thẻ × 5 pip kiểm tra thuần View qua `CanAfford`/`IsMaxLevel`, và đồng bộ số vòng (`1V/2V/3V/5V`) + độ khó qua `PlayerPrefs` giữa `LobbyScene` và `SampleScene`.
-  - `RaceHUD` bố trí 4 góc thông thoáng (`Leaderboard + QuickButtons`, `RankShield + FlashBanner`, `Minimap`, `Tachometer + LCD km/h + 12-LED RPM`, `Lap + Stopwatch`), giữ trung tâm ẩn khi không kích hoạt Countdown/Wrong-way/Finished, và hủy đăng ký Observer đầy đủ trong `OnDisable()` / `OnDestroy()`. `PauseMenuUI` dựng `PauseMenuCanvas` (`sortingOrder = 30`) với đủ 4 nút `TC-44`, nút CRT Scanline và Controls Modal đồng bộ 100% phím thật (`W/↑`, `S/↓`, `A/D`, `SPACE`, `M`, `R`, `ESC/P`).
-- **Lưu trữ tiến trình JSON (`CarUpgradeSystem`, `PlayerSaveData`):**
-  Đường dẫn mặc định: `Application.persistentDataPath/racing2d_save.json`
-  ```json
-  {
-    "money": 580,
-    "engineLevel": 2,
-    "brakesLevel": 1,
-    "gripLevel": 1,
-    "weightLevel": 0,
-    "racesPlayed": 3,
-    "racesWon": 2,
-    "bestRaceTime": 48.72,
-    "unlockedMapIds": ["city_morning", "coastal_highway", "neon_night", "city_district"],
-    "selectedMapId": "city_morning"
-  }
-  ```
+1. **`RacingGame.Core`** (`Assets/Scripts/Core/Pure/RacingGame.Core.asmdef`, **`noEngineReferences: true`**): `25` tệp C# thuần (Contracts, Custom Exceptions, Pure Math/Domain, GoF Factory/Decorator, DTOs, `ProgressionRuleEngine`, `MidRaceSaveService`).
+2. **`RacingGame`** (`Assets/Scripts/RacingGame.asmdef`): `46` tệp Adapters (`Core/Adapters/`), `GameManager`, `GameState`, Vật lý, AI, Cảnh sát, Map, Skin/Palette Swap, Renderer Pseudo-3D, VFX/CRT, Audio BGM/SFX và uGUI + TMP.
+3. **`RacingGame.Editor`** (`Assets/Scripts/Editor/RacingGame.Editor.asmdef`): `3` tệp Editor (`RoadRashSceneSetup` có menu `Build Windows Standalone`, `ArtAssetImportPostprocessor`, `Stage2ArtWiringEditor`).
+4. **`RacingGame.Tests`** (`Assets/Tests/EditMode/RacingGame.Tests.asmdef`): `20` bộ test EditMode (`109` test cases).
 
 ---
 
-## 9. Chương Kiểm thử (Testing)
+## 9. Chương Kiểm Thử & Đóng Gói Clean-Room
 
-### 9.1 Chiến lược & Môi trường kiểm thử
-- **Phương pháp:** Kiểm thử đơn vị (Unit Test) và kiểm thử tích hợp mô phỏng nhiều bước vật lý (Simulation Integration Test) trên **Unity EditMode Test Runner** (`NUnit`, `com.unity.test-framework` `1.8.0`).
-- **Môi trường chạy:** Unity `6000.6.9f1` batchmode (`-batchmode -nographics -runTests -testPlatform EditMode`).
-
-### 9.2 Tổng hợp các nhóm Test Suite (`Assets/Tests/EditMode/`)
-*(Số liệu thực tế được đối chiếu trực tiếp với kết quả chạy Unity EditMode Test Runner tại phiên bản code hiện tại)*
-
-| STT | File Test | Phạm vi kiểm thử | Số Test Case |
-| :---: | :--- | :--- | :---: |
-| 1 | `Phase1And2Tests.cs` | Vật lý tăng tốc/phanh/rẽ, `WaypointTrack` vòng kín, phạt off-road | 4 |
-| 2 | `Loop4AITests.cs` | `AIRacerDriver`, `AIProfile` (Easy/Normal/Hard), fallback null, chống kẹt, né xe | 9 |
-| 3 | `Loop5LapCheckpointTests.cs` | Cổng `Checkpoint` 1 chiều, đếm vòng, chống đi tắt, xếp hạng, về đích, ngược chiều | 9 |
-| 4 | `Loop6And7Tests.cs` | Nâng cấp `CarUpgradeSystem`, `VehicleStatsAsset`, giới hạn cấp 5, JSON Save/Load/Clamp, đa hình `RaceStateBase` | 7 |
-| 5 | `Loop8KickAndGraphicsTests.cs` | Đòn đá & cooldown, va chạm đá ngang, sinh sprite xe/prop/minimap, tự tái tạo sprite | 4 |
-| 6 | `AIRacerDeterminismAndBenchmarkTests.cs` | Tính xác định theo `seed` của AI & benchmark 1 vòng theo mức skill | 4 |
-| 7 | `LobbyAndSkinSystemTests.cs` | `SkinManager` 4 thương hiệu, `BikeSkinData` custom asset, `GameMenuUI` Sảnh chờ | 3 |
-| 8 | `GameplayAndPauseTests.cs` | `EnvironmentDecorator`, `TrackObstacleSystem`, `PoliceChaseController`, `PauseMenuUI` & Pause/Resume | 4 |
-| 9 | `MapSystemTests.cs` | `TrackDefinition` 2–6 làn, `MapManager`, `MapTheme_Valley`, mở khóa map & lưu JSON | 8 |
-| 10 | `CityMapTests.cs` | `MapTheme_City`, `TrackDefinition_City` (26 waypoints, cầu vượt, hầm chui, ngã tư, `ParkedBus`) | 5 |
-| 11 | `CityCornerNavigationComparisonTests.cs` | So sánh 3 chế độ dẫn đường AI (`LegacyFixed`, `SpeedAdaptiveWaypoint`, `SmoothedSplinePath`) trên phố góc 90° | 1 |
-| 12 | `GameplayFeelAndOffRoadRecoveryTests.cs` | Cảm giác lái `VehicleStats.Default`, phục hồi off-road, rào chắn biên ngoài, độ rộng làn các map asset | 4 |
-| 13 | `LaneLayoutTests.cs` | Bố cục đối xứng 2/4/6 làn trên `WaypointTrack`, `GameManager` grid/AI, `TrackObstacleSystem` và vạch kẻ đường `RoadRashRenderer2D` | 6 |
-| 14 | `MapAIBenchmark3LapTests.cs` | Benchmark AI chạy 3 vòng liên tiếp (`seed=2026`, `STUCK=0`, đúng thứ tự checkpoint) trên Map Valley & City | 2 |
-| 15 | `ArtAssetsIntegrityTests.cs` | Toàn vẹn 6 sprite xe rear-view, 10 prop/vật cản trong suốt, 4 preview, 4 banner map và backdrop Lobby | 3 |
-| 16 | `BikePaletteSwapAndStage2GraphicsTests.cs` | Cache `BikePaletteSwapper` cho 5 bảng màu, fallback an toàn khi null/non-readable và gán dữ liệu Stage 2 | 3 |
-| 17 | `VfxAndCrtScanlineTests.cs` | Lưu/nạp `CrtScanlineController` qua `PlayerPrefs` (không cần Camera/Canvas) & kiểm chuẩn URP Bloom | 2 |
-| 18 | `LobbyRedesignAndLapSyncTests.cs` | Đồng bộ vòng/độ khó Lobby, Lobby uGUI+TMP, Garage thuần View, HUD 4 góc + hủy Observer, Bộ 3 Modal 4D & Font tiếng Việt + dọn dead code | 6 |
-| **Tổng** | **18 files** | **Toàn bộ EditMode Test Suite** | **84** |
-
-- **Kết quả chạy thực tế (Unity `6000.6.9f1` batchmode):** Tổng `84` test cases — **Passed: 84**, **Failed: 0**, **Skipped: 0**, **Inconclusive: 0**, thời gian chạy `4.270s` (`4.269528s`, Result = Passed) — chi tiết từng test case xem tại [TEST_CASES.md](TEST_CASES.md), kết quả benchmark 3 vòng xem tại [EXPERIMENT.md](EXPERIMENT.md), log lỗi/cảnh báo xem tại [BUG_LOG.md](BUG_LOG.md).
+- **Môi trường kiểm thử:** Unity `6000.6.9f1` batchmode (`-batchmode -nographics -runTests -testPlatform EditMode`).
+- **Kết quả chạy thực tế (`Logs/EditModeResults.xml` & `Logs/editmode_test.log`):**
+  - Tổng số test cases: **`109`** trên **`20` files**
+  - **Passed: `109`** | **Failed: `0`** | **Skipped: `0`** | **Inconclusive: `0`**
+  - Thời gian thực thi: **`4.342s`** (`4.3415978s`, Result = `Passed`)
+  - Biên dịch: **`0` lỗi**, **`0` cảnh báo (`CS` & `UAC1001`)**
+- **Bản phát hành Clean-Room:** `Builds/RoadRash2D/RoadRash2D.exe` đã biên dịch thành công (`BUILD_EXIT_CODE=0`), đóng gói kèm `RoadRash2D_Data/StreamingAssets/Maps/01..04.json` và `Config/game_balance.json`.
+- **Tài liệu kiểm thử liên quan:** [TEST_CASES.md](TEST_CASES.md), [BUG_LOG.md](BUG_LOG.md) (gồm Bug Log 6 cột + Playtest 10 kịch bản + Fault-Injection), [EXPERIMENT.md](EXPERIMENT.md).
 
 ---
 
-## 10. Chương Kết luận (Conclusion)
+## 10. Kết luận & Hướng Phát Triển
 
-### 10.1 Kết quả đạt được
-- Hoàn thiện kiến trúc hướng đối tượng (OOP) rõ ràng cho game đua xe *Road Rash 2D*, áp dụng triệt để 4 tính chất (Trừu tượng hóa, Kế thừa, Đa hình, Đóng gói) cùng State Pattern (`RaceStateBase`), Strategy/Polymorphism (`Driver`, `IComparer<RacerProgress>`) và Data-Driven `ScriptableObject` (`AIProfile`, `VehicleStatsAsset`, `TrackDefinition`, `MapTheme`, `BikeSkinData`).
-- Xây dựng đầy đủ vòng đời chơi và bộ giao diện uGUI + TextMeshPro Cyber Arcade hoàn chỉnh từ Sảnh chờ (`LobbyScene` / `MainMenu`) -> Chọn Skin & Map -> Nâng cấp Garage -> Đếm ngược -> Đua xe (vật lý 2D, AI đa độ khó, Cảnh sát truy đuổi, Chướng ngại vật, Đòn đá, multi-pose palette swap, URP Bloom + CRT Scanline) -> Tạm dừng / Hướng dẫn phím (`PauseMenuUI`) -> Kết quả (`RaceHUD`) & Lưu tiến trình JSON; dọn sạch mã mẫu thừa `Assets/Welcome/`.
-- Đảm bảo chất lượng bằng bộ **84 EditMode tests** bao phủ cả vật lý, AI determinism, benchmark 3 vòng trên nhiều bản đồ, bố cục 2–6 làn, tài nguyên art 2D, palette swap cache, URP Bloom/CRT, giao diện TMP tiếng Việt, hủy đăng ký Observer (`OnDisable`/`OnDestroy`) và an toàn lưu trữ.
-
-### 10.2 Hạn chế hiện tại
-- Bộ kiểm thử hiện tại tập trung ở **EditMode** (chưa có PlayMode UI automation tests mô phỏng thao tác chuột/bàn phím thực tế qua nhiều frame giữa `LobbyScene` và `SampleScene`).
-- Hệ thống âm thanh và sprite mặc định được sinh procedural nên tính đa dạng thẩm mỹ phụ thuộc vào việc gắn thêm tài nguyên `Sprite` / `Texture2D` / `Material` tùy biến trong Inspector nếu muốn nâng cấp đồ họa thương mại.
-- Chỉ hỗ trợ chế độ chơi đơn với AI trên máy cục bộ (single-player desktop).
-
-### 10.3 Hướng phát triển tiếp theo
-- Bổ sung **PlayMode Test Suite** kiểm thử chuyển cảnh `LobbyScene -> SampleScene`, điều khiển InputSystem thực tế và chu kỳ Pause/Resume ở runtime.
-- Bổ sung bộ đếm combo chiến đấu, vũ khí cận chiến đặc trưng của *Road Rash* (gậy/xích), hệ thống nhiệm vụ theo chặng và bảng xếp hạng trực tuyến.
-- Hỗ trợ điều khiển cảm ứng (Touch UI) và tối ưu hóa cấu hình cho nền tảng di động (Android/iOS) hoặc WebGL.
+- Hoàn thiện kiến trúc phân tầng 3 tầng với **`RacingGame.Core`** thuần C# (`0 using UnityEngine`, `noEngineReferences: true`), **6 Design Patterns GoF thuộc đủ 3/3 nhóm**, cây **`CustomException`**, **8 Interface DIP/ISP**, dữ liệu hóa bản đồ & cân bằng bằng **JSON ngoài (`StreamingAssets`)**, lưu/nạp trạng thái giữa ván đua, nhạc nền **BGM procedural** và **`109/109` EditMode Tests PASS**.
+- Hướng phát triển tiếp theo: Bổ sung bảng xếp hạng trực tuyến, vũ khí cận chiến đặc trưng của *Road Rash* (gậy/xích) qua `IObstacleBlueprint` / `IRaceCombatService`, và PlayMode UI automation tests cho thiết bị di động.

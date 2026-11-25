@@ -1,7 +1,7 @@
 using System.Collections.Generic;
+using System.IO;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -30,6 +30,8 @@ namespace RacingGame
         private SkinManager _skinManager;
         private MapManager _mapManager;
         private CarUpgradeSystem _standaloneUpgradeSystem;
+        private MidRaceSaveService _standaloneMidRaceSaveService;
+        private IInputProvider _standaloneInputProvider;
         private CrtScanlineController _crtController;
 
         private Canvas _canvas;
@@ -37,6 +39,8 @@ namespace RacingGame
         private GameObject _skinSelectorPanel;
         private GameObject _garagePanel;
         private Button _outerQuitButtonX;
+        private Button _playButton;
+        private Button _continueSavedRaceButton;
         private Image _bannerImage;
         private Image _lobbyBackgroundImg;
         private Sprite _generatedBannerSprite;
@@ -118,6 +122,15 @@ namespace RacingGame
 
         public Canvas MenuCanvas => _canvas;
         public Button OuterQuitButton => _outerQuitButtonX;
+        public Button ContinueSavedRaceButton => _continueSavedRaceButton;
+        public bool HasSavedMidRace
+        {
+            get
+            {
+                MidRaceSaveService svc = ResolveMidRaceSaveService();
+                return svc != null && svc.HasSavedRace();
+            }
+        }
         public int SkinCardCount => _skinCards.Count;
         public int MapCount => ResolveMapManager() != null ? _mapManager.MapCount : 0;
         public TrackDefinition SelectedMap => ResolveMapManager() != null ? _mapManager.SelectedMap : null;
@@ -166,6 +179,58 @@ namespace RacingGame
                 _browsedMapIndex = _mapManager.SelectedIndex;
                 RefreshMenu();
             }
+        }
+
+        public void BindStandaloneMidRaceSaveService(MidRaceSaveService service)
+        {
+            _standaloneMidRaceSaveService = service;
+            if (_canvas != null)
+            {
+                RefreshMenuDynamic();
+            }
+        }
+
+        private MidRaceSaveService ResolveMidRaceSaveService()
+        {
+            if (_gameManager != null)
+            {
+                return _gameManager.MidRaceSaveService;
+            }
+
+            if (_standaloneMidRaceSaveService == null)
+            {
+                string path = (isStandaloneLobbyScene || Application.isPlaying)
+                    ? Path.Combine(Application.persistentDataPath, "midrace_save.json")
+                    : string.Empty;
+                _standaloneMidRaceSaveService = new MidRaceSaveService(
+                    new FileSaveStorageAdapter(),
+                    new UnityJsonCodec(),
+                    path,
+                    Debug.LogWarning);
+            }
+
+            return _standaloneMidRaceSaveService;
+        }
+
+        private IInputProvider ResolveInputProvider()
+        {
+            if (_gameManager != null && _gameManager.InputProvider != null)
+            {
+                return _gameManager.InputProvider;
+            }
+
+            if (_standaloneInputProvider == null)
+            {
+                InputHandler handler = GetComponent<InputHandler>();
+                if (handler == null) handler = FindAnyObjectByType<InputHandler>();
+                if (handler == null && (isStandaloneLobbyScene || Application.isPlaying))
+                {
+                    handler = gameObject.AddComponent<InputHandler>();
+                }
+                _standaloneInputProvider = handler;
+            }
+
+            return _standaloneInputProvider;
         }
 
         private CarUpgradeSystem ResolveUpgradeSystem()
@@ -284,7 +349,7 @@ namespace RacingGame
                 _skinManager = gameManager.GetComponent<SkinManager>();
                 if (_skinManager == null) _skinManager = gameManager.gameObject.AddComponent<SkinManager>();
             }
-            _skinManager?.EnsureInitialized();
+            if (_skinManager != null) _skinManager.EnsureInitialized();
             ResolveMapManager();
             _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
 
@@ -658,15 +723,16 @@ namespace RacingGame
         {
             if (_canvas == null) return;
 
-            if (_skinSelectorPanel != null && _skinSelectorPanel.activeSelf &&
-                Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            IInputProvider input = ResolveInputProvider();
+            bool escPressed = input != null && input.WasPausePressed();
+
+            if (_skinSelectorPanel != null && _skinSelectorPanel.activeSelf && escPressed)
             {
                 CloseSkinSelector();
                 return;
             }
 
-            if (_garagePanel != null && _garagePanel.activeSelf &&
-                Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (_garagePanel != null && _garagePanel.activeSelf && escPressed)
             {
                 CloseGarageToLobby();
                 return;
@@ -1083,9 +1149,23 @@ namespace RacingGame
 
         private void RefreshMenuDynamic()
         {
-            if (_menuMuteLabel != null && _gameManager != null && _gameManager.AudioController != null)
+            if (_menuMuteLabel != null && _gameManager != null && _gameManager.AudioService != null)
             {
-                _menuMuteLabel.text = _gameManager.AudioController.IsMuted ? "ÂM: TẮT" : "ÂM: BẬT";
+                _menuMuteLabel.text = _gameManager.AudioService.IsMuted ? "ÂM: TẮT" : "ÂM: BẬT";
+            }
+
+            bool hasSavedRace = HasSavedMidRace;
+            if (_continueSavedRaceButton != null)
+            {
+                _continueSavedRaceButton.gameObject.SetActive(hasSavedRace);
+            }
+            if (_playButton != null)
+            {
+                RectTransform playRt = _playButton.GetComponent<RectTransform>();
+                if (playRt != null)
+                {
+                    playRt.sizeDelta = new Vector2(hasSavedRace ? 344f : 556f, 70f);
+                }
             }
 
             if (_crtBtnLabel != null)
@@ -1359,7 +1439,10 @@ namespace RacingGame
             _menuMuteLabel = LobbyUiBuilder.GetPrimaryLabel(muteBtn);
             muteBtn.onClick.AddListener(() =>
             {
-                _gameManager?.AudioController?.ToggleMute();
+                if (_gameManager != null && _gameManager.AudioService != null)
+                {
+                    _gameManager.AudioService.ToggleMute();
+                }
                 RefreshMenuDynamic();
             });
 
@@ -1393,7 +1476,7 @@ namespace RacingGame
                 13f, LobbyUiBuilder.TextMuted, TextAlignmentOptions.TopLeft, FontStyles.Normal, customTmpFont, wrap: true);
             LobbyUiBuilder.PlaceTopLeft(heroDesc.rectTransform, 32f, -190f, 548f, 40f);
 
-            Button playBtn = LobbyUiBuilder.CreateCyberButton(
+            _playButton = LobbyUiBuilder.CreateCyberButton(
                 _menuPanel.transform,
                 "PlayBtn",
                 "▶  CHƠI NGAY (PLAY)",
@@ -1402,8 +1485,21 @@ namespace RacingGame
                 22f,
                 "XUẤT PHÁT ĐẤU TRƯỜNG TỐC ĐỘ ĐƯỜNG PHỐ",
                 customTmpFont);
-            LobbyUiBuilder.PlaceTopLeft(playBtn.GetComponent<RectTransform>(), 32f, -242f, 556f, 70f);
-            playBtn.onClick.AddListener(OnPlayButtonClicked);
+            LobbyUiBuilder.PlaceTopLeft(_playButton.GetComponent<RectTransform>(), 32f, -242f, 556f, 70f);
+            _playButton.onClick.AddListener(OnPlayButtonClicked);
+
+            _continueSavedRaceButton = LobbyUiBuilder.CreateCyberButton(
+                _menuPanel.transform,
+                "ContinueSavedRaceBtn",
+                "▶  TIẾP TỤC VÁN",
+                LobbyUiBuilder.SuccessGreen,
+                LobbyUiBuilder.OnCyan,
+                16f,
+                "KHÔI PHỤC VÁN ĐANG ĐUA",
+                customTmpFont);
+            LobbyUiBuilder.PlaceTopLeft(_continueSavedRaceButton.GetComponent<RectTransform>(), 388f, -242f, 200f, 70f);
+            _continueSavedRaceButton.onClick.AddListener(OnContinueSavedRaceClicked);
+            _continueSavedRaceButton.gameObject.SetActive(false);
 
             const float actionBtnY = -324f;
             const float actionBtnW = 178f;
@@ -1738,6 +1834,26 @@ namespace RacingGame
             _skinSelectorPanel.SetActive(false);
         }
 
+        private void OnContinueSavedRaceClicked()
+        {
+            _confirmResetPending = false;
+            if (_gameManager != null && !isStandaloneLobbyScene)
+            {
+                if (!_gameManager.LoadMidRaceState())
+                {
+                    SetLobbyFeedback("Không tìm thấy dữ liệu ván đua hợp lệ!", LobbyUiBuilder.DangerRed);
+                    RefreshMenuDynamic();
+                }
+                return;
+            }
+
+            SkinManager.AutoResumeSavedRaceOnGameplayLoad = true;
+            if (!string.IsNullOrWhiteSpace(gameplaySceneName))
+            {
+                SceneManager.LoadScene(gameplaySceneName);
+            }
+        }
+
         private void OnResetSaveClicked()
         {
             if (_confirmResetPending)
@@ -1748,8 +1864,12 @@ namespace RacingGame
                 }
                 else
                 {
-                    ResolveUpgradeSystem()?.ResetProgress();
-                    ResolveMapManager()?.ResetProgress();
+                    CarUpgradeSystem upg = ResolveUpgradeSystem();
+                    if (upg != null) upg.ResetProgress();
+                    MidRaceSaveService mid = ResolveMidRaceSaveService();
+                    if (mid != null) mid.ClearSavedRace();
+                    MapManager mm = ResolveMapManager();
+                    if (mm != null) mm.ResetProgress();
                 }
                 _browsedMapIndex = _mapManager != null ? _mapManager.SelectedIndex : 0;
                 _confirmResetPending = false;

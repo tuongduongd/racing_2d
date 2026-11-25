@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace RacingGame
 {
     /// <summary>
-    /// Coordinates the complete game lifecycle via the OOP State Pattern:
+    /// Composition Root & State Context coordinating the complete game lifecycle via the OOP State Pattern:
     /// MainMenu -> Countdown -> Racing -> Finished -> UpgradeShop.
-    /// Owns WaypointTrack, Cars, Drivers, LapCheckpointManager, CarUpgradeSystem,
-    /// RaceAudioController, RaceHUD, and GameMenuUI.
+    /// Delegates combat/collisions to IRaceCombatService, input to IInputProvider,
+    /// audio to IAudioService, and persistence to ProgressionRuleEngine / MidRaceSaveService.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -63,12 +64,23 @@ namespace RacingGame
         private readonly Dictionary<GameFlowState, RaceStateBase> _states = new Dictionary<GameFlowState, RaceStateBase>();
         private readonly Dictionary<DifficultyLevel, AIProfile> _fallbackProfiles = new Dictionary<DifficultyLevel, AIProfile>();
 
+        private ISaveStorage _storage;
+        private IJsonCodec _jsonCodec;
+        private IInputProvider _inputProviderOverride;
+        private IAudioService _audioServiceOverride;
+        private IRaceCombatService _combatService;
         private CarUpgradeSystem _upgradeSystem;
+        private MidRaceSaveService _midRaceSaveService;
+        private GameBalanceConfig _balanceConfig;
+
         private RaceStateBase _currentState;
         private bool _prizeAwardedForCurrentRace;
         private int _lastPrizeEarned;
         private int _lastFinishPosition;
         private int _fallbackKickSide = 1;
+        private bool _isPaused;
+        private bool _skipNextGridResetOnEnter;
+        private int _policeEngagementCount;
 
         public event Action<Car, Car, Vector2> RacerKicked;
         public event Action<Car, Car, Vector2> RacersCollided;
@@ -78,10 +90,13 @@ namespace RacingGame
         public Car PlayerCar => playerCar;
         public WaypointTrack Track => track;
         public LapCheckpointManager LapManager => lapManager;
-        private bool _isPaused;
-
         public CarUpgradeSystem UpgradeSystem => _upgradeSystem;
+        public MidRaceSaveService MidRaceSaveService => EnsureMidRaceSaveService();
         public RaceAudioController AudioController => audioController;
+        public IAudioService AudioService => _audioServiceOverride != null ? _audioServiceOverride : audioController;
+        public IInputProvider InputProvider => _inputProviderOverride != null ? _inputProviderOverride : inputHandler;
+        public IRaceCombatService CombatService => _combatService ?? (_combatService = new RaceCombatSystem());
+        public GameBalanceConfig BalanceConfig => _balanceConfig ?? (_balanceConfig = GameBalanceConfig.CreateDefault());
         public SkinManager SkinManager => skinManager;
         public MapManager MapManager => mapManager;
         public EnvironmentDecorator EnvironmentDecorator => environmentDecorator;
@@ -89,6 +104,9 @@ namespace RacingGame
         public PoliceChaseController PoliceController => policeController;
         public PauseMenuUI PauseMenuUi => pauseMenuUi;
         public bool IsPaused => _isPaused;
+        public int PoliceEngagementCount => _policeEngagementCount;
+
+        public bool HasSavedMidRace => EnsureMidRaceSaveService().HasSavedRace();
 
         public GameFlowState CurrentFlowState => _currentState != null ? _currentState.StateType : GameFlowState.MainMenu;
         public DifficultyLevel Difficulty => difficulty;
@@ -96,8 +114,7 @@ namespace RacingGame
         public int LastPrizeEarned => _lastPrizeEarned;
         public int LastFinishPosition => _lastFinishPosition;
 
-        public float CountdownRemaining =>
-            _currentState is CountdownState cs ? cs.RemainingSeconds : 0f;
+        public float CountdownRemaining => _currentState != null ? _currentState.RemainingCountdown : 0f;
 
         private static readonly (string name, float skillOffset, float latOffset, Color color)[] DefaultAiRacers =
         {
@@ -113,13 +130,77 @@ namespace RacingGame
             EnsureStatesInitialized();
         }
 
+        /// <summary>
+        /// Composition Root Dependency Injection hook allowing tests or alternative hosts to swap
+        /// Storage, JSON codec, Input provider, Audio service, Combat solver, or Mid-Race persistence.
+        /// </summary>
+        public void ConfigureServices(
+            ISaveStorage storage = null,
+            IJsonCodec jsonCodec = null,
+            IInputProvider inputProvider = null,
+            IAudioService audioService = null,
+            IRaceCombatService combatService = null,
+            CarUpgradeSystem upgradeSystem = null,
+            MidRaceSaveService midRaceSaveService = null,
+            GameBalanceConfig balanceConfig = null)
+        {
+            if (storage != null) _storage = storage;
+            if (jsonCodec != null) _jsonCodec = jsonCodec;
+            if (inputProvider != null)
+            {
+                _inputProviderOverride = inputProvider;
+                if (playerDriver != null) playerDriver.SetInputProvider(inputProvider);
+            }
+            if (audioService != null) _audioServiceOverride = audioService;
+            if (combatService != null) _combatService = combatService;
+            if (balanceConfig != null) _balanceConfig = balanceConfig.Sanitize();
+
+            if (upgradeSystem != null)
+            {
+                _upgradeSystem = upgradeSystem;
+                if (mapManager != null) mapManager.BindSaveSystem(_upgradeSystem);
+            }
+            if (midRaceSaveService != null)
+            {
+                _midRaceSaveService = midRaceSaveService;
+            }
+        }
+
+        private MidRaceSaveService EnsureMidRaceSaveService()
+        {
+            _storage ??= new FileSaveStorageAdapter();
+            _jsonCodec ??= new UnityJsonCodec();
+            if (_midRaceSaveService == null)
+            {
+                string midPath = Path.Combine(Application.persistentDataPath, "midrace_save.json");
+                _midRaceSaveService = new MidRaceSaveService(_storage, _jsonCodec, midPath, Debug.LogWarning);
+            }
+            return _midRaceSaveService;
+        }
+
         private void EnsureStatesInitialized()
         {
+            _storage ??= new FileSaveStorageAdapter();
+            _jsonCodec ??= new UnityJsonCodec();
+            _combatService ??= new RaceCombatSystem();
+
+            if (_balanceConfig == null)
+            {
+                var loader = new ExternalBalanceConfigLoader(_storage, _jsonCodec);
+                _balanceConfig = loader.LoadOrDefault();
+            }
+
             if (_upgradeSystem == null)
             {
-                _upgradeSystem = new CarUpgradeSystem();
+                VehicleStats baseline = defaultVehicleStats != null
+                    ? defaultVehicleStats.Stats
+                    : VehicleStats.FromPure(_balanceConfig.defaultVehicleStats);
+                string savePath = Path.Combine(Application.persistentDataPath, "racing2d_save.json");
+                _upgradeSystem = new CarUpgradeSystem(_storage, _jsonCodec, savePath, baseline, _balanceConfig);
                 _upgradeSystem.Load();
             }
+
+            EnsureMidRaceSaveService();
 
             if (_states.Count == 0)
             {
@@ -138,7 +219,7 @@ namespace RacingGame
             difficulty = LoadSavedDifficulty(difficulty);
             SpawnOrSyncOpponents();
             ApplyPlayerUpgrades();
-            skinManager.ApplyToCar(playerCar);
+            if (skinManager != null) skinManager.ApplyToCar(playerCar);
             ApplyDifficultyToAI();
 
             lapManager.Initialize(track, new List<Car>(_allCars), totalLaps);
@@ -146,20 +227,28 @@ namespace RacingGame
             ApplyActiveMapSettings();
             obstacleSystem.SpawnObstacles(track);
 
-            BindAudioEvents();
-            raceHud.Bind(this, playerCar, lapManager, track);
-            menuUi.Bind(this);
-            pauseMenuUi.Bind(this);
+            BindSystemEvents();
+            if (raceHud != null) raceHud.Bind(this, playerCar, lapManager, track);
+            if (menuUi != null) menuUi.Bind(this);
+            if (pauseMenuUi != null) pauseMenuUi.Bind(this);
 
+            bool shouldResumeSaved = SkinManager.AutoResumeSavedRaceOnGameplayLoad;
             bool shouldStartDirectly = !startInMainMenu || SkinManager.AutoStartRaceOnGameplayLoad;
+            SkinManager.AutoResumeSavedRaceOnGameplayLoad = false;
             SkinManager.AutoStartRaceOnGameplayLoad = false;
+
+            if (shouldResumeSaved && LoadMidRaceState())
+            {
+                return;
+            }
+
             TransitionTo(shouldStartDirectly ? GameFlowState.Countdown : GameFlowState.MainMenu);
         }
 
         private void OnDestroy()
         {
             Time.timeScale = 1f;
-            UnbindAudioEvents();
+            UnbindSystemEvents();
 
             foreach (AIProfile fallback in _fallbackProfiles.Values)
             {
@@ -193,7 +282,14 @@ namespace RacingGame
             ApplyActiveMapSettings();
 
             playerDriver.SetDriverName("Player");
-            playerDriver.SetInputHandler(inputHandler);
+            if (_inputProviderOverride != null)
+            {
+                playerDriver.SetInputProvider(_inputProviderOverride);
+            }
+            else
+            {
+                playerDriver.SetInputHandler(inputHandler);
+            }
 
             playerCar = FindOrCreate(playerCar, "PlayerCar");
             playerCar.ConfigureIdentity(true, RoadRashVisualTheme.PlayerJacketBlue);
@@ -245,8 +341,12 @@ namespace RacingGame
             for (int i = 0; i < existingAis.Length; i++)
             {
                 Car aiCar = existingAis[i].GetComponent<Car>();
-                if (aiCar != null && !_allCars.Contains(aiCar))
+                if (aiCar != null && aiCar != playerCar && !_allCars.Contains(aiCar))
                 {
+                    if (aiCar.IsPlayer)
+                    {
+                        aiCar.ConfigureIdentity(false, aiCar.BikeColor);
+                    }
                     _allCars.Add(aiCar);
                     _aiDrivers.Add(existingAis[i]);
                 }
@@ -282,20 +382,33 @@ namespace RacingGame
             }
         }
 
+        public bool ConsumeSkipNextGridResetOnEnter()
+        {
+            if (!_skipNextGridResetOnEnter) return false;
+            _skipNextGridResetOnEnter = false;
+            return true;
+        }
+
         public void TransitionTo(GameFlowState targetState)
         {
             EnsureStatesInitialized();
             if (!_states.TryGetValue(targetState, out RaceStateBase next)) return;
 
             ResumeGame();
-            _currentState?.Exit(this);
+            if (_currentState != null) _currentState.Exit(this);
             _currentState = next;
             _currentState.Enter(this);
         }
 
+        public void TransitionToStrict(GameFlowState targetState)
+        {
+            RaceStateTransitionRules.ValidateTransitionOrThrow(CurrentFlowState, targetState);
+            TransitionTo(targetState);
+        }
+
         public void PauseGame()
         {
-            if (CurrentFlowState != GameFlowState.Racing && CurrentFlowState != GameFlowState.Countdown)
+            if (!RaceStateTransitionRules.CanPause(CurrentFlowState))
             {
                 return;
             }
@@ -331,14 +444,171 @@ namespace RacingGame
             ResumeGame();
             ApplyActiveMapSettings();
             ApplyPlayerUpgrades();
-            skinManager?.ApplyToCar(playerCar);
+            if (skinManager != null) skinManager.ApplyToCar(playerCar);
             ApplyDifficultyToAI();
-            lapManager.SetTotalLaps(totalLaps);
-            raceHud?.RebuildMinimapTexture();
+            if (lapManager != null) lapManager.SetTotalLaps(totalLaps);
+            if (raceHud != null) raceHud.RebuildMinimapTexture();
             _prizeAwardedForCurrentRace = false;
             _lastPrizeEarned = 0;
             _lastFinishPosition = 0;
             TransitionTo(GameFlowState.Countdown);
+        }
+
+        /// <summary>
+        /// Captures complete mid-race state (map, lap settings, race timer, vehicle positions/velocities,
+        /// and checkpoint progress) and persists it to JSON via MidRaceSaveService.
+        /// </summary>
+        public bool SaveMidRaceState()
+        {
+            EnsureStatesInitialized();
+            if (track == null || _allCars.Count == 0) return false;
+
+            var snapshot = new MidRaceSaveData
+            {
+                mapId = mapManager != null && !string.IsNullOrEmpty(mapManager.SelectedMapId)
+                    ? mapManager.SelectedMapId
+                    : (track.ActiveDefinition != null ? track.ActiveDefinition.MapId : "city_morning"),
+                totalLaps = Mathf.Max(1, totalLaps),
+                difficulty = (int)difficulty,
+                raceTime = lapManager != null ? lapManager.RaceTime : 0f,
+                finishedCount = 0
+            };
+
+            Car copCar = policeController != null ? policeController.PoliceCar : null;
+            int finished = 0;
+
+            for (int i = 0; i < _allCars.Count; i++)
+            {
+                Car c = _allCars[i];
+                if (c == null) continue;
+
+                RacerProgress prog = lapManager != null ? lapManager.GetProgress(c) : null;
+                if (prog != null && prog.IsFinished)
+                {
+                    finished++;
+                }
+
+                snapshot.racers.Add(new RacerMidRaceSnapshot
+                {
+                    racerName = c.RacerName,
+                    isPlayer = c == playerCar,
+                    isPolice = copCar != null && c == copCar,
+                    posX = c.Physics.Position.x,
+                    posY = c.Physics.Position.y,
+                    velX = c.Physics.Velocity.x,
+                    velY = c.Physics.Velocity.y,
+                    headingRad = c.Physics.Heading,
+                    completedLaps = prog != null ? prog.CompletedLaps : 0,
+                    nextCheckpointIndex = prog != null ? prog.NextCheckpointIndex : 1,
+                    totalCheckpointsPassed = prog != null ? prog.TotalCheckpointsPassed : 0,
+                    isFinished = prog != null && prog.IsFinished,
+                    finishPosition = prog != null ? prog.FinishPosition : 0,
+                    finishTime = prog != null ? prog.FinishTime : 0f,
+                    lastLapTime = prog != null ? prog.LastLapTime : 0f,
+                    bestLapTime = prog != null ? prog.BestLapTime : 0f
+                });
+            }
+
+            snapshot.finishedCount = finished;
+            _midRaceSaveService.SaveSnapshot(snapshot);
+            return true;
+        }
+
+        /// <summary>
+        /// Restores an active race from midrace_save.json (map, lap progress, vehicle positions, velocities,
+        /// checkpoints, and race timer) and resumes directly in Racing state.
+        /// </summary>
+        public bool LoadMidRaceState()
+        {
+            EnsureStatesInitialized();
+            if (!_midRaceSaveService.TryLoadSnapshot(out MidRaceSaveData snapshot))
+            {
+                return false;
+            }
+
+            if (track == null || _allCars.Count == 0)
+            {
+                SetupReferences();
+                SpawnOrSyncOpponents();
+            }
+
+            if (mapManager != null && !string.IsNullOrEmpty(snapshot.mapId))
+            {
+                mapManager.SelectMap(snapshot.mapId, track, environmentDecorator);
+            }
+
+            totalLaps = Mathf.Clamp(snapshot.totalLaps, 1, 10);
+            if (Enum.IsDefined(typeof(DifficultyLevel), snapshot.difficulty))
+            {
+                difficulty = (DifficultyLevel)snapshot.difficulty;
+            }
+
+            ApplyActiveMapSettings();
+            ApplyPlayerUpgrades();
+            if (skinManager != null) skinManager.ApplyToCar(playerCar);
+            ApplyDifficultyToAI();
+            EnsurePoliceSetup();
+
+            if (lapManager != null)
+            {
+                lapManager.Initialize(track, new List<Car>(_allCars), totalLaps);
+            }
+
+            Car copCar = policeController != null ? policeController.PoliceCar : null;
+            for (int i = 0; i < snapshot.racers.Count; i++)
+            {
+                RacerMidRaceSnapshot rSnap = snapshot.racers[i];
+                if (rSnap == null) continue;
+
+                Car targetCar = FindCarForSnapshot(rSnap, copCar, i);
+                if (targetCar == null) continue;
+
+                targetCar.RestoreRuntimeState(
+                    new Vector2(rSnap.posX, rSnap.posY),
+                    new Vector2(rSnap.velX, rSnap.velY),
+                    rSnap.headingRad,
+                    track);
+            }
+
+            if (lapManager != null)
+            {
+                lapManager.RestoreRaceSnapshot(snapshot.raceTime, snapshot.finishedCount, snapshot.racers);
+            }
+
+            if (obstacleSystem != null && track != null)
+            {
+                obstacleSystem.SpawnObstacles(track);
+            }
+
+            if (raceHud != null)
+            {
+                raceHud.RebuildMinimapTexture();
+                raceHud.ClearMessage();
+            }
+
+            _prizeAwardedForCurrentRace = false;
+            _lastPrizeEarned = 0;
+            _lastFinishPosition = 0;
+
+            TransitionTo(GameFlowState.Racing);
+            return true;
+        }
+
+        private Car FindCarForSnapshot(RacerMidRaceSnapshot snap, Car copCar, int fallbackIndex)
+        {
+            if (snap.isPlayer && playerCar != null) return playerCar;
+            if (snap.isPolice && copCar != null) return copCar;
+
+            for (int i = 0; i < _allCars.Count; i++)
+            {
+                Car c = _allCars[i];
+                if (c != null && !c.IsPlayer && c != copCar && string.Equals(c.RacerName, snap.racerName, StringComparison.Ordinal))
+                {
+                    return c;
+                }
+            }
+
+            return fallbackIndex >= 0 && fallbackIndex < _allCars.Count ? _allCars[fallbackIndex] : null;
         }
 
         public bool SelectPlayerMap(string mapId)
@@ -357,8 +627,8 @@ namespace RacingGame
             {
                 ApplyActiveMapSettings();
                 ApplyDifficultyToAI();
-                raceHud?.RebuildMinimapTexture();
-                if (audioController != null) audioController.PlayUpgradeResult(true);
+                if (raceHud != null) raceHud.RebuildMinimapTexture();
+                if (AudioService != null) AudioService.PlayUpgradeResult(true);
             }
             return changed;
         }
@@ -379,8 +649,8 @@ namespace RacingGame
             {
                 ApplyActiveMapSettings();
                 ApplyDifficultyToAI();
-                raceHud?.RebuildMinimapTexture();
-                if (audioController != null) audioController.PlayUpgradeResult(true);
+                if (raceHud != null) raceHud.RebuildMinimapTexture();
+                if (AudioService != null) AudioService.PlayUpgradeResult(true);
             }
             return def;
         }
@@ -403,9 +673,9 @@ namespace RacingGame
                 mapManager.SelectMap(mapId, track, environmentDecorator);
                 ApplyActiveMapSettings();
                 ApplyDifficultyToAI();
-                raceHud?.RebuildMinimapTexture();
+                if (raceHud != null) raceHud.RebuildMinimapTexture();
             }
-            if (audioController != null) audioController.PlayUpgradeResult(unlocked);
+            if (AudioService != null) AudioService.PlayUpgradeResult(unlocked);
             return unlocked;
         }
 
@@ -430,9 +700,9 @@ namespace RacingGame
                 skinManager = GetOrAdd(skinManager);
             }
             bool changed = skinManager.SelectSkin(brand, playerCar);
-            if (changed && audioController != null)
+            if (changed && AudioService != null)
             {
-                audioController.PlayUpgradeResult(true);
+                AudioService.PlayUpgradeResult(true);
             }
             return changed;
         }
@@ -504,9 +774,9 @@ namespace RacingGame
             {
                 ApplyPlayerUpgrades();
             }
-            if (audioController != null)
+            if (AudioService != null)
             {
-                audioController.PlayUpgradeResult(bought);
+                AudioService.PlayUpgradeResult(bought);
             }
             return bought;
         }
@@ -517,12 +787,13 @@ namespace RacingGame
             {
                 _upgradeSystem.ResetProgress();
             }
+            EnsureMidRaceSaveService().ClearSavedRace();
             if (mapManager != null)
             {
                 mapManager.ResetProgress();
                 ApplyActiveMapSettings();
                 ApplyDifficultyToAI();
-                raceHud?.RebuildMinimapTexture();
+                if (raceHud != null) raceHud.RebuildMinimapTexture();
             }
             ApplyPlayerUpgrades();
         }
@@ -535,7 +806,10 @@ namespace RacingGame
                 {
                     playerCar.SetBaseStatsAsset(defaultVehicleStats);
                 }
-                _upgradeSystem.SetBaseStats(playerCar.BaseStats);
+                VehicleStats baseStats = playerCar.BaseStatsAsset != null
+                    ? playerCar.BaseStatsAsset.Stats
+                    : (_balanceConfig != null ? VehicleStats.FromPure(_balanceConfig.defaultVehicleStats) : playerCar.BaseStats);
+                _upgradeSystem.SetBaseStats(baseStats);
                 _upgradeSystem.ApplyToCar(playerCar.Physics);
             }
         }
@@ -626,9 +900,9 @@ namespace RacingGame
                 if (car.LastInput.kick && car.CanKick)
                 {
                     int kickSide = ChooseKickDirection(car);
-                    if (car.TryStartKick(kickSide) && car == playerCar && audioController != null)
+                    if (car.TryStartKick(kickSide) && car == playerCar && AudioService != null)
                     {
-                        audioController.PlayKick(false);
+                        AudioService.PlayKick(false);
                     }
                 }
             }
@@ -673,25 +947,40 @@ namespace RacingGame
             _lastPrizeEarned = _upgradeSystem != null
                 ? _upgradeSystem.AwardRaceResult(_lastFinishPosition, p.FinishTime, rewardMult)
                 : 0;
+
+            string mapId = activeMap != null ? activeMap.MapId : "city_morning";
+            if (_upgradeSystem != null && p.IsFinished && p.FinishTime > 0f)
+            {
+                _upgradeSystem.RecordHighScore(mapId, playerCar.RacerName, p.FinishTime, totalLaps, difficulty);
+            }
             if (activeMap != null && p.IsFinished)
             {
                 mapManager.RecordBestTime(activeMap.MapId, p.FinishTime);
             }
+            EnsureMidRaceSaveService().ClearSavedRace();
         }
 
         public void SetEngineSoundActive(bool active)
         {
-            if (audioController != null)
+            if (AudioService != null)
             {
-                audioController.SetEngineActive(active);
+                AudioService.SetEngineActive(active);
+            }
+        }
+
+        public void SetBgmActive(bool active)
+        {
+            if (AudioService != null)
+            {
+                AudioService.SetBgmActive(active);
             }
         }
 
         public void PlayCountdownBeep(bool isGo)
         {
-            if (audioController != null)
+            if (AudioService != null)
             {
-                audioController.PlayCountdown(isGo);
+                AudioService.PlayCountdown(isGo);
             }
         }
 
@@ -815,100 +1104,71 @@ namespace RacingGame
 
         private void Update()
         {
-            if (CurrentFlowState == GameFlowState.Countdown)
+            IInputProvider input = InputProvider;
+            if (input != null && input.WasMutePressed() && AudioService != null)
             {
-                var kb = UnityEngine.InputSystem.Keyboard.current;
-                if (kb != null && (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame))
-                {
-                    TogglePause();
-                    return;
-                }
+                AudioService.ToggleMute();
             }
 
             if (_isPaused)
             {
-                var kb = UnityEngine.InputSystem.Keyboard.current;
-                if (kb != null && (kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame))
+                if (input != null && input.WasPausePressed())
                 {
                     ResumeGame();
                 }
                 return;
             }
 
-            _currentState?.Update(this, Time.deltaTime);
+            if (_currentState != null)
+            {
+                _currentState.Update(this, Time.deltaTime);
+            }
 
-            if (audioController != null && playerCar != null &&
+            if (AudioService != null && playerCar != null &&
                 (CurrentFlowState == GameFlowState.Racing || CurrentFlowState == GameFlowState.Countdown))
             {
                 float speedNorm = playerCar.Physics.Speed / Mathf.Max(1f, playerCar.Physics.MaxSpeed);
-                audioController.UpdateEnginePitch(speedNorm, playerCar.LastInput.throttle);
+                AudioService.UpdateEnginePitch(speedNorm, playerCar.LastInput.throttle);
             }
         }
 
         private void FixedUpdate()
         {
             if (_isPaused) return;
-            _currentState?.FixedUpdate(this, Time.fixedDeltaTime);
+            if (_currentState != null)
+            {
+                _currentState.FixedUpdate(this, Time.fixedDeltaTime);
+            }
         }
 
         private void ResolveVehicleCollisions()
         {
-            for (int i = 0; i < _allCars.Count; i++)
-            {
-                Car a = _allCars[i];
-                if (a == null) continue;
-
-                for (int j = i + 1; j < _allCars.Count; j++)
-                {
-                    Car b = _allCars[j];
-                    if (b == null) continue;
-
-                    VehicleCollisionResult res = VehicleCollisionPhysics.Resolve(
-                        a.Physics.Position, a.Physics.Velocity, a.Physics.Mass, bikeCollisionRadius,
-                        b.Physics.Position, b.Physics.Velocity, b.Physics.Mass, bikeCollisionRadius,
-                        collisionRestitution, collisionFriction);
-
-                    if (!res.Collided) continue;
-
-                    a.ApplyPhysicalCollisionImpact(
-                        res.PositionDeltaA, res.VelocityDeltaA, res.AngularVelocityDeltaA, res.VerticalLaunchVelA);
-                    b.ApplyPhysicalCollisionImpact(
-                        res.PositionDeltaB, res.VelocityDeltaB, res.AngularVelocityDeltaB, res.VerticalLaunchVelB);
-
-                    if (res.NormalImpulse > 120f)
-                    {
-                        RacersCollided?.Invoke(a, b, res.ContactPoint);
-
-                        if ((a == playerCar || b == playerCar) && audioController != null)
-                        {
-                            audioController.PlayCollision();
-                        }
-                    }
-                }
-            }
+            CombatService.ResolveVehicleCollisions(
+                _allCars,
+                bikeCollisionRadius,
+                collisionRestitution,
+                collisionFriction,
+                playerCar,
+                AudioService,
+                (a, b, pt) => RacersCollided?.Invoke(a, b, pt));
         }
 
         private int ChooseKickDirection(Car attacker)
         {
-            return FindBestKickDirection(attacker, _allCars, kickReachForward, kickReachLateral, ref _fallbackKickSide);
+            return CombatService.FindBestKickDirection(
+                attacker, _allCars, kickReachForward, kickReachLateral, ref _fallbackKickSide);
         }
 
         private void ResolveKickAttacks()
         {
-            for (int i = 0; i < _allCars.Count; i++)
-            {
-                Car attacker = _allCars[i];
-                Car hitTarget = TryResolveKickHit(attacker, _allCars, kickReachForward, kickReachLateral, kickLateralImpulse, out Vector2 hitPos);
-                if (hitTarget != null)
-                {
-                    RacerKicked?.Invoke(attacker, hitTarget, hitPos);
-
-                    if ((attacker == playerCar || hitTarget == playerCar) && audioController != null)
-                    {
-                        audioController.PlayKick(true);
-                    }
-                }
-            }
+            CombatService.ResolveKickAttacks(
+                _allCars,
+                kickReachForward,
+                kickReachLateral,
+                kickLateralImpulse,
+                playerCar,
+                AudioService,
+                (att, hit, pt) => RacerKicked?.Invoke(att, hit, pt));
         }
 
         public static int FindBestKickDirection(
@@ -918,39 +1178,8 @@ namespace RacingGame
             float lateralReach,
             ref int fallbackSide)
         {
-            Vector2 fwd = attacker.Physics.Forward;
-            Vector2 right = attacker.Physics.Right;
-            float bestDistSq = float.MaxValue;
-            int bestSide = 0;
-
-            for (int i = 0; i < allCars.Count; i++)
-            {
-                Car target = allCars[i];
-                if (target == null || target == attacker) continue;
-
-                Vector2 rel = target.Physics.Position - attacker.Physics.Position;
-                float localFwd = Vector2.Dot(rel, fwd);
-                float localLat = Vector2.Dot(rel, right);
-
-                if (Mathf.Abs(localFwd) <= forwardReach + 0.8f && Mathf.Abs(localLat) <= lateralReach + 1.0f)
-                {
-                    float d2 = rel.sqrMagnitude;
-                    if (d2 < bestDistSq)
-                    {
-                        bestDistSq = d2;
-                        bestSide = localLat >= 0f ? 1 : -1;
-                    }
-                }
-            }
-
-            if (bestSide != 0) return bestSide;
-            if (Mathf.Abs(attacker.LastInput.steering) > 0.15f)
-            {
-                return attacker.LastInput.steering > 0f ? 1 : -1;
-            }
-
-            fallbackSide = -fallbackSide;
-            return fallbackSide;
+            return RaceCombatSystem.FindBestKickDirectionStatic(
+                attacker, allCars, forwardReach, lateralReach, ref fallbackSide);
         }
 
         public static Car TryResolveKickHit(
@@ -961,83 +1190,83 @@ namespace RacingGame
             float lateralImpulse,
             out Vector2 hitPos)
         {
-            hitPos = Vector2.zero;
-            if (attacker == null || !attacker.IsKicking || attacker.HasKickHitThisSwing) return null;
-            if (attacker.KickProgress < 0.16f || attacker.KickProgress > 0.88f) return null;
+            return RaceCombatSystem.TryResolveKickHitStatic(
+                attacker, allCars, forwardReach, lateralReach, lateralImpulse, out hitPos);
+        }
 
-            Vector2 fwd = attacker.Physics.Forward;
-            Vector2 right = attacker.Physics.Right;
-            Car bestTarget = null;
-            float bestDistSq = float.MaxValue;
-
-            for (int j = 0; j < allCars.Count; j++)
+        private void BindSystemEvents()
+        {
+            if (lapManager != null)
             {
-                Car target = allCars[j];
-                if (target == null || target == attacker) continue;
-
-                Vector2 rel = target.Physics.Position - attacker.Physics.Position;
-                float localFwd = Vector2.Dot(rel, fwd);
-                float sideLat = Vector2.Dot(rel, right) * attacker.KickDirection;
-
-                if (Mathf.Abs(localFwd) <= forwardReach && sideLat >= -0.45f && sideLat <= lateralReach)
-                {
-                    float d2 = rel.sqrMagnitude;
-                    if (d2 < bestDistSq)
-                    {
-                        bestDistSq = d2;
-                        bestTarget = target;
-                    }
-                }
+                lapManager.CheckpointPassed += OnCheckpointPassedAudio;
+                lapManager.LapCompleted += OnLapCompletedAudio;
+                lapManager.RacerFinished += OnRacerFinishedAudio;
             }
-
-            if (bestTarget == null) return null;
-
-            Vector2 impulse = right * (attacker.KickDirection * lateralImpulse);
-            bestTarget.ReceiveKick(attacker.KickDirection, impulse, 0.45f);
-            attacker.ApplyCollisionPush(Vector2.zero, -right * (attacker.KickDirection * 2.4f));
-            attacker.MarkKickHit();
-
-            hitPos = (attacker.Physics.Position + bestTarget.Physics.Position) * 0.5f;
-            return bestTarget;
+            if (policeController != null)
+            {
+                policeController.PoliceEngaged += OnPoliceEngaged;
+            }
+            if (skinManager != null)
+            {
+                skinManager.SkinChanged += OnSkinChanged;
+            }
         }
 
-        private void BindAudioEvents()
+        private void UnbindSystemEvents()
         {
-            if (lapManager == null) return;
-            lapManager.CheckpointPassed += OnCheckpointPassedAudio;
-            lapManager.LapCompleted += OnLapCompletedAudio;
-            lapManager.RacerFinished += OnRacerFinishedAudio;
-        }
-
-        private void UnbindAudioEvents()
-        {
-            if (lapManager == null) return;
-            lapManager.CheckpointPassed -= OnCheckpointPassedAudio;
-            lapManager.LapCompleted -= OnLapCompletedAudio;
-            lapManager.RacerFinished -= OnRacerFinishedAudio;
+            if (lapManager != null)
+            {
+                lapManager.CheckpointPassed -= OnCheckpointPassedAudio;
+                lapManager.LapCompleted -= OnLapCompletedAudio;
+                lapManager.RacerFinished -= OnRacerFinishedAudio;
+            }
+            if (policeController != null)
+            {
+                policeController.PoliceEngaged -= OnPoliceEngaged;
+            }
+            if (skinManager != null)
+            {
+                skinManager.SkinChanged -= OnSkinChanged;
+            }
         }
 
         private void OnCheckpointPassedAudio(RacerProgress progress, Checkpoint cp)
         {
-            if (progress.Car == playerCar && !cp.IsFinishLine && audioController != null)
+            if (progress.Car == playerCar && !cp.IsFinishLine && AudioService != null)
             {
-                audioController.PlayCheckpoint();
+                AudioService.PlayCheckpoint();
             }
         }
 
         private void OnLapCompletedAudio(RacerProgress progress)
         {
-            if (progress.Car == playerCar && !progress.IsFinished && audioController != null)
+            if (progress.Car == playerCar && !progress.IsFinished && AudioService != null)
             {
-                audioController.PlayLapCompleted();
+                AudioService.PlayLapCompleted();
             }
         }
 
         private void OnRacerFinishedAudio(RacerProgress progress)
         {
-            if (progress.Car == playerCar && audioController != null)
+            if (progress.Car == playerCar && AudioService != null)
             {
-                audioController.PlayRaceFinished();
+                AudioService.PlayRaceFinished();
+            }
+        }
+
+        private void OnPoliceEngaged(Car copCar)
+        {
+            if (copCar != null)
+            {
+                _policeEngagementCount++;
+            }
+        }
+
+        private void OnSkinChanged(BikeSkinData newSkin)
+        {
+            if (playerCar != null && newSkin != null)
+            {
+                playerCar.ApplySkin(newSkin);
             }
         }
     }

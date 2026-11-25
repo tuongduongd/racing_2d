@@ -1,5 +1,5 @@
 """
-Script Python điền sẵn mức tự đánh giá lần 1 (trung thực theo hiện trạng mã nguồn)
+Script Python điền mức tự đánh giá sau nâng cấp (trung thực theo hiện trạng mã nguồn & kết quả kiểm chứng)
 và cột Minh chứng vào sheet "Nhóm 01 người" của Checklist_BTL_Game_v2026.xlsx.
 
 Không phụ thuộc thư viện ngoài (chỉ dùng zipfile, re, xml.sax.saxutils trong stdlib),
@@ -25,116 +25,117 @@ HEADER_UPDATES = {
     "A4": (
         "Mã nhóm: Nhóm 01 SV   Tên đề tài: Road Rash 2D: Đại Chiến Shipper (newbie)   "
         "Phân nhánh: Nhánh 1 - Đua xe Real-time (Vật lý 2D & AI)   "
-        "SV (MSSV – Họ tên): [SV tự điền]   Git: tungduongd (20 commits)"
+        "SV (MSSV – Họ tên): [SV tự điền]   Git: tungduongd (22 commits + bản nâng cấp)"
     ),
     "A5": (
-        "TỰ KÊ KHAI KHỐI LƯỢNG (SV điền): Thể loại/PCU: Đua xe Pseudo-3D (4 Map SO + Police Chase + Kick + Garage + 4 Skin + 2D Art/Shader CRT) | "
-        "UC: 9 UC | Entity/UML: 40 runtime + 3 editor / 26+ lớp | Thuật toán/AI: 4 | GoF: 3 mẫu (State, Strategy, Observer) | "
-        "Tests: 84 EditMode PASS (18 files, 4.270s) | Git: 20 commits (Nâng cấp Stage 1-5)"
+        "TỰ KÊ KHAI KHỐI LƯỢNG (SV điền): Thể loại/PCU: Đua xe Pseudo-3D (4 Map JSON + Config JSON + Mid-Race Save + Police + Kick + Garage + 4 Skin + CRT + BGM) | "
+        "UC: 9 UC | Entity/UML: 4 .asmdef, 71 runtime (25 Pure Core 0 UnityEngine + 6 Adapters + 40 Game) + 3 Editor / 30+ lớp | "
+        "Thuật toán/AI: 5 thuật toán + O(.) | GoF: 6 mẫu đủ 3 nhóm (Factory, Decorator, Adapter, State, Strategy, Observer) | "
+        "Tests: 109/109 EditMode PASS (20 files, 4.342s, 0 warnings) | Build: Builds/RoadRash2D/RoadRash2D.exe"
     ),
 }
 
 # (row, ma_tieu_chi, diem_chu, check_x, minh_chung)
 SELF_ASSESSMENT = [
     (
-        8, "1.1", "B", "X",
-        "Mục 2.1, 8.2 BC | TrackDefinition.cs; Map_01..04.asset; PoliceChaseController.cs | "
-        "4 Map SO (2-6 làn) + Cảnh sát + 3 mức AI + 9 UC (thiếu map JSON rời)",
+        8, "1.1", "A", "X",
+        "Mục 2.1, 8.2 BC | 01..04_*.json; TrackDefinition.cs; PoliceChaseController.cs; RaceCombatSystem.cs | "
+        "4 Map JSON (2-6 làn) + Cảnh sát truy đuổi + Đá đối thủ + 3 mức AI + 9 UC",
     ),
     (
-        9, "1.2", "C", "",
-        "Mục 8.2 BC | CarUpgradeSystem.cs; MapManager.cs; SkinManager.cs | "
-        "Lưu JSON racing2d_save.json + PlayerPrefs (thiếu Save giữa trận & JSON map)",
+        9, "1.2", "A", "X",
+        "Mục 8.2 BC | ExternalJsonTrackLoader.cs; ExternalBalanceConfigLoader.cs; MidRaceSaveService.cs; PauseMenuUI.cs; GameMenuUI.cs | "
+        "4 Map JSON + game_balance.json + Save/Load giữa trận (Mid-Race) + HighScoreEntry top điểm",
     ),
     (
-        10, "1.3", "B", "X",
-        "Mục 7, 8.2 BC; EXPERIMENT.md | AIRacerDriver.cs; PoliceRacerDriver.cs; TrackObstacleSystem.cs | "
-        "2 AI riêng, 5 vật cản, 4 nâng cấp, Benchmark 3 vòng 2 map đạt 100%",
+        10, "1.3", "A", "X",
+        "Mục 2.4, 7, 8.2 BC; game_balance.json; EXPERIMENT.md | AIRacerDriver.cs; PoliceRacerDriver.cs; PoliceInterceptorDecorator | "
+        "Bảng cân bằng chi tiết, 2 AI riêng, 5 vật cản, 4 Upgrade Tiers, Benchmark 100% winnable",
     ),
     (
-        11, "1.4", "D", "",
-        "Docs/README.md; .gitignore | Git log | "
-        ".gitignore chuẩn Unity/VS (0 Library/Temp/obj); 20 commits (thiếu README gốc, Build sạch, Video)",
+        11, "1.4", "B", "X",
+        "README.md; .gitignore; Builds/RoadRash2D/RoadRash2D.exe | RoadRashSceneSetup.BuildWindowsRelease() | "
+        "README gốc đủ hướng dẫn, Build Windows sạch + StreamingAssets/, .gitignore chuẩn, 22+ commits (chờ SV quay Video 3-5p & xuất Slide PPTX; lịch sử git 10 ngày < 3 tuần)",
     ),
     (
-        12, "2.1", "B", "X",
+        12, "2.1", "A", "X",
         "Mục 6, 8.2 BC | LobbyUiBuilder.cs; GarageUiBuilder.cs; GameMenuUI.cs; RaceHUD.cs; PauseMenuUI.cs; CrtScanlineController.cs; RaceVfxController.cs; RaceAudioController.cs | "
-        "uGUI+TMP Cyber Arcade đủ luồng (Font VN, CRT Scanline, URP Bloom, 25 asset Assets/Art/, 11 SFX phím M; thiếu BGM)",
+        "uGUI+TMP Cyber Arcade đủ luồng (Save/Continue/Replay reset sạch), BGM Synthwave 120 BPM + 11 SFX + PlayerPrefs Volume/Mute, URP Bloom + CRT",
     ),
     (
-        13, "2.2", "C", "",
-        "Mục 8.2, 9 BC | Car.cs; AIRacerDriver.cs; CarUpgradeSystem.cs; BikePaletteSwapper.cs; RaceHUD.cs; TC-09,29,61,75,82 | "
-        "0 catch {} rỗng, fallback null/non-readable an toàn, kẹp JSON lỗi, STUCK=0 (chưa có cây CustomException)",
+        13, "2.2", "A", "X",
+        "Mục 3.4, 8.2, 9 BC; BUG_LOG.md | GameDomainException.cs (+4 lớp con); CarUpgradeSystem.cs (LoadStrict, BuyUpgradeStrict); CollisionSolverMath.cs | "
+        "Cây GameDomainException đầy đủ, 0 catch {} rỗng, fallback/clamping an toàn JSON hỏng, vật lý va chạm Newton + wall-slide",
     ),
     (
-        14, "2.3", "B", "X",
-        "Mục 2.3 NFR-01 BC | GameManager.cs; RoadRashRenderer2D.cs (_opponentPool, _propPool); BikePaletteSwapper.cs; CrtScanlineController.cs | "
-        "FixedUpdate 50Hz, Object Pool sprite, Palette Swap cache Dictionary (0 alloc Update), tự dọn Material OnDestroy",
+        14, "2.3", "A", "X",
+        "Mục 2.3 NFR-01 BC | GameManager.cs; RoadRashRenderer2D.cs (_opponentPool, _propPool); BikePaletteSwapper.cs; StreamingAssets/ | "
+        "FixedUpdate 50Hz, Object Pool sprite, Palette Swap cache Dictionary (0 alloc Update), nạp JSON đường dẫn tương đối StreamingAssets/",
     ),
     (
-        15, "2.4", "B", "X",
-        "Mục 8.1 BC | Assets/Scripts/ (14 thư mục, 3 .asmdef, 40 runtime + 3 editor .cs) | "
-        "Đã xóa Assets/Welcome/ (Welcome2DScript.cs), tách SRP LobbyUiBuilder/GarageUiBuilder, 0 lỗi biên dịch, 0 warning",
+        15, "2.4", "A", "X",
+        "Mục 8.1 BC | Assets/Scripts/ (4 .asmdef, 71 runtime + 3 Editor .cs) | "
+        "SRP RaceCombatSystem/Builders, 0 lỗi biên dịch, 0 CS warnings, 0 UAC1001 ([Serializable] VehicleInput), 0 ?. trên UnityEngine.Object, đã xóa Assets/Welcome/",
     ),
     (
         16, "3.1", "A", "X",
-        "Mục 2, 5.1 BC | GameManager.cs; LapCheckpointManager.cs; CarUpgradeSystem.cs | "
-        "9 UC ánh xạ 1-1; FixedUpdate rõ; 0 luật thắng/tiền ẩn trong UI",
+        "Mục 2, 5.1 BC | GameManager.cs; LapCheckpointManager.cs; CarUpgradeSystem.cs; ProgressionRuleEngine.cs | "
+        "9 UC ánh xạ 1-1; FixedUpdate 50Hz rõ; 0 luật thắng/tiền ẩn trong UI",
     ),
     (
-        17, "3.2", "B", "X",
-        "Mục 4, 8.2 BC | Car, VehiclePhysics, VehicleStats, Driver, Checkpoint, RacerProgress, TrackDefinition... | "
-        ">=12 lớp Entity/VO thực chất (chưa nạp JSON ngoài)",
+        17, "3.2", "A", "X",
+        "Mục 4, 8.2 BC | Core/Pure/Domain/ (17 files) + TrackDefinition + Car + Driver + StreamingAssets/*.json | "
+        ">=17 lớp Entity/VO/Enum thực chất + nạp Map JSON & game_balance.json ngoài",
     ),
     (
-        18, "3.3", "B", "X",
-        "Mục 7 BC | AIRacerDriver.cs; PoliceRacerDriver.cs; Checkpoint.cs; WaypointTrack.cs; InputHandler.cs | "
-        "4 thuật toán lõi + tách InputHandler (phím Esc/P/M đọc ở Manager)",
+        18, "3.3", "A", "X",
+        "Mục 7 BC | CollisionSolverMath.cs; CheckpointGateMath.cs; WaypointTrack.cs; ProgressionRuleEngine.cs; InputHandler.cs | "
+        "5 thuật toán lõi kèm bảng độ phức tạp O(.); cô lập Keyboard.current 100% chỉ còn trong InputHandler.cs (0 đọc phím trong GameState/Audio/UI)",
     ),
     (
-        19, "4.1", "C", "",
-        "Mục 4 BC | BAO_CAO_KIEN_TRUC_OOP.md (26 lớp) <-> Assets/Scripts/ | "
-        "26 lớp, 0 lớp ma (lệch GameManager *-- RaceStateBase & thiếu mũi tên Realization)",
+        19, "4.1", "A", "X",
+        "Mục 4.1 BC | BAO_CAO_KIEN_TRUC_OOP.md (30+ lớp) <-> Assets/Scripts/ | "
+        "30+ lớp thật, 0 lớp ma, đủ 6/6 quan hệ UML (Realization ..|>, Inheritance, sửa GameManager o-- GameState)",
     ),
     (
-        20, "4.2", "B", "X",
-        "Mục 5, 6 BC | GameManager.cs; GameState.cs | "
-        "1 State Diagram + 2 Sequence Diagrams khớp chuỗi gọi hàm (cần thêm [Guard])",
+        20, "4.2", "A", "X",
+        "Mục 5, 6 BC | GameState.cs; RaceStateTransitionRules.cs; PauseMenuUI.cs; MidRaceSaveService.cs | "
+        "1 State Diagram đủ [Guard] / Action + 2 Sequence Diagrams khớp call stack DI & Mid-Race Save",
     ),
     (
-        21, "4.3", "D", "",
-        "Mục 8.1 BC | RacingGame.asmdef (36 runtime .cs) | "
-        "0 Circular Dependency nhưng 35/36 file có using UnityEngine & thiếu Package Diagram",
+        21, "4.3", "A", "X",
+        "Mục 4.2, 8.1 BC | RacingGame.Core.asmdef (noEngineReferences: true); Core/Adapters/ | "
+        "Package Diagram 3 tầng; 25 Pure Core files với 0 using UnityEngine (TC-91 PASS), 0 Circular Dependency",
     ),
     (
         22, "4.4", "A", "X",
-        "Mục 3 BC | VehicleStats.cs; CarUpgradeSystem.cs; LapCheckpointManager.cs; Driver.cs; GameState.cs | "
-        ">=5 bất biến miền, LSP chuẩn, 0 downcast as, 0 override rỗng",
+        "Mục 3 BC | VehicleStatsDecorators.cs; ProgressionRuleEngine.cs; Driver.cs (UsesArcadeAssist); GameState.cs (RemainingCountdown) | "
+        "Bất biến miền chặt, LSP chuẩn đa hình, 0 downcast is PlayerDriver / is CountdownState, 0 override rỗng",
     ),
     (
-        23, "4.5", "D", "",
-        "GameManager.cs (965 dòng); Assets/Scripts/ | "
-        "0 custom interface; GameManager ôm nhiều vai trò & new CarUpgradeSystem() trực tiếp",
+        23, "4.5", "A", "X",
+        "Mục 3, 4 BC | Core/Pure/Contracts/ (8+ Interfaces); GameManager.ConfigureServices; RaceCombatSystem.cs | "
+        "SRP tách Combat/Progression/MidRaceSave, 8 ISP interfaces, Constructor/Method DI Composition Root",
     ),
     (
-        24, "4.6", "C", "",
-        "Mục 3, 4, 6 BC | RaceStateBase (State); Driver & IComparer (Strategy); C# event (Observer) | "
-        "3 mẫu GoF chạy thật qua Call Stack, nhưng cùng 1 nhóm Behavioral",
+        24, "4.6", "A", "X",
+        "Mục 4.3 BC | TrackObstacleFactory (Factory); VehicleStatsDecorators (Decorator); File/Json/Audio/Track Adapters; GameState; Driver; Observer events | "
+        "6 mẫu GoF phủ đủ cả 3 nhóm (Creational, Structural, Behavioral) + Test kiểm chứng mở rộng OCP & Live Swap",
     ),
     (
-        25, "5.1", "B", "X",
-        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (18 files) | "
-        "84/84 EditMode Tests PASS (4.270s), có StubDriver, phủ biên BVA, JSON lỗi, Art/Palette/CRT/TMP UI",
+        25, "5.1", "A", "X",
+        "Mục 9 BC; TEST_CASES.md | PureCoreArchitectureAndDipTests.cs; ExternalJsonMidRaceSaveAndBgmTests.cs (20 test files, 109 tests) | "
+        "109/109 PASS (4.342s), Ma trận EP/BVA/State/Exception/Integration, 4 Stub/Fake qua Interface (InMemorySaveStorage, FakeInputProvider, FakeTrackDataProvider, StubDriver)",
     ),
     (
-        26, "5.2", "C", "",
-        "Mục 9 BC; BUG_LOG.md | TC-25,29,32,42,61,69,70,82 | "
-        "Có >=4 Integration Tests + test hủy Observer (TC-82 OnDisable/OnDestroy) PASS; thiếu Playtest >=8 ca & Bug Log mở rộng",
+        26, "5.2", "A", "X",
+        "Mục 9 BC; BUG_LOG.md | TC-82, TC-109 (Observer); Mid-Race Save Round-Trip; External JSON Tests | "
+        "Integration Round-Trip + test hủy PoliceEngaged/SkinChanged ở OnDisable/OnDestroy PASS, 6 Bug Log 6 cột + 10 kịch bản Playtest PT-01..PT-10",
     ),
     (
         27, "5.3", "A", "X",
-        "Mục 9 BC; TEST_CASES.md | Assets/Tests/EditMode/ (18 files, 84 tests) | "
-        "84/84 Automated Tests PASS 100%, Assertion thực chất kiểm chứng physics/AI/UI/View!=Logic/font VN",
+        "Mục 9 BC; TEST_CASES.md; BUG_LOG.md; Logs/EditModeResults.xml | 20 files, 109 tests | "
+        "109/109 Automated Tests PASS 100% (0 Failed, 0 Skipped, 0 Warning) + 3 kịch bản Fault-Injection kiểm chứng thực chất",
     ),
 ]
 
@@ -166,6 +167,16 @@ def set_cell_shared_string(sheet_xml: str, ref: str, ss_idx: int) -> str:
         raise ValueError(f"Không tìm thấy ô {ref} trong sheet1.xml")
     attrs = re.sub(r'\s+t="[^"]*"', "", m.group(1))
     replacement = f'<c r="{ref}"{attrs} t="s"><v>{ss_idx}</v></c>'
+    return sheet_xml[:m.start()] + replacement + sheet_xml[m.end():]
+
+
+def clear_cell_value(sheet_xml: str, ref: str) -> str:
+    pattern = re.compile(rf'<c r="{ref}"([^>]*?)(?:/>|>.*?</c>)')
+    m = pattern.search(sheet_xml)
+    if not m:
+        return sheet_xml
+    attrs = re.sub(r'\s+t="[^"]*"', "", m.group(1))
+    replacement = f'<c r="{ref}"{attrs}/>'
     return sheet_xml[:m.start()] + replacement + sheet_xml[m.end():]
 
 
@@ -230,6 +241,8 @@ def main() -> None:
             sst_xml, x_idx = append_shared_string(sst_xml, check_mark)
             sheet1_xml = set_cell_shared_string(sheet1_xml, f"G{row}", x_idx)
             check_count += 1
+        else:
+            sheet1_xml = clear_cell_value(sheet1_xml, f"G{row}")
 
         sst_xml, h_idx = append_shared_string(sst_xml, evidence)
         sheet1_xml = set_cell_shared_string(sheet1_xml, f"H{row}", h_idx)
@@ -249,6 +262,34 @@ def main() -> None:
     final_score = min(total, 10, epistemic_cap)
     final_rounded = round(final_score * 2.0) / 2.0
 
+    def classify_letter_grade(score: float) -> str:
+        if score < 4.0:
+            return "Xếp loại: F (Trượt)"
+        if score < 5.0:
+            return "Xếp loại: D"
+        if score < 5.5:
+            return "Xếp loại: D+"
+        if score < 6.5:
+            return "Xếp loại: C"
+        if score < 7.0:
+            return "Xếp loại: C+"
+        if score < 8.0:
+            return "Xếp loại: B"
+        if score < 8.5:
+            return "Xếp loại: B+"
+        if score < 9.5:
+            return "Xếp loại: A"
+        return "Xếp loại: A+"
+
+    def classify_band(score: float) -> str:
+        if score < 5.5:
+            return "Yếu / Kém"
+        if score < 7.0:
+            return "Trung bình"
+        if score < 8.5:
+            return "Khá"
+        return "Xuất sắc / Giỏi"
+
     sheet1_xml = set_formula_cached_value(sheet1_xml, "E28", "Đủ 20/20", is_string=True)
     sheet1_xml = set_formula_cached_value(sheet1_xml, "F28", total, is_string=False)
     sheet1_xml = set_formula_cached_value(sheet1_xml, "G28", check_count, is_string=False)
@@ -256,9 +297,9 @@ def main() -> None:
     sheet1_xml = set_formula_cached_value(sheet1_xml, "F30", epistemic_cap, is_string=False)
     sheet1_xml = set_formula_cached_value(sheet1_xml, "E31", "Không bị chặn" if final_score >= total else "Bị giới hạn trần", is_string=True)
     sheet1_xml = set_formula_cached_value(sheet1_xml, "F31", final_score, is_string=False)
-    sheet1_xml = set_formula_cached_value(sheet1_xml, "G31", "Trung bình" if 5.5 <= final_rounded < 7 else ("Khá" if final_rounded < 8.5 else "Xuất sắc / Giỏi"), is_string=True)
+    sheet1_xml = set_formula_cached_value(sheet1_xml, "G31", classify_band(final_rounded), is_string=True)
     sheet1_xml = set_formula_cached_value(sheet1_xml, "F32", final_rounded, is_string=False)
-    sheet1_xml = set_formula_cached_value(sheet1_xml, "G32", "Xếp loại: C+" if 6.5 <= final_rounded < 7 else "Xếp loại: B", is_string=True)
+    sheet1_xml = set_formula_cached_value(sheet1_xml, "G32", classify_letter_grade(final_rounded), is_string=True)
 
     summary_rows = [
         (30, truc1, 4.0),

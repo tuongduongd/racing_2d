@@ -2,6 +2,7 @@
   "name": "RacingGame.Editor",
   "rootNamespace": "RacingGame.Editor",
   "references": [
+    "RacingGame.Core",
     "RacingGame",
     "Unity.InputSystem",
     "Unity.RenderPipelines.Core.Runtime",
